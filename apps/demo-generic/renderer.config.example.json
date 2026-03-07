@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "assistant": {
+    "name": "Demo Assistant",
+    "locale": "en-US"
+  },
+  "links": {
+    "appUrl": "/app/demo-assistant"
+  },
+  "avatar": {
+    "manifestUrl": "./avatar.manifest.example.json"
+  },
+  "scene": {
+    "configUrl": "./scene.example.json"
+  },
+  "state": {
+    "provider": "json",
+    "stateUrl": "./state.example.json",
+    "idleLinesUrl": "./idle-lines.example.json"
+  },
+  "control": {
+    "provider": "json",
+    "controlUrl": "./control.example.json"
+  }
+}
+

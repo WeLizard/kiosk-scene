@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "rotation": {
+    "order": [
+      "weather",
+      "week",
+      "home"
+    ],
+    "defaultDwellSeconds": 18
+  },
+  "pages": [
+    {
+      "id": "weather",
+      "kind": "overview",
+      "title": "Weather"
+    },
+    {
+      "id": "week",
+      "kind": "forecast+cards",
+      "title": "Week Rhythm",
+      "cardStyle": "mini",
+      "cards": [
+        {
+          "type": "text",
+          "caption": "Sunrise",
+          "value": "07:12",
+          "hint": "first light tomorrow"
+        },
+        {
+          "type": "text",
+          "caption": "Sunset",
+          "value": "18:42",
+          "hint": "blue hour begins"
+        },
+        {
+          "type": "text",
+          "caption": "Errands",
+          "value": "3 items",
+          "hint": "shopping list is still open"
+        },
+        {
+          "type": "text",
+          "caption": "Rain Risk",
+          "value": "28%",
+          "hint": "light showers on Thursday"
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "kind": "cards",
+      "title": "Home",
+      "cardStyle": "full",
+      "cards": [
+        {
+          "type": "text",
+          "caption": "Network",
+          "value": "Online",
+          "hint": "latency stays low"
+        },
+        {
+          "type": "text",
+          "caption": "Lights",
+          "value": "2 active",
+          "hint": "kitchen and desk"
+        },
+        {
+          "type": "text",
+          "caption": "Battery",
+          "value": "84%",
+          "hint": "phone is charging slowly"
+        },
+        {
+          "type": "text",
+          "caption": "Climate",
+          "value": "22 C",
+          "hint": "steady indoor comfort"
+        }
+      ]
+    }
+  ]
+}

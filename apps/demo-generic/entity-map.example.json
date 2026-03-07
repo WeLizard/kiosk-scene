@@ -1,0 +1,12 @@
+{
+  "online": "input_boolean.assistant_online",
+  "busy": "input_boolean.assistant_busy",
+  "status": "input_text.assistant_status",
+  "message": "input_text.assistant_message",
+  "source": "input_text.assistant_source",
+  "updatedAt": "input_text.assistant_updated_at",
+  "emotion": "input_text.assistant_emotion",
+  "motion": "input_text.assistant_motion",
+  "revision": "input_number.assistant_revision"
+}
+

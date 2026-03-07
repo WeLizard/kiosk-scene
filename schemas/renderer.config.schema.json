@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://welizard.dev/schemas/kiosk-scene/renderer.config.schema.json",
+  "title": "kiosk-scene renderer config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "assistant",
+    "avatar",
+    "scene",
+    "state",
+    "control"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "assistant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "locale": {
+          "type": "string"
+        }
+      }
+    },
+    "links": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "avatar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifestUrl"
+      ],
+      "properties": {
+        "manifestUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configUrl"
+      ],
+      "properties": {
+        "configUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "provider",
+        "stateUrl"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "json",
+            "ha"
+          ]
+        },
+        "stateUrl": {
+          "type": "string"
+        },
+        "haApiFallback": {
+          "type": "boolean"
+        },
+        "idleLinesUrl": {
+          "type": "string"
+        },
+        "entityMapUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "controlUrl"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "json"
+          ]
+        },
+        "controlUrl": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
+

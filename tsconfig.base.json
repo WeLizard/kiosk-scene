@@ -1,0 +1,54 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@kiosk-scene/core": [
+        "packages/core/src/index.ts"
+      ],
+      "@kiosk-scene/adapter-live2d": [
+        "packages/adapter-live2d/src/index.ts"
+      ],
+      "@kiosk-scene/adapter-unity-webgl": [
+        "packages/adapter-unity-webgl/src/index.ts"
+      ],
+      "@kiosk-scene/adapter-static": [
+        "packages/adapter-static/src/index.ts"
+      ],
+      "@kiosk-scene/shell-browser": [
+        "packages/shell-browser/src/index.ts"
+      ],
+      "@kiosk-scene/shell-browser/*": [
+        "packages/shell-browser/src/*"
+      ],
+      "@kiosk-scene/provider-ha": [
+        "packages/provider-ha/src/index.ts"
+      ],
+      "@kiosk-scene/provider-json": [
+        "packages/provider-json/src/index.ts"
+      ],
+      "@kiosk-scene/widgets-core": [
+        "packages/widgets-core/src/index.ts"
+      ]
+    },
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "packages/**/*.ts"
+  ]
+}

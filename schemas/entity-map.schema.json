@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://welizard.dev/schemas/kiosk-scene/entity-map.schema.json",
+  "title": "kiosk-scene Home Assistant entity map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "online",
+    "busy",
+    "status",
+    "message",
+    "source",
+    "updatedAt",
+    "revision"
+  ],
+  "properties": {
+    "online": { "type": "string" },
+    "busy": { "type": "string" },
+    "status": { "type": "string" },
+    "message": { "type": "string" },
+    "source": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "emotion": { "type": "string" },
+    "activity": { "type": "string" },
+    "cue": { "type": "string" },
+    "speaking": { "type": "string" },
+    "intensity": { "type": "string" },
+    "motion": { "type": "string" },
+    "revision": { "type": "string" }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "adapter": "static",
+  "assetRoot": "./assets",
+  "modelUrl": "./assets/avatar.png",
+  "entry": "./assets/avatar.png",
+  "fallbackPortrait": "./assets/avatar.png",
+  "presetThumbs": {
+    "full": "./assets/preset-full.svg",
+    "torso": "./assets/preset-torso.svg",
+    "head": "./assets/preset-head.svg"
+  },
+  "capabilities": {
+    "supportsEmotion": false,
+    "supportsMotion": false,
+    "supportsViewPresets": true,
+    "supportsLipSync": false,
+    "supportsPointerFocus": false
+  }
+}

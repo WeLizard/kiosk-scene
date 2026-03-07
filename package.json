@@ -1,0 +1,24 @@
+{
+  "name": "kiosk-scene",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Backend-agnostic kiosk scene engine for avatar-driven dashboards",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.6.0",
+  "scripts": {
+    "dev:demo": "pnpm --filter @kiosk-scene/demo-generic dev",
+    "build:demo": "pnpm --filter @kiosk-scene/demo-generic build",
+    "preview:demo": "pnpm --filter @kiosk-scene/demo-generic preview",
+    "validate:config": "node ./tools/validate-config.mjs",
+    "validate:demo": "node ./tools/validate-demo.mjs",
+    "typecheck:packages": "tsc -p tsconfig.base.json --noEmit",
+    "typecheck": "pnpm typecheck:packages && pnpm --filter @kiosk-scene/demo-generic typecheck",
+    "verify": "pnpm typecheck && pnpm validate:demo && pnpm build:demo"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.2"
+  }
+}

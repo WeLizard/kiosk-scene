@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "assistant": "Demo Assistant",
+  "online": true,
+  "busy": false,
+  "status": "Ready",
+  "message": "Waiting for input.",
+  "source": "demo",
+  "updatedAt": "2026-03-07T12:00:00Z",
+  "emotion": null,
+  "motion": null,
+  "revision": 1,
+  "event": "demo:boot"
+}
+

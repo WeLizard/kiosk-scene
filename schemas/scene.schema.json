@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://welizard.dev/schemas/kiosk-scene/scene.schema.json",
+  "title": "kiosk-scene scene v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "rotation",
+    "pages"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "rotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order",
+        "defaultDwellSeconds"
+      ],
+      "properties": {
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "defaultDwellSeconds": {
+          "type": "integer",
+          "minimum": 5
+        }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "kind",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "overview",
+              "cards",
+              "forecast+cards"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cardStyle": {
+            "type": "string",
+            "enum": [
+              "mini",
+              "full"
+            ]
+          },
+          "stampCaption": {
+            "type": "string"
+          },
+          "stampValue": {
+            "type": "string"
+          },
+          "cards": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

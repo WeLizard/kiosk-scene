@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.turbo/
+.cache/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+tmp/
+private/
+instances/*/private/
+

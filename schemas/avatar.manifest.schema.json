@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://welizard.dev/schemas/kiosk-scene/avatar.manifest.schema.json",
+  "title": "kiosk-scene avatar manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "adapter",
+    "assetRoot",
+    "capabilities"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "adapter": {
+      "type": "string",
+      "enum": [
+        "live2d",
+        "unity-webgl",
+        "static"
+      ]
+    },
+    "assetRoot": {
+      "type": "string"
+    },
+    "runtimeUrl": {
+      "type": "string"
+    },
+    "entry": {
+      "type": "string"
+    },
+    "modelUrl": {
+      "type": "string"
+    },
+    "fallbackPortrait": {
+      "type": "string"
+    },
+    "motionMapUrl": {
+      "type": "string"
+    },
+    "expressionMapUrl": {
+      "type": "string"
+    },
+    "presetThumbs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "viewPresets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supportsEmotion",
+        "supportsMotion",
+        "supportsViewPresets",
+        "supportsLipSync"
+      ],
+      "properties": {
+        "supportsEmotion": {
+          "type": "boolean"
+        },
+        "supportsMotion": {
+          "type": "boolean"
+        },
+        "supportsViewPresets": {
+          "type": "boolean"
+        },
+        "supportsLipSync": {
+          "type": "boolean"
+        },
+        "supportsPointerFocus": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

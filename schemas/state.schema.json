@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://welizard.dev/schemas/kiosk-scene/state.schema.json",
+  "title": "kiosk-scene state v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "version",
+    "revision"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "assistant": {
+      "type": "string",
+      "minLength": 1
+    },
+    "online": {
+      "type": "boolean"
+    },
+    "busy": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "emotion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "activity": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cue": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "intensity": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "speaking": {
+      "type": "boolean"
+    },
+    "motion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event": {
+      "type": "string"
+    }
+  }
+}

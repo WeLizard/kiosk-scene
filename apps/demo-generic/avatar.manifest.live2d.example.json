@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "adapter": "live2d",
+  "assetRoot": "/local/live2d/haru-pro",
+  "runtimeUrl": "../avatar.html",
+  "modelUrl": "./haru_greeter_t05.model3.json",
+  "fallbackPortrait": "./haru_greeter_t05.2048/texture_00.png",
+  "motionMapUrl": "/local/live2d/neiri-motion-map.json",
+  "presetThumbs": {
+    "full": "/local/live2d/avatar-full.svg?v=2",
+    "torso": "/local/live2d/avatar-torso.svg?v=2",
+    "head": "/local/live2d/avatar-head.svg?v=2"
+  },
+  "capabilities": {
+    "supportsEmotion": true,
+    "supportsMotion": true,
+    "supportsViewPresets": true,
+    "supportsLipSync": true,
+    "supportsPointerFocus": true
+  }
+}
