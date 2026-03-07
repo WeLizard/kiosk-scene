@@ -56,6 +56,7 @@ export interface Live2dAdapterOptions {
 }
 
 const DEFAULT_CUE: ControlCueV1 = {
+  cue: null,
   emotion: null,
   motion: null,
   until: null,
@@ -290,6 +291,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
 
   async setCue(cue: ControlCueV1): Promise<void> {
     this.currentCue = {
+      cue: trimText(cue?.cue, 32) || null,
       emotion: trimText(cue?.emotion, 32) || null,
       motion: trimText(cue?.motion, 32) || null,
       until: trimText(cue?.until, 64) || null,
