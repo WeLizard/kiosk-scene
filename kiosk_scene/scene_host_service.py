@@ -49,6 +49,8 @@ def build_bootstrap() -> dict[str, Any]:
         "packBaseUrl": pack_base_url,
         "apiBaseUrl": f"{PATH_PREFIX}/",
         "sceneEditorUrl": "/scene-editor/",
+        "sceneEditorFormUrl": "/scene-editor-form/",
+        "sceneEditorApiUrl": "/scene-editor-form/api/config",
         "files": {
             "rendererConfigUrl": pack_base_url + "renderer.kiosk-scene.json",
             "sceneConfigUrl": pack_base_url + "scene.default.json",

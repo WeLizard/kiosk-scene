@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 HOST = os.environ.get("SCENE_EDITOR_HOST", "127.0.0.1")
 PORT = int(os.environ.get("SCENE_EDITOR_PORT", "48098"))
 PATH_PREFIX = "/scene-editor"
+PATH_PREFIX = os.environ.get("SCENE_EDITOR_PATH_PREFIX", PATH_PREFIX).rstrip("/")
 SCENE_ROOT = Path(os.environ.get("SCENE_ROOT", "/config/kiosk-scene"))
 PACKS_DIR = Path(os.environ.get("SCENE_PACKS_DIR", str(SCENE_ROOT / "scene-packs")))
 ACTIVE_PACK_FILE = Path(

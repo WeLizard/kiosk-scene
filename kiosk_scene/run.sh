@@ -26,6 +26,7 @@ export SCENE_HOST_BIND="127.0.0.1"
 export SCENE_HOST_PORT="48097"
 export SCENE_EDITOR_HOST="127.0.0.1"
 export SCENE_EDITOR_PORT="48098"
+export SCENE_EDITOR_PATH_PREFIX="/scene-editor-form"
 
 IMAGE_SCENE_RUNTIME_SEED_DIR="/opt/kiosk-scene/scene-runtime-seed"
 LEGACY_SCENE_ROOT="/config/openclaw-scene"
