@@ -58,7 +58,7 @@ void (async () => {
       renderStatus(
         root,
         "Scene host is missing a renderer config",
-        "The OpenClaw host is up, but the active pack does not provide renderer.kiosk-scene.json yet.",
+        "The scene host is up, but the active pack does not provide renderer.kiosk-scene.json yet.",
         JSON.stringify(bootstrap, null, 2),
       );
       return;
@@ -77,7 +77,7 @@ void (async () => {
     renderStatus(
       root,
       "Scene host failed to start",
-      "The hosted runtime could not load its bootstrap payload from OpenClaw Assistant.",
+      "The hosted runtime could not load its bootstrap payload from the scene add-on.",
       String(error),
     );
   }

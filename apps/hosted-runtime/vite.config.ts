@@ -5,6 +5,7 @@ import { defineConfig } from "vite";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  base: "./",
   resolve: {
     alias: {
       "@kiosk-scene/core": path.resolve(__dirname, "../../packages/core/src/index.ts"),
