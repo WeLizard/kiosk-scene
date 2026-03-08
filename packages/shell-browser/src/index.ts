@@ -537,30 +537,32 @@ export class BrowserSceneShellApp {
     };
     this.weatherData = buildWeatherOverview(options.defaultWeather);
     this.root.innerHTML = `
-      <div class="layout">
-        <section class="panel avatar-panel">
-          <div class="avatar-shell">
-            <div class="avatar-presets" aria-label="Avatar view presets">
-              <button class="avatar-preset is-active" type="button" data-avatar-preset="full" title="${escapeHtml(this.presetLabels.full)}" aria-label="${escapeHtml(this.presetLabels.full)}">
-                <img src="" alt="" aria-hidden="true" data-preset-thumb="full">
-              </button>
-              <button class="avatar-preset" type="button" data-avatar-preset="torso" title="${escapeHtml(this.presetLabels.torso)}" aria-label="${escapeHtml(this.presetLabels.torso)}">
-                <img src="" alt="" aria-hidden="true" data-preset-thumb="torso">
-              </button>
-              <button class="avatar-preset" type="button" data-avatar-preset="head" title="${escapeHtml(this.presetLabels.head)}" aria-label="${escapeHtml(this.presetLabels.head)}">
-                <img src="" alt="" aria-hidden="true" data-preset-thumb="head">
-              </button>
+      <div class="scene-viewport">
+        <div class="layout">
+          <section class="panel avatar-panel">
+            <div class="avatar-shell">
+              <div class="avatar-presets" aria-label="Avatar view presets">
+                <button class="avatar-preset is-active" type="button" data-avatar-preset="full" title="${escapeHtml(this.presetLabels.full)}" aria-label="${escapeHtml(this.presetLabels.full)}">
+                  <img src="" alt="" aria-hidden="true" data-preset-thumb="full">
+                </button>
+                <button class="avatar-preset" type="button" data-avatar-preset="torso" title="${escapeHtml(this.presetLabels.torso)}" aria-label="${escapeHtml(this.presetLabels.torso)}">
+                  <img src="" alt="" aria-hidden="true" data-preset-thumb="torso">
+                </button>
+                <button class="avatar-preset" type="button" data-avatar-preset="head" title="${escapeHtml(this.presetLabels.head)}" aria-label="${escapeHtml(this.presetLabels.head)}">
+                  <img src="" alt="" aria-hidden="true" data-preset-thumb="head">
+                </button>
+              </div>
+              <div class="avatar-mount" data-avatar-mount></div>
             </div>
-            <div class="avatar-mount" data-avatar-mount></div>
-          </div>
-        </section>
+          </section>
 
-        <section class="panel content-panel">
-          <div class="carousel-shell" data-carousel-shell tabindex="0" aria-label="Scene carousel">
-            <div class="carousel-track" data-carousel-track></div>
-            <div class="carousel-dots" data-dots aria-label="Display pages"></div>
-          </div>
-        </section>
+          <section class="panel content-panel">
+            <div class="carousel-shell" data-carousel-shell tabindex="0" aria-label="Scene carousel">
+              <div class="carousel-track" data-carousel-track></div>
+              <div class="carousel-dots" data-dots aria-label="Display pages"></div>
+            </div>
+          </section>
+        </div>
       </div>
     `;
 
@@ -775,6 +777,7 @@ export class BrowserSceneShellApp {
     });
 
     const normalizedScene = normalizeSceneConfig(this.sceneConfig, this.sceneConfig);
+    this.applyDisplayConfig(normalizedScene);
     const orderedPages = this.getOrderedPages(normalizedScene.pages, normalizedScene.rotation.order);
     const selection = resolveSceneSelection({
       control: this.currentControl,
@@ -991,6 +994,17 @@ export class BrowserSceneShellApp {
     }
     const base = withTrailingSlash(trimText(this.options.iconBaseUrl, 1024) || "./assets");
     return `${base}${DEFAULT_ICON_FILENAMES[key]}`;
+  }
+
+  private applyDisplayConfig(scene: ReturnType<typeof normalizeSceneConfig>): void {
+    const { safeAreaPx, layoutPaddingPx, layoutGapPx, globalScale } = scene.display;
+    this.root.style.setProperty("--scene-safe-top", `${safeAreaPx.top}px`);
+    this.root.style.setProperty("--scene-safe-right", `${safeAreaPx.right}px`);
+    this.root.style.setProperty("--scene-safe-bottom", `${safeAreaPx.bottom}px`);
+    this.root.style.setProperty("--scene-safe-left", `${safeAreaPx.left}px`);
+    this.root.style.setProperty("--scene-layout-padding", `${layoutPaddingPx}px`);
+    this.root.style.setProperty("--scene-layout-gap", `${layoutGapPx}px`);
+    this.root.style.setProperty("--scene-global-scale", String(globalScale));
   }
 
   private getOrderedPages(pages: ScenePageV1[], order: string[]): ScenePageV1[] {

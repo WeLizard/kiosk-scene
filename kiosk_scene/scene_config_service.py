@@ -33,6 +33,17 @@ DEFAULT_SCENE_CONFIG: dict[str, Any] = {
         "order": ["page-1"],
         "defaultDwellSeconds": 18,
     },
+    "display": {
+        "safeArea": {
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0,
+        },
+        "layoutPaddingPx": 16,
+        "layoutGapPx": 16,
+        "globalScale": 1,
+    },
     "pages": [
         {
             "id": "page-1",
@@ -400,6 +411,40 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
             </div>
           </div>
           <p class="section-note">Page order follows the visual stack below and is mirrored into <code>rotation.order</code>.</p>
+          <div class="details">
+            <h2>Display Fit</h2>
+            <p class="section-note">Use these values to compensate for HDMI overscan, bezel crop or kiosk scaling without changing the page template itself.</p>
+            <div class="field-grid">
+              <div class="field">
+                <label for="safeTopInput">Safe top (px)</label>
+                <input id="safeTopInput" type="number" min="0" step="1">
+              </div>
+              <div class="field">
+                <label for="safeRightInput">Safe right (px)</label>
+                <input id="safeRightInput" type="number" min="0" step="1">
+              </div>
+              <div class="field">
+                <label for="safeBottomInput">Safe bottom (px)</label>
+                <input id="safeBottomInput" type="number" min="0" step="1">
+              </div>
+              <div class="field">
+                <label for="safeLeftInput">Safe left (px)</label>
+                <input id="safeLeftInput" type="number" min="0" step="1">
+              </div>
+              <div class="field">
+                <label for="layoutPaddingInput">Layout padding (px)</label>
+                <input id="layoutPaddingInput" type="number" min="0" step="1">
+              </div>
+              <div class="field">
+                <label for="layoutGapInput">Layout gap (px)</label>
+                <input id="layoutGapInput" type="number" min="0" step="1">
+              </div>
+              <div class="field">
+                <label for="globalScaleInput">Global scale</label>
+                <input id="globalScaleInput" type="number" min="0.75" max="1" step="0.01">
+              </div>
+            </div>
+          </div>
         </section>
         <section class="panel">
           <h2>Pages</h2>
@@ -441,6 +486,13 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     const starterBtn = document.getElementById('starterBtn');
     const visualSyncBtn = document.getElementById('visualSyncBtn');
     const dwellInput = document.getElementById('dwellInput');
+    const safeTopInput = document.getElementById('safeTopInput');
+    const safeRightInput = document.getElementById('safeRightInput');
+    const safeBottomInput = document.getElementById('safeBottomInput');
+    const safeLeftInput = document.getElementById('safeLeftInput');
+    const layoutPaddingInput = document.getElementById('layoutPaddingInput');
+    const layoutGapInput = document.getElementById('layoutGapInput');
+    const globalScaleInput = document.getElementById('globalScaleInput');
     const pagesEl = document.getElementById('pages');
     const rootExtrasEl = document.getElementById('rootExtras');
 
@@ -493,6 +545,14 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         return fallback;
       }
       return Math.max(minimum, parsed);
+    }
+
+    function readClampedNumber(value, fallback, minimum, maximum) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return fallback;
+      }
+      return Math.min(maximum, Math.max(minimum, parsed));
     }
 
     function parseJsonObject(text, label) {
@@ -550,12 +610,31 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         return extras;
       }
       for (const [key, value] of Object.entries(config)) {
-        if (['version', 'rotation', 'pages'].includes(key)) {
+        if (['version', 'rotation', 'display', 'pages'].includes(key)) {
           continue;
         }
         extras[key] = value;
       }
       return extras;
+    }
+
+    function normalizeVisualDisplay(config) {
+      const source = config && typeof config === 'object' && !Array.isArray(config) ? config : {};
+      const display = source.display && typeof source.display === 'object' && !Array.isArray(source.display)
+        ? source.display
+        : {};
+      const safeArea = display.safeArea && typeof display.safeArea === 'object' && !Array.isArray(display.safeArea)
+        ? display.safeArea
+        : {};
+      return {
+        safeTop: readNumber(safeArea.top, 0, 0),
+        safeRight: readNumber(safeArea.right, 0, 0),
+        safeBottom: readNumber(safeArea.bottom, 0, 0),
+        safeLeft: readNumber(safeArea.left, 0, 0),
+        layoutPaddingPx: readNumber(display.layoutPaddingPx, 16, 0),
+        layoutGapPx: readNumber(display.layoutGapPx, 16, 0),
+        globalScale: readClampedNumber(display.globalScale, 1, 0.75, 1),
+      };
     }
 
     function cardExtras(card) {
@@ -686,6 +765,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         : starterConfig().pages.map((page, index) => normalizeVisualPage(page, index));
       return {
         dwell: readNumber(source.rotation && source.rotation.defaultDwellSeconds, 18, 5),
+        display: normalizeVisualDisplay(source),
         pages,
         rootExtrasText: JSON.stringify(rootExtras(source), null, 2),
       };
@@ -795,6 +875,13 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
 
     function renderVisualEditor(config) {
       dwellInput.value = String(config.dwell);
+      safeTopInput.value = String(config.display.safeTop);
+      safeRightInput.value = String(config.display.safeRight);
+      safeBottomInput.value = String(config.display.safeBottom);
+      safeLeftInput.value = String(config.display.safeLeft);
+      layoutPaddingInput.value = String(config.display.layoutPaddingPx);
+      layoutGapInput.value = String(config.display.layoutGapPx);
+      globalScaleInput.value = String(config.display.globalScale);
       rootExtrasEl.value = config.rootExtrasText && config.rootExtrasText !== '{}' ? config.rootExtrasText : '';
       pagesEl.innerHTML = config.pages.map((page, index) => `
         <article class="page-card" data-page-index="${index}">
@@ -998,6 +1085,17 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
           order: pages.map((page) => page.id),
           defaultDwellSeconds: readNumber(dwellInput.value, 18, 5),
         },
+        display: {
+          safeArea: {
+            top: readNumber(safeTopInput.value, 0, 0),
+            right: readNumber(safeRightInput.value, 0, 0),
+            bottom: readNumber(safeBottomInput.value, 0, 0),
+            left: readNumber(safeLeftInput.value, 0, 0),
+          },
+          layoutPaddingPx: readNumber(layoutPaddingInput.value, 16, 0),
+          layoutGapPx: readNumber(layoutGapInput.value, 16, 0),
+          globalScale: readClampedNumber(globalScaleInput.value, 1, 0.75, 1),
+        },
         pages,
       };
     }
@@ -1198,6 +1296,13 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     dwellInput.addEventListener('input', () => {
       try { syncVisualToJson('Visual changes mirrored into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
     });
+
+    [safeTopInput, safeRightInput, safeBottomInput, safeLeftInput, layoutPaddingInput, layoutGapInput, globalScaleInput]
+      .forEach((input) => {
+        input.addEventListener('input', () => {
+          try { syncVisualToJson('Visual changes mirrored into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
+        });
+      });
 
     rootExtrasEl.addEventListener('change', () => {
       try { syncVisualToJson('Visual changes mirrored into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }

@@ -7,7 +7,34 @@ export interface NormalizedSceneConfigV1 {
     order: string[];
     defaultDwellMs: number;
   };
+  display: {
+    safeAreaPx: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    };
+    layoutPaddingPx: number;
+    layoutGapPx: number;
+    globalScale: number;
+  };
   pages: ScenePageV1[];
+}
+
+function normalizeNonNegativeNumber(value: unknown, fallback: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.max(0, numeric);
+}
+
+function normalizeDisplayScale(value: unknown, fallback = 1): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.min(1, Math.max(0.75, numeric));
 }
 
 export function unwrapSceneConfigPayload(config: unknown): unknown {
@@ -69,6 +96,10 @@ export function normalizeSceneConfig(config: unknown, defaults: SceneConfigV1): 
   });
 
   const incomingRotation = isObjectRecord(payload) && isObjectRecord(payload.rotation) ? payload.rotation : {};
+  const defaultDisplay = isObjectRecord(defaults.display) ? defaults.display : {};
+  const incomingDisplay = isObjectRecord(payload) && isObjectRecord(payload.display) ? payload.display : {};
+  const defaultSafeArea = isObjectRecord(defaultDisplay.safeArea) ? defaultDisplay.safeArea : {};
+  const incomingSafeArea = isObjectRecord(incomingDisplay.safeArea) ? incomingDisplay.safeArea : {};
   const rawOrder = Array.isArray(incomingRotation.order) ? incomingRotation.order : defaults.rotation.order;
   const order = normalizeStringList(rawOrder).filter((item, index, list) => {
     return pages.some((page) => page.id === item) && list.indexOf(item) === index;
@@ -83,6 +114,17 @@ export function normalizeSceneConfig(config: unknown, defaults: SceneConfigV1): 
         (Number(incomingRotation.defaultDwellSeconds) || defaults.rotation.defaultDwellSeconds) * 1_000,
       ),
     },
+    display: {
+      safeAreaPx: {
+        top: normalizeNonNegativeNumber(incomingSafeArea.top, normalizeNonNegativeNumber(defaultSafeArea.top, 0)),
+        right: normalizeNonNegativeNumber(incomingSafeArea.right, normalizeNonNegativeNumber(defaultSafeArea.right, 0)),
+        bottom: normalizeNonNegativeNumber(incomingSafeArea.bottom, normalizeNonNegativeNumber(defaultSafeArea.bottom, 0)),
+        left: normalizeNonNegativeNumber(incomingSafeArea.left, normalizeNonNegativeNumber(defaultSafeArea.left, 0)),
+      },
+      layoutPaddingPx: normalizeNonNegativeNumber(incomingDisplay.layoutPaddingPx, normalizeNonNegativeNumber(defaultDisplay.layoutPaddingPx, 16)),
+      layoutGapPx: normalizeNonNegativeNumber(incomingDisplay.layoutGapPx, normalizeNonNegativeNumber(defaultDisplay.layoutGapPx, 16)),
+      globalScale: normalizeDisplayScale(incomingDisplay.globalScale, normalizeDisplayScale(defaultDisplay.globalScale, 1)),
+    },
     pages,
   };
 }
@@ -92,4 +134,3 @@ export function getSceneSlides(scene: NormalizedSceneConfigV1): ScenePageV1[] {
     .filter((page) => page.kind !== "overview")
     .sort((left, right) => (Number(left.slot) || 0) - (Number(right.slot) || 0));
 }
-

@@ -54,6 +54,20 @@ export interface SceneRotationV1 {
   defaultDwellSeconds: number;
 }
 
+export interface SceneDisplaySafeAreaV1 {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}
+
+export interface SceneDisplayV1 {
+  safeArea?: SceneDisplaySafeAreaV1;
+  layoutPaddingPx?: number;
+  layoutGapPx?: number;
+  globalScale?: number;
+}
+
 export interface SceneCardV1 {
   type?: string;
   entity?: string;
@@ -75,6 +89,7 @@ export interface ScenePageV1 {
 export interface SceneConfigV1 {
   version: 1;
   rotation: SceneRotationV1;
+  display?: SceneDisplayV1;
   pages: ScenePageV1[];
 }
 

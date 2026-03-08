@@ -8,6 +8,17 @@
     ],
     "defaultDwellSeconds": 18
   },
+  "display": {
+    "safeArea": {
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "layoutPaddingPx": 16,
+    "layoutGapPx": 16,
+    "globalScale": 1
+  },
   "pages": [
     {
       "id": "weather",

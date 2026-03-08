@@ -35,6 +35,47 @@
         }
       }
     },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "safeArea": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "top": {
+              "type": "number",
+              "minimum": 0
+            },
+            "right": {
+              "type": "number",
+              "minimum": 0
+            },
+            "bottom": {
+              "type": "number",
+              "minimum": 0
+            },
+            "left": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "layoutPaddingPx": {
+          "type": "number",
+          "minimum": 0
+        },
+        "layoutGapPx": {
+          "type": "number",
+          "minimum": 0
+        },
+        "globalScale": {
+          "type": "number",
+          "minimum": 0.75,
+          "maximum": 1
+        }
+      }
+    },
     "pages": {
       "type": "array",
       "items": {
@@ -91,4 +132,3 @@
     }
   }
 }
-
