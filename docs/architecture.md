@@ -84,7 +84,7 @@ The current Live2D path is intentionally pragmatic: `packages/adapter-live2d` ho
 
 Apps such as `apps/demo-generic`, `apps/hosted-runtime`, and instance wrappers such as `neiri-scene/app` should stay thin and configure this shell rather than forking its runtime logic.
 
-`apps/hosted-runtime` is the canonical hosted entrypoint for `OpenClawHomeAssistant`: it loads `/scene-api/bootstrap`, resolves the active pack URLs, and then boots the generic shell.
+`apps/hosted-runtime` is the canonical hosted entrypoint for the standalone `Kiosk Scene` add-on: it loads `/scene-api/bootstrap`, resolves the active pack URLs, and then boots the generic shell.
 
 ### Instance pack
 
