@@ -362,34 +362,41 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
 <body>
   <div class="wrap">
     <section class="panel">
-      <h1>Kiosk Scene Editor</h1>
-      <p>Ingress-owned editor for the renderer scene config. This belongs to the dedicated Kiosk Scene add-on, not HAOS-kiosk.</p>
+      <h1 data-i18n="title">Kiosk Scene Editor</h1>
+      <p data-i18n="lead">Ingress-owned editor for the renderer scene config. This belongs to the dedicated Kiosk Scene add-on, not HAOS-kiosk.</p>
     </section>
     <section class="panel">
       <div class="row">
-        <button id="loadBtn" type="button">Load</button>
-        <button id="applyVisualBtn" type="button">Apply Visual -> JSON</button>
-        <button id="jsonToVisualBtn" type="button">Reload Visual from JSON</button>
-        <button id="validateBtn" type="button">Validate JSON</button>
-        <button id="formatBtn" type="button">Format</button>
-        <button id="newPageBtn" type="button">+ Page</button>
-        <button id="starterBtn" type="button">Template</button>
-        <button id="saveBtn" type="button">Save</button>
+        <button id="loadBtn" type="button" data-i18n="button.load">Load</button>
+        <button id="applyVisualBtn" type="button" data-i18n="button.applyVisual">Apply Visual -> JSON</button>
+        <button id="jsonToVisualBtn" type="button" data-i18n="button.reloadVisual">Reload Visual from JSON</button>
+        <button id="validateBtn" type="button" data-i18n="button.validate">Validate JSON</button>
+        <button id="formatBtn" type="button" data-i18n="button.format">Format</button>
+        <button id="newPageBtn" type="button" data-i18n="button.newPage">+ Page</button>
+        <button id="starterBtn" type="button" data-i18n="button.template">Template</button>
+        <button id="saveBtn" type="button" data-i18n="button.save">Save</button>
+        <label class="field" style="min-width: 120px;">
+          <span data-i18n="label.language">Language</span>
+          <select id="langSelect">
+            <option value="en">EN</option>
+            <option value="ru">RU</option>
+          </select>
+        </label>
       </div>
       <div id="status" class="status"></div>
     </section>
     <section class="panel">
       <div class="overview-grid">
         <div class="stat">
-          <span class="stat-label">Active pack</span>
+          <span class="stat-label" data-i18n="stat.activePack">Active pack</span>
           <div class="stat-value"><code>__ACTIVE_PACK_ID__</code></div>
         </div>
         <div class="stat">
-          <span class="stat-label">Primary path</span>
+          <span class="stat-label" data-i18n="stat.primaryPath">Primary path</span>
           <div class="stat-value"><code>__SCENE_EDITOR_CONFIG_PATH__</code></div>
         </div>
         <div class="stat">
-          <span class="stat-label">Legacy fallback</span>
+          <span class="stat-label" data-i18n="stat.legacyFallback">Legacy fallback</span>
           <div class="stat-value"><code>__LEGACY_SCENE_EDITOR_CONFIG_PATHS__</code></div>
         </div>
       </div>
@@ -399,76 +406,76 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         <section class="panel">
           <div class="visual-header">
             <div>
-              <h2>Page Composer</h2>
-              <p>Build the carousel from reusable page templates and card blocks instead of editing raw JSON.</p>
+              <h2 data-i18n="composer.title">Page Composer</h2>
+              <p data-i18n="composer.lead">Build the carousel from reusable page templates and card blocks instead of editing raw JSON.</p>
             </div>
-            <button id="visualSyncBtn" type="button">Sync Form</button>
+            <button id="visualSyncBtn" type="button" data-i18n="button.syncForm">Sync Form</button>
           </div>
           <div class="field-grid">
             <div class="field">
-              <label for="dwellInput">Default dwell seconds</label>
+              <label for="dwellInput" data-i18n="field.defaultDwell">Default dwell seconds</label>
               <input id="dwellInput" type="number" min="5" step="1">
             </div>
           </div>
-          <p class="section-note">Page order follows the visual stack below and is mirrored into <code>rotation.order</code>.</p>
+          <p class="section-note" data-i18n="composer.orderNote">Page order follows the visual stack below and is mirrored into <code>rotation.order</code>.</p>
           <div class="details">
-            <h2>Display Fit</h2>
-            <p class="section-note">Use these values to compensate for HDMI overscan, bezel crop or kiosk scaling without changing the page template itself.</p>
+            <h2 data-i18n="display.title">Display Fit</h2>
+            <p class="section-note" data-i18n="display.lead">Use these values to compensate for HDMI overscan, bezel crop or kiosk scaling without changing the page template itself.</p>
             <div class="field-grid">
               <div class="field">
-                <label for="safeTopInput">Safe top (px)</label>
+                <label for="safeTopInput" data-i18n="display.safeTop">Safe top (px)</label>
                 <input id="safeTopInput" type="number" min="0" step="1">
               </div>
               <div class="field">
-                <label for="safeRightInput">Safe right (px)</label>
+                <label for="safeRightInput" data-i18n="display.safeRight">Safe right (px)</label>
                 <input id="safeRightInput" type="number" min="0" step="1">
               </div>
               <div class="field">
-                <label for="safeBottomInput">Safe bottom (px)</label>
+                <label for="safeBottomInput" data-i18n="display.safeBottom">Safe bottom (px)</label>
                 <input id="safeBottomInput" type="number" min="0" step="1">
               </div>
               <div class="field">
-                <label for="safeLeftInput">Safe left (px)</label>
+                <label for="safeLeftInput" data-i18n="display.safeLeft">Safe left (px)</label>
                 <input id="safeLeftInput" type="number" min="0" step="1">
               </div>
               <div class="field">
-                <label for="layoutPaddingInput">Layout padding (px)</label>
+                <label for="layoutPaddingInput" data-i18n="display.layoutPadding">Layout padding (px)</label>
                 <input id="layoutPaddingInput" type="number" min="0" step="1">
               </div>
               <div class="field">
-                <label for="layoutGapInput">Layout gap (px)</label>
+                <label for="layoutGapInput" data-i18n="display.layoutGap">Layout gap (px)</label>
                 <input id="layoutGapInput" type="number" min="0" step="1">
               </div>
               <div class="field">
-                <label for="globalScaleInput">Global scale</label>
+                <label for="globalScaleInput" data-i18n="display.globalScale">Global scale</label>
                 <input id="globalScaleInput" type="number" min="0.75" max="1" step="0.01">
               </div>
             </div>
           </div>
         </section>
         <section class="panel">
-          <h2>Pages</h2>
+          <h2 data-i18n="pages.title">Pages</h2>
           <div id="pages" class="pages"></div>
         </section>
       </div>
       <div class="column">
         <section class="panel">
           <details class="advanced">
-            <summary>Advanced root fields</summary>
-            <p class="section-note">Unknown top-level fields are preserved here so the visual composer does not strip them.</p>
+            <summary data-i18n="advanced.rootTitle">Advanced root fields</summary>
+            <p class="section-note" data-i18n="advanced.rootLead">Unknown top-level fields are preserved here so the visual composer does not strip them.</p>
             <textarea id="rootExtras" spellcheck="false"></textarea>
           </details>
         </section>
         <section class="panel">
           <details class="advanced">
-            <summary>Advanced JSON</summary>
-            <p class="section-note">Optional raw access for migration and debugging. The main editing path should stay in the visual composer.</p>
+            <summary data-i18n="advanced.jsonTitle">Advanced JSON</summary>
+            <p class="section-note" data-i18n="advanced.jsonLead">Optional raw access for migration and debugging. The main editing path should stay in the visual composer.</p>
             <textarea id="editor" spellcheck="false"></textarea>
           </details>
         </section>
         <section class="panel meta">
-          <div>Saving always writes to the primary path so the hosted scene app and editor share one source of truth.</div>
-          <div>The visual composer is the main workflow for carousel pages and cards. Raw JSON stays only as an advanced fallback.</div>
+          <div data-i18n="meta.primaryWrite">Saving always writes to the primary path so the hosted scene app and editor share one source of truth.</div>
+          <div data-i18n="meta.visualFirst">The visual composer is the main workflow for carousel pages and cards. Raw JSON stays only as an advanced fallback.</div>
         </section>
       </div>
     </div>
@@ -495,12 +502,181 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     const globalScaleInput = document.getElementById('globalScaleInput');
     const pagesEl = document.getElementById('pages');
     const rootExtrasEl = document.getElementById('rootExtras');
+    const langSelect = document.getElementById('langSelect');
+
+    const I18N = {
+      en: {
+        title: 'Kiosk Scene Editor',
+        lead: 'Ingress-owned editor for the renderer scene config. This belongs to the dedicated Kiosk Scene add-on, not HAOS-kiosk.',
+        'label.language': 'Language',
+        'button.load': 'Load',
+        'button.applyVisual': 'Apply Form -> JSON',
+        'button.reloadVisual': 'Reload Form from JSON',
+        'button.validate': 'Validate JSON',
+        'button.format': 'Format',
+        'button.newPage': '+ Page',
+        'button.template': 'Template',
+        'button.save': 'Save',
+        'button.syncForm': 'Sync Form',
+        'stat.activePack': 'Active pack',
+        'stat.primaryPath': 'Primary path',
+        'stat.legacyFallback': 'Legacy fallback',
+        'composer.title': 'Page Composer',
+        'composer.lead': 'Build the carousel from reusable page templates and card blocks instead of editing raw JSON.',
+        'composer.orderNote': 'Page order follows the visual stack below and is mirrored into rotation.order.',
+        'field.defaultDwell': 'Default dwell seconds',
+        'display.title': 'Display Fit',
+        'display.lead': 'Use these values to compensate for HDMI overscan, bezel crop or kiosk scaling without changing the page template itself.',
+        'display.safeTop': 'Safe top (px)',
+        'display.safeRight': 'Safe right (px)',
+        'display.safeBottom': 'Safe bottom (px)',
+        'display.safeLeft': 'Safe left (px)',
+        'display.layoutPadding': 'Layout padding (px)',
+        'display.layoutGap': 'Layout gap (px)',
+        'display.globalScale': 'Global scale',
+        'pages.title': 'Pages',
+        'advanced.rootTitle': 'Advanced root fields',
+        'advanced.rootLead': 'Unknown top-level fields are preserved here so the visual composer does not strip them.',
+        'advanced.jsonTitle': 'Advanced JSON',
+        'advanced.jsonLead': 'Optional raw access for migration and debugging. The main editing path should stay in the visual composer.',
+        'meta.primaryWrite': 'Saving always writes to the primary path so the hosted scene app and editor share one source of truth.',
+        'meta.visualFirst': 'The visual composer is the main workflow for carousel pages and cards. Raw JSON stays only as an advanced fallback.',
+        'field.pageId': 'Page ID',
+        'field.kind': 'Kind',
+        'field.slot': 'Slot',
+        'field.cardStyle': 'Card style',
+        'field.title': 'Title',
+        'field.subtitle': 'Subtitle',
+        'field.stampCaption': 'Stamp caption',
+        'field.stampValue': 'Stamp value',
+        'cards.title': 'Cards',
+        'cards.lead': 'Fill the page with typed card blocks. The renderer template stays the same; you only control content.',
+        'cards.none': 'No cards yet. Add the first block for this page.',
+        'cards.overview': 'Overview pages use the built-in weather and assistant template and usually do not need manual cards.',
+        'advanced.pageFields': 'Advanced page fields',
+        'advanced.cardFields': 'Advanced card fields',
+        'card.add': '+ Card',
+        'action.up': 'Up',
+        'action.down': 'Down',
+        'action.remove': 'Remove',
+        'field.type': 'Type',
+        'field.caption': 'Caption',
+        'field.hint': 'Hint',
+        'field.entity': 'Entity',
+        'field.stateEntity': 'State entity',
+        'field.downEntity': 'Down entity',
+        'field.upEntity': 'Up entity',
+        'field.onText': 'On text',
+        'field.offText': 'Off text',
+        'field.staticValue': 'Static value',
+        'field.unit': 'Unit',
+        'field.digits': 'Digits',
+        'field.fallbackValue': 'Fallback value',
+      },
+      ru: {
+        title: 'Редактор Kiosk Scene',
+        lead: 'Ingress-редактор конфигурации сцены. Он относится к отдельному add-on Kiosk Scene, а не к HAOS-kiosk.',
+        'label.language': 'Язык',
+        'button.load': 'Загрузить',
+        'button.applyVisual': 'Применить форму -> JSON',
+        'button.reloadVisual': 'Перечитать форму из JSON',
+        'button.validate': 'Проверить JSON',
+        'button.format': 'Форматировать',
+        'button.newPage': '+ Страница',
+        'button.template': 'Шаблон',
+        'button.save': 'Сохранить',
+        'button.syncForm': 'Синхронизировать форму',
+        'stat.activePack': 'Активный pack',
+        'stat.primaryPath': 'Основной путь',
+        'stat.legacyFallback': 'Legacy fallback',
+        'composer.title': 'Конструктор страниц',
+        'composer.lead': 'Собирай карусель из типовых страниц и карточек, не редактируя сырой JSON.',
+        'composer.orderNote': 'Порядок страниц берётся из визуального списка ниже и зеркалится в rotation.order.',
+        'field.defaultDwell': 'Время показа по умолчанию',
+        'display.title': 'Подгонка под дисплей',
+        'display.lead': 'Эти значения помогают компенсировать HDMI overscan, обрезку краёв и kiosk scaling без изменения шаблона страницы.',
+        'display.safeTop': 'Безопасный отступ сверху (px)',
+        'display.safeRight': 'Безопасный отступ справа (px)',
+        'display.safeBottom': 'Безопасный отступ снизу (px)',
+        'display.safeLeft': 'Безопасный отступ слева (px)',
+        'display.layoutPadding': 'Внешний padding layout (px)',
+        'display.layoutGap': 'Зазор между колонками (px)',
+        'display.globalScale': 'Общий scale',
+        'pages.title': 'Страницы',
+        'advanced.rootTitle': 'Дополнительные корневые поля',
+        'advanced.rootLead': 'Неизвестные верхнеуровневые поля сохраняются здесь, чтобы визуальный редактор их не съедал.',
+        'advanced.jsonTitle': 'Расширенный JSON',
+        'advanced.jsonLead': 'Сырой JSON нужен только для миграции и отладки. Основной путь редактирования должен оставаться визуальным.',
+        'meta.primaryWrite': 'Сохранение всегда пишет в основной путь, чтобы hosted scene app и editor использовали один source of truth.',
+        'meta.visualFirst': 'Главный workflow — визуальный composer страниц и карточек. Raw JSON оставлен только как расширенный fallback.',
+        'field.pageId': 'ID страницы',
+        'field.kind': 'Тип страницы',
+        'field.slot': 'Слот',
+        'field.cardStyle': 'Стиль карточек',
+        'field.title': 'Заголовок',
+        'field.subtitle': 'Подзаголовок',
+        'field.stampCaption': 'Подпись штампа',
+        'field.stampValue': 'Значение штампа',
+        'cards.title': 'Карточки',
+        'cards.lead': 'Наполняй страницу типовыми карточками. Шаблон рендера не меняется — меняется только содержимое.',
+        'cards.none': 'Карточек пока нет. Добавь первый блок для этой страницы.',
+        'cards.overview': 'Страницы overview используют встроенный weather/assistant шаблон и обычно не требуют ручных карточек.',
+        'advanced.pageFields': 'Дополнительные поля страницы',
+        'advanced.cardFields': 'Дополнительные поля карточки',
+        'card.add': '+ Карточка',
+        'action.up': 'Выше',
+        'action.down': 'Ниже',
+        'action.remove': 'Удалить',
+        'field.type': 'Тип',
+        'field.caption': 'Подпись',
+        'field.hint': 'Подсказка',
+        'field.entity': 'Entity',
+        'field.stateEntity': 'Entity состояния',
+        'field.downEntity': 'Entity down',
+        'field.upEntity': 'Entity up',
+        'field.onText': 'Текст On',
+        'field.offText': 'Текст Off',
+        'field.staticValue': 'Статическое значение',
+        'field.unit': 'Единица',
+        'field.digits': 'Знаков',
+        'field.fallbackValue': 'Fallback значение',
+      },
+    };
+
+    function resolveInitialLanguage() {
+      try {
+        const saved = window.localStorage.getItem('kiosk-scene-editor-lang');
+        if (saved && I18N[saved]) {
+          return saved;
+        }
+      } catch {}
+      return navigator.language && navigator.language.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+    }
+
+    let currentLang = resolveInitialLanguage();
+
+    function t(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key;
+    }
 
     let lastEditedMode = 'visual';
 
     function setStatus(text, kind) {
       statusEl.textContent = text || '';
       statusEl.className = `status${kind ? ` ${kind}` : ''}`;
+    }
+
+    function applyStaticTranslations() {
+      document.documentElement.lang = currentLang;
+      langSelect.value = currentLang;
+      document.title = t('title');
+      document.querySelectorAll('[data-i18n]').forEach((element) => {
+        const key = element.getAttribute('data-i18n');
+        if (!key) {
+          return;
+        }
+        element.textContent = t(key);
+      });
     }
 
     function apiUrl() {
@@ -514,12 +690,23 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
           order: ['page-1'],
           defaultDwellSeconds: 18
         },
+        display: {
+          safeArea: {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+          },
+          layoutPaddingPx: 16,
+          layoutGapPx: 16,
+          globalScale: 1,
+        },
         pages: [
           {
             id: 'page-1',
             kind: 'cards',
-            title: 'Overview',
-            subtitle: 'Add dashboard cards here',
+            title: currentLang === 'ru' ? 'Обзор' : 'Overview',
+            subtitle: currentLang === 'ru' ? 'Добавь сюда карточки дашборда' : 'Add dashboard cards here',
             cards: []
           }
         ]
@@ -680,7 +867,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       const normalizedType = trimText(type, 'entity');
       const card = {
         type: normalizedType,
-        caption: `Card ${index + 1}`,
+        caption: `${t('field.caption')} ${index + 1}`,
         hint: '',
         entity: '',
         stateEntity: '',
@@ -694,21 +881,21 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         extrasText: '',
       };
       if (normalizedType === 'todo') {
-        card.caption = 'To-do';
+        card.caption = currentLang === 'ru' ? 'Список дел' : 'To-do';
       } else if (normalizedType === 'onoff') {
-        card.caption = 'Device';
+        card.caption = currentLang === 'ru' ? 'Устройство' : 'Device';
       } else if (normalizedType === 'battery') {
-        card.caption = 'Battery';
+        card.caption = currentLang === 'ru' ? 'Батарея' : 'Battery';
       } else if (normalizedType === 'network') {
-        card.caption = 'Network';
+        card.caption = currentLang === 'ru' ? 'Сеть' : 'Network';
       } else if (normalizedType === 'time') {
-        card.caption = 'Time';
+        card.caption = currentLang === 'ru' ? 'Время' : 'Time';
       } else if (normalizedType === 'percent') {
-        card.caption = 'Percent';
+        card.caption = currentLang === 'ru' ? 'Процент' : 'Percent';
       } else if (normalizedType === 'number') {
-        card.caption = 'Number';
+        card.caption = currentLang === 'ru' ? 'Число' : 'Number';
       } else if (normalizedType === 'text') {
-        card.caption = 'Note';
+        card.caption = currentLang === 'ru' ? 'Заметка' : 'Note';
         card.value = '—';
       }
       return card;
@@ -814,31 +1001,31 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     function renderCardSpecificFields(card) {
       const sections = [];
       if (['entity', 'todo', 'onoff', 'battery', 'time', 'percent', 'number'].includes(card.type)) {
-        sections.push(renderField('Entity', 'entity', card.entity));
+        sections.push(renderField(t('field.entity'), 'entity', card.entity));
       }
       if (card.type === 'battery') {
-        sections.push(renderField('State entity', 'stateEntity', card.stateEntity));
+        sections.push(renderField(t('field.stateEntity'), 'stateEntity', card.stateEntity));
       }
       if (card.type === 'network') {
-        sections.push(renderField('Down entity', 'downEntity', card.downEntity));
-        sections.push(renderField('Up entity', 'upEntity', card.upEntity));
+        sections.push(renderField(t('field.downEntity'), 'downEntity', card.downEntity));
+        sections.push(renderField(t('field.upEntity'), 'upEntity', card.upEntity));
       }
       if (card.type === 'onoff') {
-        sections.push(renderField('On text', 'onText', card.onText));
-        sections.push(renderField('Off text', 'offText', card.offText));
+        sections.push(renderField(t('field.onText'), 'onText', card.onText));
+        sections.push(renderField(t('field.offText'), 'offText', card.offText));
       }
       if (card.type === 'text') {
-        sections.push(renderField('Static value', 'value', card.value));
+        sections.push(renderField(t('field.staticValue'), 'value', card.value));
       }
       if (card.type === 'number') {
-        sections.push(renderField('Unit', 'unit', card.unit));
-        sections.push(renderField('Digits', 'digits', card.digits, { type: 'number', min: 0, step: 1 }));
+        sections.push(renderField(t('field.unit'), 'unit', card.unit));
+        sections.push(renderField(t('field.digits'), 'digits', card.digits, { type: 'number', min: 0, step: 1 }));
       }
       if (card.type === 'percent') {
-        sections.push(renderField('Digits', 'digits', card.digits, { type: 'number', min: 0, step: 1 }));
+        sections.push(renderField(t('field.digits'), 'digits', card.digits, { type: 'number', min: 0, step: 1 }));
       }
       if (card.type === 'entity') {
-        sections.push(renderField('Fallback value', 'value', card.value));
+        sections.push(renderField(t('field.fallbackValue'), 'value', card.value));
       }
       return sections.join('');
     }
@@ -852,20 +1039,20 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
               <span>${escapeHtml(card.type)}</span>
             </div>
             <div class="page-actions">
-              <button type="button" data-action="card-up" ${cardIndex === 0 ? 'disabled' : ''}>Up</button>
-              <button type="button" data-action="card-down" ${cardIndex === totalCards - 1 ? 'disabled' : ''}>Down</button>
-              <button type="button" data-action="card-remove">Remove</button>
+              <button type="button" data-action="card-up" ${cardIndex === 0 ? 'disabled' : ''}>${escapeHtml(t('action.up'))}</button>
+              <button type="button" data-action="card-down" ${cardIndex === totalCards - 1 ? 'disabled' : ''}>${escapeHtml(t('action.down'))}</button>
+              <button type="button" data-action="card-remove">${escapeHtml(t('action.remove'))}</button>
             </div>
           </div>
           <div class="card-body">
             <div class="field-grid">
-              ${renderField('Type', 'type', card.type, { type: 'select', choices: CARD_TYPE_OPTIONS })}
-              ${renderField('Caption', 'caption', card.caption)}
-              ${renderField('Hint', 'hint', card.hint)}
+              ${renderField(t('field.type'), 'type', card.type, { type: 'select', choices: CARD_TYPE_OPTIONS })}
+              ${renderField(t('field.caption'), 'caption', card.caption)}
+              ${renderField(t('field.hint'), 'hint', card.hint)}
               ${renderCardSpecificFields(card)}
             </div>
             <details class="advanced">
-              <summary>Advanced card fields</summary>
+              <summary>${escapeHtml(t('advanced.cardFields'))}</summary>
               <textarea data-card-field="extras" spellcheck="false">${escapeHtml(card.extrasText && card.extrasText !== '{}' ? card.extrasText : '')}</textarea>
             </details>
           </div>
@@ -894,19 +1081,19 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
               </div>
             </div>
             <div class="page-actions">
-              <button type="button" data-action="move-up" ${index === 0 ? 'disabled' : ''}>Up</button>
-              <button type="button" data-action="move-down" ${index === config.pages.length - 1 ? 'disabled' : ''}>Down</button>
-              <button type="button" data-action="remove" ${config.pages.length <= 1 ? 'disabled' : ''}>Remove</button>
+              <button type="button" data-action="move-up" ${index === 0 ? 'disabled' : ''}>${escapeHtml(t('action.up'))}</button>
+              <button type="button" data-action="move-down" ${index === config.pages.length - 1 ? 'disabled' : ''}>${escapeHtml(t('action.down'))}</button>
+              <button type="button" data-action="remove" ${config.pages.length <= 1 ? 'disabled' : ''}>${escapeHtml(t('action.remove'))}</button>
             </div>
           </div>
           <div class="page-body">
             <div class="field-grid">
               <div class="field">
-                <label>Page ID</label>
+                <label>${escapeHtml(t('field.pageId'))}</label>
                 <input type="text" data-field="id" value="${escapeHtml(page.id)}">
               </div>
               <div class="field">
-                <label>Kind</label>
+                <label>${escapeHtml(t('field.kind'))}</label>
                 <select data-field="kind">
                   <option value="overview" ${page.kind === 'overview' ? 'selected' : ''}>overview</option>
                   <option value="cards" ${page.kind === 'cards' ? 'selected' : ''}>cards</option>
@@ -914,54 +1101,54 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
                 </select>
               </div>
               <div class="field">
-                <label>Slot</label>
+                <label>${escapeHtml(t('field.slot'))}</label>
                 <input type="number" min="0" step="1" data-field="slot" value="${escapeHtml(page.slot)}">
               </div>
               <div class="field">
-                <label>Card style</label>
+                <label>${escapeHtml(t('field.cardStyle'))}</label>
                 <select data-field="cardStyle">
                   <option value="full" ${page.cardStyle === 'full' ? 'selected' : ''}>full</option>
                   <option value="mini" ${page.cardStyle === 'mini' ? 'selected' : ''}>mini</option>
                 </select>
               </div>
               <div class="field">
-                <label>Title</label>
+                <label>${escapeHtml(t('field.title'))}</label>
                 <input type="text" data-field="title" value="${escapeHtml(page.title)}">
               </div>
               <div class="field">
-                <label>Subtitle</label>
+                <label>${escapeHtml(t('field.subtitle'))}</label>
                 <input type="text" data-field="subtitle" value="${escapeHtml(page.subtitle)}">
               </div>
               <div class="field">
-                <label>Stamp caption</label>
+                <label>${escapeHtml(t('field.stampCaption'))}</label>
                 <input type="text" data-field="stampCaption" value="${escapeHtml(page.stampCaption)}">
               </div>
               <div class="field">
-                <label>Stamp value</label>
+                <label>${escapeHtml(t('field.stampValue'))}</label>
                 <input type="text" data-field="stampValue" value="${escapeHtml(page.stampValue)}">
               </div>
             </div>
             <div class="cards-toolbar">
               <div>
-                <div class="subsection-label">Cards</div>
-                <p class="section-note">Fill the page with typed card blocks. The renderer template stays the same; you only control content.</p>
+                <div class="subsection-label">${escapeHtml(t('cards.title'))}</div>
+                <p class="section-note">${escapeHtml(t('cards.lead'))}</p>
               </div>
               <div class="row">
                 <select data-field="newCardType">
                   ${CARD_TYPE_OPTIONS.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join('')}
                 </select>
-                <button type="button" data-action="add-card">+ Card</button>
+                <button type="button" data-action="add-card">${escapeHtml(t('card.add'))}</button>
               </div>
             </div>
             <div class="card-stack">
               ${page.kind === 'overview'
-                ? `<p class="section-note">Overview pages use the built-in weather/assistant template and usually do not need manual cards.</p>`
+                ? `<p class="section-note">${escapeHtml(t('cards.overview'))}</p>`
                 : (page.cards.length
                     ? page.cards.map((card, cardIndex) => renderCardEditor(card, cardIndex, page.cards.length)).join('')
-                    : `<p class="section-note">No cards yet. Add the first block for this page.</p>`)}
+                    : `<p class="section-note">${escapeHtml(t('cards.none'))}</p>`)}
             </div>
             <details class="advanced">
-              <summary>Advanced page fields</summary>
+              <summary>${escapeHtml(t('advanced.pageFields'))}</summary>
               <textarea data-field="extras" spellcheck="false">${escapeHtml(page.extrasText && page.extrasText !== '{}' ? page.extrasText : '')}</textarea>
             </details>
           </div>
@@ -1141,8 +1328,8 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         kind: 'cards',
         slot: '',
         cardStyle: 'full',
-        title: `Page ${nextIndex}`,
-        subtitle: 'New scene section',
+        title: currentLang === 'ru' ? `Страница ${nextIndex}` : `Page ${nextIndex}`,
+        subtitle: currentLang === 'ru' ? 'Новый раздел сцены' : 'New scene section',
         stampCaption: '',
         stampValue: '',
         cards: [],
@@ -1289,6 +1476,20 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       try { await saveConfig(); } catch (error) { setStatus(String(error), 'bad'); }
     });
 
+    langSelect.addEventListener('change', () => {
+      const nextLang = langSelect.value === 'ru' ? 'ru' : 'en';
+      currentLang = nextLang;
+      try {
+        window.localStorage.setItem('kiosk-scene-editor-lang', nextLang);
+      } catch {}
+      applyStaticTranslations();
+      try {
+        renderVisualEditor(normalizeVisualConfig(lastEditedMode === 'json' ? readConfigOrDefault() : readVisualConfig()));
+      } catch (error) {
+        setStatus(String(error), 'bad');
+      }
+    });
+
     editorEl.addEventListener('input', () => {
       lastEditedMode = 'json';
     });
@@ -1379,6 +1580,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       }
     });
 
+    applyStaticTranslations();
     loadConfig().catch((error) => setStatus(String(error), 'bad'));
   </script>
 </body>
