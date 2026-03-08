@@ -14,11 +14,41 @@ interface SceneHostBootstrap {
   availability?: Record<string, boolean>;
 }
 
-const DEFAULT_BOOTSTRAP_URL = "/scene-api/bootstrap";
+const DEFAULT_BOOTSTRAP_URL = "../scene-api/bootstrap";
 
 function resolveBootstrapUrl(): string {
   const params = new URLSearchParams(window.location.search);
   return params.get("bootstrap") || DEFAULT_BOOTSTRAP_URL;
+}
+
+function resolveIngressRoot(bootstrapUrl: string): string | null {
+  const resolved = new URL(bootstrapUrl, window.location.href);
+  for (const marker of ["/scene-api/", "/scene-runtime/", "/scene-editor/"]) {
+    const index = resolved.pathname.indexOf(marker);
+    if (index >= 0) {
+      return new URL(resolved.pathname.slice(0, index + 1), resolved.origin).toString();
+    }
+  }
+  return null;
+}
+
+function resolveHostedUrl(value: string, bootstrapUrl: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
+    return normalized;
+  }
+
+  const bootstrapBase = new URL(bootstrapUrl, window.location.href);
+  if (normalized.startsWith("/")) {
+    const ingressRoot = resolveIngressRoot(bootstrapUrl);
+    if (ingressRoot) {
+      return new URL(normalized.slice(1), ingressRoot).toString();
+    }
+  }
+  return new URL(normalized, bootstrapBase).toString();
 }
 
 function renderStatus(root: HTMLElement, title: string, body: string, details?: string): void {
@@ -53,7 +83,10 @@ void (async () => {
   const bootstrapUrl = resolveBootstrapUrl();
   try {
     const bootstrap = await loadBootstrap(bootstrapUrl);
-    const rendererConfigUrl = String(bootstrap.files?.rendererConfigUrl || "").trim();
+    const rendererConfigUrl = resolveHostedUrl(
+      String(bootstrap.files?.rendererConfigUrl || "").trim(),
+      bootstrapUrl,
+    );
     if (!rendererConfigUrl) {
       renderStatus(
         root,

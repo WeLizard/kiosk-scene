@@ -51,11 +51,12 @@ if [ ! -f "$SCENE_ACTIVE_PACK_FILE" ]; then
   printf '{\n  "id": "%s"\n}\n' "$SCENE_DEFAULT_PACK_ID" > "$SCENE_ACTIVE_PACK_FILE"
 fi
 
-if [ -d "$IMAGE_SCENE_RUNTIME_SEED_DIR" ] && [ ! -f "$SCENE_RUNTIME_DIR/index.html" ]; then
+if [ -d "$IMAGE_SCENE_RUNTIME_SEED_DIR" ]; then
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a --ignore-existing "$IMAGE_SCENE_RUNTIME_SEED_DIR/" "$SCENE_RUNTIME_DIR/" 2>/dev/null || true
+    rsync -a --delete "$IMAGE_SCENE_RUNTIME_SEED_DIR/" "$SCENE_RUNTIME_DIR/" 2>/dev/null || true
   else
-    cp -rn "$IMAGE_SCENE_RUNTIME_SEED_DIR/." "$SCENE_RUNTIME_DIR/" 2>/dev/null || true
+    rm -rf "${SCENE_RUNTIME_DIR:?}/"*
+    cp -r "$IMAGE_SCENE_RUNTIME_SEED_DIR/." "$SCENE_RUNTIME_DIR/" 2>/dev/null || true
   fi
 fi
 
