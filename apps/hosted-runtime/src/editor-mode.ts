@@ -1,4 +1,5 @@
 import type { SceneCardV1, SceneConfigV1, ScenePageV1 } from "@kiosk-scene/core";
+import { getHomeAssistantHandle, type HomeAssistantStateEntity, type HomeAssistantStates } from "@kiosk-scene/provider-ha";
 
 type UiLang = "ru" | "en";
 
@@ -62,6 +63,12 @@ type EditorCopy = {
   cardTime: string;
   cardPercent: string;
   cardNumber: string;
+  homeAssistant: string;
+  entitySearch: string;
+  entityBinding: string;
+  entityBindingEmpty: string;
+  noEntities: string;
+  useEntity: string;
 };
 
 export interface NativeEditorShellOptions {
@@ -147,6 +154,12 @@ const COPY: Record<UiLang, EditorCopy> = {
     cardTime: "time",
     cardPercent: "percent",
     cardNumber: "number",
+    homeAssistant: "Home Assistant",
+    entitySearch: "Поиск сущностей",
+    entityBinding: "Связать с полем",
+    entityBindingEmpty: "Кликни в поле Entity / State / Down / Up у карточки, потом выбери сущность здесь.",
+    noEntities: "Сущности Home Assistant пока недоступны",
+    useEntity: "Использовать",
   },
   en: {
     title: "Scene Editor",
@@ -208,6 +221,12 @@ const COPY: Record<UiLang, EditorCopy> = {
     cardTime: "time",
     cardPercent: "percent",
     cardNumber: "number",
+    homeAssistant: "Home Assistant",
+    entitySearch: "Search entities",
+    entityBinding: "Bind into field",
+    entityBindingEmpty: "Click an Entity / State / Down / Up field on a card, then choose an entity here.",
+    noEntities: "Home Assistant entities are not available yet",
+    useEntity: "Use",
   },
 };
 
@@ -218,6 +237,17 @@ type EditorState = {
   saving: boolean;
   status: string;
   statusTone: "muted" | "ok" | "bad";
+  haEntities: HaEntitySummary[];
+  entitySearch: string;
+  focusedBinding: { cardIndex: number; field: string } | null;
+};
+
+type HaEntitySummary = {
+  entityId: string;
+  name: string;
+  domain: string;
+  state: string;
+  unit: string;
 };
 
 function resolveUiLang(): UiLang {
@@ -430,6 +460,48 @@ function labelForField(copy: EditorCopy, field: string): string {
   return map[field] || field;
 }
 
+function summarizeHaEntity(entityId: string, entity: HomeAssistantStateEntity): HaEntitySummary {
+  const attributes = entity.attributes || {};
+  const name = String(attributes.friendly_name || entityId);
+  const domain = entityId.includes(".") ? entityId.split(".", 1)[0] || "other" : "other";
+  const state = String(entity.state || "");
+  const unit = String(attributes.unit_of_measurement || "");
+  return { entityId, name, domain, state, unit };
+}
+
+function buildHaEntityCatalog(states: HomeAssistantStates | null | undefined): HaEntitySummary[] {
+  if (!states) {
+    return [];
+  }
+  return Object.entries(states)
+    .map(([entityId, entity]) => summarizeHaEntity(entityId, entity))
+    .sort((a, b) => {
+      const domainCompare = a.domain.localeCompare(b.domain);
+      if (domainCompare !== 0) {
+        return domainCompare;
+      }
+      return a.name.localeCompare(b.name, "ru");
+    });
+}
+
+function filterHaEntityCatalog(catalog: HaEntitySummary[], query: string): HaEntitySummary[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return catalog.slice(0, 48);
+  }
+  return catalog
+    .filter((item) =>
+      item.entityId.toLowerCase().includes(normalized)
+      || item.name.toLowerCase().includes(normalized)
+      || item.domain.toLowerCase().includes(normalized)
+      || item.state.toLowerCase().includes(normalized))
+    .slice(0, 48);
+}
+
+function isEntityBindingField(field: string): boolean {
+  return ["entity", "stateEntity", "downEntity", "upEntity"].includes(field);
+}
+
 function renderPageField(label: string, field: string, value: string, wide = false): string {
   return `
     <div class="field ${wide ? "is-wide" : ""}">
@@ -485,6 +557,7 @@ function renderCard(copy: EditorCopy, card: SceneCardV1, index: number, count: n
               type="${field === "digits" ? "number" : "text"}"
               data-card-index="${index}"
               data-card-field="${escapeHtml(field)}"
+              ${isEntityBindingField(field) ? `data-binding-field="${escapeHtml(field)}"` : ""}
               value="${escapeHtml(fieldValue(card as Record<string, unknown>, field))}"
             >
           </div>
@@ -492,6 +565,21 @@ function renderCard(copy: EditorCopy, card: SceneCardV1, index: number, count: n
       </div>
     </article>
   `;
+}
+
+function hydrateCardFromEntity(card: SceneCardV1, field: string, entity: HaEntitySummary): void {
+  (card as Record<string, unknown>)[field] = entity.entityId;
+
+  const record = card as Record<string, unknown>;
+  if (!String(record.caption || "").trim()) {
+    record.caption = entity.name;
+  }
+  if (!String(record.hint || "").trim()) {
+    record.hint = entity.unit ? `${entity.state} ${entity.unit}`.trim() : entity.state;
+  }
+  if ((record.type === "number" || record.type === "percent") && !String(record.unit || "").trim() && entity.unit) {
+    record.unit = entity.unit;
+  }
 }
 
 export async function mountNativeEditorShell(options: NativeEditorShellOptions): Promise<void> {
@@ -510,6 +598,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     saving: false,
     status: copy.statusLoading,
     statusTone: "muted",
+    haEntities: [],
+    entitySearch: "",
+    focusedBinding: null,
   };
 
   const render = (): void => {
@@ -517,16 +608,18 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const ordered = config ? orderedPages(config) : [];
     const selectedPage = ordered.find((page) => page.id === state.selectedPageId) || ordered[0] || null;
     const selectedCards = Array.isArray(selectedPage?.cards) ? selectedPage.cards : [];
+    const filteredEntities = filterHaEntityCatalog(state.haEntities, state.entitySearch);
+    const bindingLabel = state.focusedBinding
+      ? `${copy.entityBinding}: #${state.focusedBinding.cardIndex + 1} → ${state.focusedBinding.field}`
+      : copy.entityBindingEmpty;
 
     wrapper.innerHTML = `
       <style>
         #scene-editor-shell {
-          position: fixed;
-          top: 18px;
-          right: 18px;
-          bottom: 18px;
-          width: min(540px, calc(100vw - 36px));
-          z-index: 40;
+          position: relative;
+          width: auto;
+          height: auto;
+          margin: 18px;
           display: grid;
           grid-template-rows: auto 1fr;
           border-radius: 28px;
@@ -536,7 +629,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
           backdrop-filter: blur(18px);
           overflow: hidden;
         }
-        #scene-editor-shell[data-collapsed="true"] { width: auto; bottom: auto; background: transparent; border: 0; box-shadow: none; backdrop-filter: none; overflow: visible; }
+        #scene-editor-shell[data-collapsed="true"] { background: transparent; border: 0; box-shadow: none; backdrop-filter: none; overflow: visible; }
         #scene-editor-shell[data-collapsed="true"] .scene-editor-main { display: none; }
         #scene-editor-shell .scene-editor-topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid rgba(32,48,65,0.08); background:linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.52)); }
         #scene-editor-shell[data-collapsed="true"] .scene-editor-topbar { border:0; padding:0; background:transparent; }
@@ -550,10 +643,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         #scene-editor-shell .scene-editor-button, #scene-editor-shell .tiny-btn { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:0 14px; border-radius:999px; border:1px solid rgba(62,98,122,0.18); background:rgba(255,255,255,0.86); color:#203041; text-decoration:none; cursor:pointer; }
         #scene-editor-shell .tiny-btn { min-height:30px; padding:0 10px; }
         #scene-editor-shell .scene-editor-button.is-accent { background:linear-gradient(180deg, rgba(111,191,162,0.24), rgba(111,191,162,0.12)); border-color:rgba(77,147,121,0.28); }
-        #scene-editor-shell .scene-editor-main { display:grid; grid-template-columns:190px minmax(0, 1fr); min-height:0; }
-        #scene-editor-shell .scene-editor-pages, #scene-editor-shell .scene-editor-inspector { min-height:0; overflow:auto; }
+        #scene-editor-shell .scene-editor-main { display:grid; grid-template-columns:240px minmax(0, 1fr) 340px; min-height:0; }
+        #scene-editor-shell .scene-editor-pages, #scene-editor-shell .scene-editor-inspector, #scene-editor-shell .scene-editor-ha { min-height:0; overflow:auto; }
         #scene-editor-shell .scene-editor-pages { padding:14px; border-right:1px solid rgba(32,48,65,0.08); background:rgba(246,250,252,0.92); }
         #scene-editor-shell .scene-editor-inspector { padding:16px; background:rgba(250,252,253,0.92); }
+        #scene-editor-shell .scene-editor-ha { padding:16px; border-left:1px solid rgba(32,48,65,0.08); background:rgba(247,250,252,0.96); }
         #scene-editor-shell h2 { margin:0 0 10px; font:700 15px/1.1 "Aptos","Segoe UI",sans-serif; color:#203041; }
         #scene-editor-shell .meta { font:12px/1.35 "Aptos","Segoe UI",sans-serif; color:rgba(32,48,65,0.66); }
         #scene-editor-shell .page-list, #scene-editor-shell .cards-list { display:grid; gap:10px; }
@@ -567,6 +661,27 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         #scene-editor-shell .field.is-wide { grid-column:1 / -1; }
         #scene-editor-shell .field label { font:12px/1.25 "Aptos","Segoe UI",sans-serif; color:rgba(32,48,65,0.72); }
         #scene-editor-shell input, #scene-editor-shell select { width:100%; min-height:40px; border-radius:12px; border:1px solid rgba(32,48,65,0.12); background:rgba(255,255,255,0.92); padding:0 12px; color:#203041; }
+        #scene-editor-shell .ha-search { margin-bottom: 10px; }
+        #scene-editor-shell .ha-list { display:grid; gap:8px; }
+        #scene-editor-shell .ha-entity { display:grid; gap:6px; padding:10px 12px; border-radius:16px; border:1px solid rgba(32,48,65,0.08); background:rgba(255,255,255,0.88); }
+        #scene-editor-shell .ha-entity strong { font:700 13px/1.15 "Aptos","Segoe UI",sans-serif; color:#203041; }
+        #scene-editor-shell .ha-entity code { font:12px/1.25 Consolas, monospace; color:#385268; }
+        #scene-editor-shell .ha-entity-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        #scene-editor-shell .ha-state { font:12px/1.3 "Aptos","Segoe UI",sans-serif; color:#4f6a7c; }
+        @media (max-width: 1280px) {
+          #scene-editor-shell .scene-editor-main { grid-template-columns: 180px minmax(0, 1fr) 280px; }
+        }
+        @media (max-width: 980px) {
+          #scene-editor-shell .scene-editor-main {
+            grid-template-columns: 1fr;
+          }
+          #scene-editor-shell .scene-editor-pages,
+          #scene-editor-shell .scene-editor-inspector,
+          #scene-editor-shell .scene-editor-ha {
+            border: 0;
+            border-top: 1px solid rgba(32,48,65,0.08);
+          }
+        }
       </style>
       <div class="scene-editor-topbar">
         <div class="scene-editor-title">
@@ -625,6 +740,29 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               ${selectedCards.length ? selectedCards.map((card, index) => renderCard(copy, card, index, selectedCards.length)).join("") : `<div class="meta">${copy.noCards}</div>`}
             </div>
           ` : `<div class="meta">${copy.statusLoading}</div>`}
+        </section>
+        <section class="scene-editor-ha">
+          <h2>${copy.homeAssistant}</h2>
+          <div class="meta">${escapeHtml(bindingLabel)}</div>
+          <div class="field ha-search" style="margin-top:12px;">
+            <label for="ha-entity-search">${copy.entitySearch}</label>
+            <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
+          </div>
+          <div class="ha-list">
+            ${filteredEntities.length ? filteredEntities.map((entity) => `
+              <article class="ha-entity">
+                <div class="ha-entity-row">
+                  <div>
+                    <strong>${escapeHtml(entity.name)}</strong>
+                    <div class="meta">${escapeHtml(entity.domain)}</div>
+                  </div>
+                  <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}">${copy.useEntity}</button>
+                </div>
+                <code>${escapeHtml(entity.entityId)}</code>
+                <div class="ha-state">${escapeHtml(entity.state)}${entity.unit ? ` · ${escapeHtml(entity.unit)}` : ""}</div>
+              </article>
+            `).join("") : `<div class="meta">${copy.noEntities}</div>`}
+          </div>
         </section>
       </div>
     `;
@@ -720,6 +858,24 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       (card as Record<string, unknown>)[field] = value;
     }
     markDirty();
+  };
+
+  const bindEntityToFocusedField = (entityId: string): void => {
+    if (!state.config || !state.selectedPageId || !state.focusedBinding) {
+      return;
+    }
+    const page = state.config.pages.find((item) => item.id === state.selectedPageId);
+    const entity = state.haEntities.find((item) => item.entityId === entityId);
+    if (!page || !Array.isArray(page.cards) || !entity) {
+      return;
+    }
+    const card = page.cards[state.focusedBinding.cardIndex];
+    if (!card) {
+      return;
+    }
+    hydrateCardFromEntity(card, state.focusedBinding.field, entity);
+    markDirty();
+    render();
   };
 
   wrapper.addEventListener("click", async (event) => {
@@ -840,6 +996,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         state.saving = false;
         setStatus(`${copy.saveError}: ${String(error)}`, "bad");
       }
+      return;
+    }
+    if (action === "bind-entity") {
+      const entityId = actionEl?.dataset.entityId || "";
+      bindEntityToFocusedField(entityId);
     }
   });
 
@@ -856,11 +1017,32 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     if (target.dataset.cardField && target.dataset.cardIndex) {
       updateCardField(Number(target.dataset.cardIndex), target.dataset.cardField, target.value);
       render();
+      return;
     }
+    if (target.hasAttribute("data-ha-search")) {
+      state.entitySearch = target.value;
+      render();
+    }
+  });
+
+  wrapper.addEventListener("focusin", (event) => {
+    const target = event.target as HTMLInputElement | null;
+    if (!target?.dataset.bindingField) {
+      return;
+    }
+    const cardIndex = Number(target.dataset.cardIndex || "-1");
+    if (cardIndex < 0) {
+      return;
+    }
+    state.focusedBinding = {
+      cardIndex,
+      field: target.dataset.bindingField,
+    };
   });
 
   try {
     state.config = await loadConfig(options.sceneApiUrl);
+    state.haEntities = buildHaEntityCatalog(getHomeAssistantHandle()?.states || null);
     state.selectedPageId = initialSelectedPageId(state.config);
     state.status = copy.statusSaved;
     state.statusTone = "ok";
