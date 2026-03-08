@@ -6,6 +6,12 @@ type UiLang = "ru" | "en";
 type EditorCopy = {
   title: string;
   subtitle: (packId: string) => string;
+  previewTitle: string;
+  previewSubtitle: string;
+  previewDisplay: string;
+  previewResolution: string;
+  dashboardTitle: string;
+  dashboardSubtitle: string;
   statusLoading: string;
   statusSaved: string;
   statusDirty: string;
@@ -21,6 +27,8 @@ type EditorCopy = {
   pageCards: (count: number) => string;
   inspector: string;
   pageSettings: string;
+  displaySettings: string;
+  displaySubtitle: string;
   cards: string;
   cardType: string;
   noCards: string;
@@ -41,6 +49,13 @@ type EditorCopy = {
   fieldCardStyle: string;
   fieldStampCaption: string;
   fieldStampValue: string;
+  fieldDisplaySafeTop: string;
+  fieldDisplaySafeRight: string;
+  fieldDisplaySafeBottom: string;
+  fieldDisplaySafeLeft: string;
+  fieldDisplayPadding: string;
+  fieldDisplayGap: string;
+  fieldDisplayScale: string;
   fieldCardCaption: string;
   fieldCardHint: string;
   fieldCardEntity: string;
@@ -96,7 +111,13 @@ const COMMON_CARD_FIELDS = ["caption", "hint"] as const;
 const COPY: Record<UiLang, EditorCopy> = {
   ru: {
     title: "Редактор сцены",
-    subtitle: (packId) => `Pack: ${packId || "default"} · Редактирование прямо поверх живой сцены`,
+    subtitle: (packId) => `Пакет: ${packId || "default"} · Живое превью сцены и полный дашборд настроек`,
+    previewTitle: "Превью дисплея",
+    previewSubtitle: "Сверху показывается та сцена, которую увидит выбранный экран.",
+    previewDisplay: "Профиль дисплея",
+    previewResolution: "Разрешение",
+    dashboardTitle: "Панель настройки сцены",
+    dashboardSubtitle: "Вся настройка расположена ниже превью как длинная редакторская страница.",
     statusLoading: "Загружаю конфигурацию сцены...",
     statusSaved: "Сохранено",
     statusDirty: "Есть несохранённые изменения",
@@ -112,6 +133,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     pageCards: (count) => `${count} карточ${count === 1 ? "ка" : count < 5 ? "ки" : "ек"}`,
     inspector: "Инспектор",
     pageSettings: "Параметры страницы",
+    displaySettings: "Дисплей и врезка",
+    displaySubtitle: "Подстройка под физический экран, safe area и общий масштаб сцены.",
     cards: "Карточки",
     cardType: "Тип карточки",
     noCards: "На странице пока нет карточек",
@@ -121,9 +144,9 @@ const COPY: Record<UiLang, EditorCopy> = {
     down: "Ниже",
     loadError: "Не удалось загрузить конфиг сцены",
     saveError: "Не удалось сохранить конфиг сцены",
-    kindOverview: "overview",
-    kindCards: "cards",
-    kindForecastCards: "forecast+cards",
+    kindOverview: "Обзор",
+    kindCards: "Карточки",
+    kindForecastCards: "Прогноз + карточки",
     fieldPageId: "ID страницы",
     fieldTitle: "Заголовок",
     fieldSubtitle: "Подзаголовок",
@@ -132,38 +155,51 @@ const COPY: Record<UiLang, EditorCopy> = {
     fieldCardStyle: "Стиль карточек",
     fieldStampCaption: "Подпись штампа",
     fieldStampValue: "Значение штампа",
+    fieldDisplaySafeTop: "Безопасная зона сверху",
+    fieldDisplaySafeRight: "Безопасная зона справа",
+    fieldDisplaySafeBottom: "Безопасная зона снизу",
+    fieldDisplaySafeLeft: "Безопасная зона слева",
+    fieldDisplayPadding: "Внутренний отступ layout",
+    fieldDisplayGap: "Промежуток между панелями",
+    fieldDisplayScale: "Общий масштаб сцены",
     fieldCardCaption: "Подпись",
     fieldCardHint: "Подсказка",
-    fieldCardEntity: "Entity",
+    fieldCardEntity: "Сущность",
     fieldCardValue: "Текст / значение",
-    fieldCardOnText: "Текст On",
-    fieldCardOffText: "Текст Off",
-    fieldCardStateEntity: "Entity состояния",
-    fieldCardDownEntity: "Entity down",
-    fieldCardUpEntity: "Entity up",
-    fieldCardDigits: "Digits",
-    fieldCardUnit: "Unit",
-    styleFull: "full",
-    styleMini: "mini",
-    cardEntity: "entity",
-    cardText: "text",
-    cardTodo: "todo",
-    cardOnOff: "onoff",
-    cardBattery: "battery",
-    cardNetwork: "network",
-    cardTime: "time",
-    cardPercent: "percent",
-    cardNumber: "number",
+    fieldCardOnText: "Текст Вкл",
+    fieldCardOffText: "Текст Выкл",
+    fieldCardStateEntity: "Сущность состояния",
+    fieldCardDownEntity: "Сущность down",
+    fieldCardUpEntity: "Сущность up",
+    fieldCardDigits: "Знаков после запятой",
+    fieldCardUnit: "Единица измерения",
+    styleFull: "Крупные",
+    styleMini: "Мини",
+    cardEntity: "Сущность",
+    cardText: "Текст",
+    cardTodo: "Список задач",
+    cardOnOff: "Вкл / выкл",
+    cardBattery: "Батарея",
+    cardNetwork: "Сеть",
+    cardTime: "Время",
+    cardPercent: "Процент",
+    cardNumber: "Число",
     homeAssistant: "Home Assistant",
     entitySearch: "Поиск сущностей",
     entityBinding: "Связать с полем",
-    entityBindingEmpty: "Кликни в поле Entity / State / Down / Up у карточки, потом выбери сущность здесь.",
+    entityBindingEmpty: "Кликни в поле Сущность / State / Down / Up у карточки, потом выбери сущность здесь.",
     noEntities: "Сущности Home Assistant пока недоступны",
     useEntity: "Использовать",
   },
   en: {
     title: "Scene Editor",
-    subtitle: (packId) => `Pack: ${packId || "default"} · Edit directly on top of the live scene`,
+    subtitle: (packId) => `Pack: ${packId || "default"} · Live scene preview with a full settings dashboard`,
+    previewTitle: "Display Preview",
+    previewSubtitle: "The top stage mirrors how the selected screen should look.",
+    previewDisplay: "Display profile",
+    previewResolution: "Resolution",
+    dashboardTitle: "Scene Settings Dashboard",
+    dashboardSubtitle: "All configuration lives below the preview as a normal scrollable page.",
     statusLoading: "Loading scene config...",
     statusSaved: "Saved",
     statusDirty: "Unsaved changes",
@@ -179,6 +215,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     pageCards: (count) => `${count} cards`,
     inspector: "Inspector",
     pageSettings: "Page settings",
+    displaySettings: "Display fit",
+    displaySubtitle: "Tune safe areas, spacing and overall scale for the physical screen.",
     cards: "Cards",
     cardType: "Card type",
     noCards: "No cards on this page yet",
@@ -199,6 +237,13 @@ const COPY: Record<UiLang, EditorCopy> = {
     fieldCardStyle: "Card style",
     fieldStampCaption: "Stamp caption",
     fieldStampValue: "Stamp value",
+    fieldDisplaySafeTop: "Safe area top",
+    fieldDisplaySafeRight: "Safe area right",
+    fieldDisplaySafeBottom: "Safe area bottom",
+    fieldDisplaySafeLeft: "Safe area left",
+    fieldDisplayPadding: "Layout padding",
+    fieldDisplayGap: "Layout gap",
+    fieldDisplayScale: "Global scene scale",
     fieldCardCaption: "Caption",
     fieldCardHint: "Hint",
     fieldCardEntity: "Entity",
@@ -240,6 +285,7 @@ type EditorState = {
   haEntities: HaEntitySummary[];
   entitySearch: string;
   focusedBinding: { cardIndex: number; field: string } | null;
+  previewDisplayId: string;
 };
 
 type HaEntitySummary = {
@@ -250,9 +296,85 @@ type HaEntitySummary = {
   unit: string;
 };
 
+type PreviewDisplayProfile = {
+  id: string;
+  width: number;
+  height: number;
+  label: Record<UiLang, string>;
+};
+
+const PREVIEW_DISPLAY_PROFILES: readonly PreviewDisplayProfile[] = [
+  {
+    id: "mellow-fly-7",
+    width: 1024,
+    height: 600,
+    label: {
+      ru: "Mellow Fly 7\" · 1024×600",
+      en: "Mellow Fly 7\" · 1024x600",
+    },
+  },
+  {
+    id: "hdmi-1080p",
+    width: 1920,
+    height: 1080,
+    label: {
+      ru: "HDMI дисплей 1920×1080",
+      en: "HDMI display 1920x1080",
+    },
+  },
+  {
+    id: "tv-1366",
+    width: 1366,
+    height: 768,
+    label: {
+      ru: "ТВ панель 1366×768",
+      en: "TV panel 1366x768",
+    },
+  },
+  {
+    id: "hdmi-1440p",
+    width: 2560,
+    height: 1440,
+    label: {
+      ru: "Монитор 2560×1440",
+      en: "Monitor 2560x1440",
+    },
+  },
+  {
+    id: "display-4k",
+    width: 3840,
+    height: 2160,
+    label: {
+      ru: "4K дисплей 3840×2160",
+      en: "4K display 3840x2160",
+    },
+  },
+  {
+    id: "portrait-1080",
+    width: 1080,
+    height: 1920,
+    label: {
+      ru: "Portrait 1080×1920",
+      en: "Portrait 1080x1920",
+    },
+  },
+] as const;
+
+const DEFAULT_PREVIEW_DISPLAY_ID = "mellow-fly-7";
+
 function resolveUiLang(): UiLang {
   const locale = String(navigator.language || "").toLowerCase();
   return locale.startsWith("ru") ? "ru" : "en";
+}
+
+function resolvePreviewDisplayProfile(profileId: string | null | undefined): PreviewDisplayProfile {
+  return PREVIEW_DISPLAY_PROFILES.find((profile) => profile.id === profileId)
+    || PREVIEW_DISPLAY_PROFILES.find((profile) => profile.id === DEFAULT_PREVIEW_DISPLAY_ID)
+    || PREVIEW_DISPLAY_PROFILES[0];
+}
+
+function formatPreviewResolution(profile: PreviewDisplayProfile): string {
+  return `${profile.width} × ${profile.height}`;
 }
 
 function escapeHtml(value: unknown): string {
@@ -347,6 +469,48 @@ function fieldValue(record: Record<string, unknown>, key: string): string {
 function pageFieldValue(page: ScenePageV1, key: keyof ScenePageV1): string {
   const value = page[key];
   return value === undefined || value === null ? "" : String(value);
+}
+
+type DisplayFieldKey =
+  | "safeTop"
+  | "safeRight"
+  | "safeBottom"
+  | "safeLeft"
+  | "layoutPaddingPx"
+  | "layoutGapPx"
+  | "globalScale";
+
+function readDisplayFieldValue(config: SceneConfigV1, field: DisplayFieldKey): string {
+  const display = config.display || {};
+  const safeArea = display.safeArea || {};
+  switch (field) {
+    case "safeTop":
+      return String(Number.isFinite(Number(safeArea.top)) ? Number(safeArea.top) : 0);
+    case "safeRight":
+      return String(Number.isFinite(Number(safeArea.right)) ? Number(safeArea.right) : 0);
+    case "safeBottom":
+      return String(Number.isFinite(Number(safeArea.bottom)) ? Number(safeArea.bottom) : 0);
+    case "safeLeft":
+      return String(Number.isFinite(Number(safeArea.left)) ? Number(safeArea.left) : 0);
+    case "layoutPaddingPx":
+      return String(Number.isFinite(Number(display.layoutPaddingPx)) ? Number(display.layoutPaddingPx) : 16);
+    case "layoutGapPx":
+      return String(Number.isFinite(Number(display.layoutGapPx)) ? Number(display.layoutGapPx) : 16);
+    case "globalScale":
+      return String(Number.isFinite(Number(display.globalScale)) ? Number(display.globalScale) : 1);
+    default:
+      return "";
+  }
+}
+
+function ensureDisplayConfig(config: SceneConfigV1): NonNullable<SceneConfigV1["display"]> {
+  if (!config.display) {
+    config.display = {};
+  }
+  if (!config.display.safeArea) {
+    config.display.safeArea = {};
+  }
+  return config.display;
 }
 
 function focusScenePageByIndex(index: number): void {
@@ -511,6 +675,16 @@ function renderPageField(label: string, field: string, value: string, wide = fal
   `;
 }
 
+function renderDisplayField(label: string, field: DisplayFieldKey, value: string): string {
+  const step = field === "globalScale" ? "0.01" : "1";
+  return `
+    <div class="field">
+      <label for="display-field-${field}">${escapeHtml(label)}</label>
+      <input id="display-field-${field}" type="number" step="${step}" data-display-field="${escapeHtml(field)}" value="${escapeHtml(value)}">
+    </div>
+  `;
+}
+
 function renderPageSelect(
   label: string,
   field: string,
@@ -584,12 +758,340 @@ function hydrateCardFromEntity(card: SceneCardV1, field: string, entity: HaEntit
 
 export async function mountNativeEditorShell(options: NativeEditorShellOptions): Promise<void> {
   const copy = COPY[resolveUiLang()];
+  const appRoot = document.getElementById("app");
+  if (!appRoot) {
+    throw new Error("Missing #app root");
+  }
   const existing = document.getElementById("scene-editor-shell");
+  if (existing?.contains(appRoot)) {
+    document.body.insertBefore(appRoot, existing);
+  }
   existing?.remove();
 
-  const wrapper = document.createElement("aside");
+  const wrapper = document.createElement("section");
   wrapper.id = "scene-editor-shell";
+  wrapper.innerHTML = `
+    <style>
+      #scene-editor-shell {
+        --preview-stage-width: min(100%, 1280px);
+        max-width: 1420px;
+        margin: 0 auto;
+        padding: 24px 18px 64px;
+        color: #203041;
+      }
+      #scene-editor-shell .scene-editor-page {
+        display: grid;
+        gap: 22px;
+      }
+      #scene-editor-shell .scene-preview-shell,
+      #scene-editor-shell .scene-settings-card {
+        border-radius: 30px;
+        border: 1px solid rgba(32,48,65,0.1);
+        background: rgba(248, 251, 253, 0.86);
+        box-shadow: 0 24px 64px rgba(46,72,94,0.18);
+        backdrop-filter: blur(14px);
+      }
+      #scene-editor-shell .scene-preview-shell {
+        padding: 18px;
+      }
+      #scene-editor-shell .scene-preview-head,
+      #scene-editor-shell .scene-dashboard-topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      #scene-editor-shell .scene-preview-copy strong,
+      #scene-editor-shell .scene-dashboard-title strong {
+        display: block;
+        font: 700 18px/1.05 "Aptos","Segoe UI",sans-serif;
+        letter-spacing: -0.03em;
+      }
+      #scene-editor-shell .scene-preview-copy span,
+      #scene-editor-shell .scene-dashboard-title span {
+        display: block;
+        margin-top: 6px;
+        font: 13px/1.45 "Aptos","Segoe UI",sans-serif;
+        color: rgba(32,48,65,0.68);
+      }
+      #scene-editor-shell .scene-preview-controls {
+        display: flex;
+        align-items: end;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      #scene-editor-shell .scene-preview-resolution {
+        min-width: 140px;
+        padding: 10px 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(32,48,65,0.08);
+        background: rgba(255,255,255,0.82);
+      }
+      #scene-editor-shell .scene-preview-resolution span {
+        display: block;
+        font: 12px/1.2 "Aptos","Segoe UI",sans-serif;
+        color: rgba(32,48,65,0.62);
+      }
+      #scene-editor-shell .scene-preview-resolution strong {
+        display: block;
+        margin-top: 4px;
+        font: 700 15px/1.1 "Aptos","Segoe UI",sans-serif;
+      }
+      #scene-editor-shell .scene-preview-frame {
+        margin-top: 18px;
+        display: grid;
+        justify-items: center;
+      }
+      #scene-editor-shell .scene-preview-screen {
+        width: var(--preview-stage-width);
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 30px;
+        padding: 16px;
+        border: 1px solid rgba(32,48,65,0.08);
+        background:
+          radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 28%),
+          linear-gradient(165deg, #edf5fb 0%, #dbeaf3 52%, #f8fbfd 100%);
+        overflow: hidden;
+      }
+      #scene-editor-shell .scene-preview-stage {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border-radius: 22px;
+        background: rgba(231, 240, 247, 0.68);
+        border: 1px solid rgba(32,48,65,0.08);
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+      }
+      #scene-editor-shell #app {
+        flex: none;
+        margin: 0;
+        min-height: 0;
+        transform-origin: top left;
+      }
+      #scene-editor-shell #app,
+      #scene-editor-shell #app .scene-viewport,
+      #scene-editor-shell #app .layout {
+        min-height: 0;
+        height: 100%;
+      }
+      #scene-editor-shell #app .scene-viewport {
+        overflow: hidden;
+      }
+      #scene-editor-shell .scene-dashboard {
+        display: grid;
+        gap: 18px;
+      }
+      #scene-editor-shell[data-collapsed="true"] .scene-dashboard-body {
+        display: none;
+      }
+      #scene-editor-shell .scene-editor-status {
+        margin-top: 10px;
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.84);
+        font: 12px/1 "Aptos","Segoe UI",sans-serif;
+        color: #4b6577;
+      }
+      #scene-editor-shell .scene-editor-status[data-tone="ok"] { color:#2b7f57; }
+      #scene-editor-shell .scene-editor-status[data-tone="bad"] { color:#ab4444; }
+      #scene-editor-shell .scene-editor-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      #scene-editor-shell .scene-editor-button,
+      #scene-editor-shell .tiny-btn,
+      #scene-editor-shell input,
+      #scene-editor-shell select {
+        font: 13px/1.2 "Aptos","Segoe UI",sans-serif;
+      }
+      #scene-editor-shell .scene-editor-button,
+      #scene-editor-shell .tiny-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 0 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(62,98,122,0.18);
+        background: rgba(255,255,255,0.86);
+        color: #203041;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      #scene-editor-shell .tiny-btn {
+        min-height: 30px;
+        padding: 0 10px;
+      }
+      #scene-editor-shell .scene-editor-button.is-accent {
+        background: linear-gradient(180deg, rgba(111,191,162,0.24), rgba(111,191,162,0.12));
+        border-color: rgba(77,147,121,0.28);
+      }
+      #scene-editor-shell .scene-settings-card {
+        padding: 18px;
+      }
+      #scene-editor-shell .scene-settings-head {
+        margin-bottom: 12px;
+      }
+      #scene-editor-shell h2 {
+        margin: 0 0 6px;
+        font: 700 16px/1.1 "Aptos","Segoe UI",sans-serif;
+        color: #203041;
+      }
+      #scene-editor-shell .meta {
+        font: 12px/1.4 "Aptos","Segoe UI",sans-serif;
+        color: rgba(32,48,65,0.66);
+      }
+      #scene-editor-shell .page-list,
+      #scene-editor-shell .cards-list,
+      #scene-editor-shell .ha-list,
+      #scene-editor-shell .scene-settings-stack {
+        display: grid;
+        gap: 10px;
+      }
+      #scene-editor-shell .page-chip,
+      #scene-editor-shell .card-item,
+      #scene-editor-shell .ha-entity {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 18px;
+        border: 1px solid rgba(32,48,65,0.08);
+        background: rgba(255,255,255,0.86);
+      }
+      #scene-editor-shell .page-chip.is-active {
+        border-color: rgba(77,147,121,0.34);
+        box-shadow: 0 0 0 2px rgba(111,191,162,0.18);
+      }
+      #scene-editor-shell .page-chip-header {
+        display: grid;
+        gap: 4px;
+        cursor: pointer;
+      }
+      #scene-editor-shell .page-chip-header strong,
+      #scene-editor-shell .card-item-head strong,
+      #scene-editor-shell .ha-entity strong {
+        display: block;
+        font: 700 14px/1.1 "Aptos","Segoe UI",sans-serif;
+        color: #203041;
+      }
+      #scene-editor-shell .page-chip-actions,
+      #scene-editor-shell .card-actions,
+      #scene-editor-shell .card-add {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      #scene-editor-shell .inspector-grid,
+      #scene-editor-shell .card-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      #scene-editor-shell .field {
+        display: grid;
+        gap: 6px;
+      }
+      #scene-editor-shell .field.is-wide {
+        grid-column: 1 / -1;
+      }
+      #scene-editor-shell .field label {
+        font: 12px/1.25 "Aptos","Segoe UI",sans-serif;
+        color: rgba(32,48,65,0.72);
+      }
+      #scene-editor-shell input,
+      #scene-editor-shell select {
+        width: 100%;
+        min-height: 40px;
+        border-radius: 12px;
+        border: 1px solid rgba(32,48,65,0.12);
+        background: rgba(255,255,255,0.92);
+        padding: 0 12px;
+        color: #203041;
+      }
+      #scene-editor-shell .ha-entity code {
+        font: 12px/1.25 Consolas, monospace;
+        color: #385268;
+      }
+      #scene-editor-shell .ha-entity-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      #scene-editor-shell .ha-state {
+        font: 12px/1.3 "Aptos","Segoe UI",sans-serif;
+        color: #4f6a7c;
+      }
+      @media (max-width: 980px) {
+        #scene-editor-shell {
+          padding: 12px 12px 42px;
+        }
+        #scene-editor-shell .scene-preview-shell,
+        #scene-editor-shell .scene-settings-card {
+          border-radius: 24px;
+        }
+        #scene-editor-shell .scene-preview-screen {
+          padding: 10px;
+        }
+        #scene-editor-shell .inspector-grid,
+        #scene-editor-shell .card-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <div class="scene-editor-page">
+      <section class="scene-preview-shell">
+        <div class="scene-preview-head">
+          <div class="scene-preview-copy">
+            <strong>${copy.previewTitle}</strong>
+            <span>${copy.previewSubtitle}</span>
+          </div>
+          <div class="scene-preview-controls">
+            <div class="field">
+              <label for="scene-preview-display">${copy.previewDisplay}</label>
+              <select id="scene-preview-display" data-preview-display>
+                ${PREVIEW_DISPLAY_PROFILES.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.label[resolveUiLang()])}</option>`).join("")}
+              </select>
+            </div>
+            <div class="scene-preview-resolution">
+              <span>${copy.previewResolution}</span>
+              <strong data-preview-resolution>1920 × 1080</strong>
+            </div>
+          </div>
+        </div>
+        <div class="scene-preview-frame">
+          <div class="scene-preview-screen" data-preview-screen>
+            <div class="scene-preview-stage" data-preview-stage></div>
+          </div>
+        </div>
+      </section>
+      <section class="scene-dashboard" data-dashboard></section>
+    </div>
+  `;
   document.body.appendChild(wrapper);
+  document.documentElement.dataset.editorMode = "true";
+  document.body.dataset.editorMode = "true";
+  document.body.style.overflow = "auto";
+
+  const previewScreen = wrapper.querySelector<HTMLElement>("[data-preview-screen]");
+  const previewStage = wrapper.querySelector<HTMLElement>("[data-preview-stage]");
+  const previewResolution = wrapper.querySelector<HTMLElement>("[data-preview-resolution]");
+  const previewDisplaySelect = wrapper.querySelector<HTMLSelectElement>("[data-preview-display]");
+  const dashboardHost = wrapper.querySelector<HTMLElement>("[data-dashboard]");
+  if (!previewScreen || !previewStage || !previewResolution || !previewDisplaySelect || !dashboardHost) {
+    throw new Error("Missing native editor shell elements");
+  }
+  previewStage.appendChild(appRoot);
 
   const state: EditorState = {
     config: null,
@@ -601,7 +1103,26 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     haEntities: [],
     entitySearch: "",
     focusedBinding: null,
+    previewDisplayId: DEFAULT_PREVIEW_DISPLAY_ID,
   };
+
+  const applyPreviewLayout = (): void => {
+    const profile = resolvePreviewDisplayProfile(state.previewDisplayId);
+    previewDisplaySelect.value = profile.id;
+    previewResolution.textContent = formatPreviewResolution(profile);
+    previewScreen.style.aspectRatio = `${profile.width} / ${profile.height}`;
+    appRoot.style.width = `${profile.width}px`;
+    appRoot.style.height = `${profile.height}px`;
+    const availableWidth = previewScreen.clientWidth || profile.width;
+    const scale = Math.min(1, availableWidth / profile.width);
+    appRoot.style.transform = `scale(${scale})`;
+  };
+
+  const resizeObserver = typeof ResizeObserver !== "undefined"
+    ? new ResizeObserver(() => applyPreviewLayout())
+    : null;
+  resizeObserver?.observe(previewScreen);
+  window.addEventListener("resize", applyPreviewLayout);
 
   const render = (): void => {
     const config = state.config;
@@ -613,80 +1134,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       ? `${copy.entityBinding}: #${state.focusedBinding.cardIndex + 1} → ${state.focusedBinding.field}`
       : copy.entityBindingEmpty;
 
-    wrapper.innerHTML = `
-      <style>
-        #scene-editor-shell {
-          position: relative;
-          width: auto;
-          height: auto;
-          margin: 18px;
-          display: grid;
-          grid-template-rows: auto 1fr;
-          border-radius: 28px;
-          border: 1px solid rgba(32,48,65,0.12);
-          background: rgba(244,249,252,0.92);
-          box-shadow: 0 26px 80px rgba(46,72,94,0.26);
-          backdrop-filter: blur(18px);
-          overflow: hidden;
-        }
-        #scene-editor-shell[data-collapsed="true"] { background: transparent; border: 0; box-shadow: none; backdrop-filter: none; overflow: visible; }
-        #scene-editor-shell[data-collapsed="true"] .scene-editor-main { display: none; }
-        #scene-editor-shell .scene-editor-topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid rgba(32,48,65,0.08); background:linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.52)); }
-        #scene-editor-shell[data-collapsed="true"] .scene-editor-topbar { border:0; padding:0; background:transparent; }
-        #scene-editor-shell .scene-editor-title strong { display:block; font:600 15px/1.1 "Aptos","Segoe UI",sans-serif; color:#203041; }
-        #scene-editor-shell .scene-editor-title span { display:block; margin-top:4px; font:12px/1.3 "Aptos","Segoe UI",sans-serif; color:rgba(32,48,65,0.68); }
-        #scene-editor-shell .scene-editor-status { margin-top:8px; display:inline-flex; align-items:center; min-height:28px; padding:0 10px; border-radius:999px; background:rgba(255,255,255,0.84); font:12px/1 "Aptos","Segoe UI",sans-serif; color:#4b6577; }
-        #scene-editor-shell .scene-editor-status[data-tone="ok"] { color:#2b7f57; }
-        #scene-editor-shell .scene-editor-status[data-tone="bad"] { color:#ab4444; }
-        #scene-editor-shell .scene-editor-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-        #scene-editor-shell .scene-editor-button, #scene-editor-shell .tiny-btn, #scene-editor-shell input, #scene-editor-shell select { font:13px/1.2 "Aptos","Segoe UI",sans-serif; }
-        #scene-editor-shell .scene-editor-button, #scene-editor-shell .tiny-btn { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:0 14px; border-radius:999px; border:1px solid rgba(62,98,122,0.18); background:rgba(255,255,255,0.86); color:#203041; text-decoration:none; cursor:pointer; }
-        #scene-editor-shell .tiny-btn { min-height:30px; padding:0 10px; }
-        #scene-editor-shell .scene-editor-button.is-accent { background:linear-gradient(180deg, rgba(111,191,162,0.24), rgba(111,191,162,0.12)); border-color:rgba(77,147,121,0.28); }
-        #scene-editor-shell .scene-editor-main { display:grid; grid-template-columns:240px minmax(0, 1fr) 340px; min-height:0; }
-        #scene-editor-shell .scene-editor-pages, #scene-editor-shell .scene-editor-inspector, #scene-editor-shell .scene-editor-ha { min-height:0; overflow:auto; }
-        #scene-editor-shell .scene-editor-pages { padding:14px; border-right:1px solid rgba(32,48,65,0.08); background:rgba(246,250,252,0.92); }
-        #scene-editor-shell .scene-editor-inspector { padding:16px; background:rgba(250,252,253,0.92); }
-        #scene-editor-shell .scene-editor-ha { padding:16px; border-left:1px solid rgba(32,48,65,0.08); background:rgba(247,250,252,0.96); }
-        #scene-editor-shell h2 { margin:0 0 10px; font:700 15px/1.1 "Aptos","Segoe UI",sans-serif; color:#203041; }
-        #scene-editor-shell .meta { font:12px/1.35 "Aptos","Segoe UI",sans-serif; color:rgba(32,48,65,0.66); }
-        #scene-editor-shell .page-list, #scene-editor-shell .cards-list { display:grid; gap:10px; }
-        #scene-editor-shell .page-chip, #scene-editor-shell .card-item { display:grid; gap:10px; padding:12px; border-radius:18px; border:1px solid rgba(32,48,65,0.08); background:rgba(255,255,255,0.86); }
-        #scene-editor-shell .page-chip.is-active { border-color:rgba(77,147,121,0.34); box-shadow:0 0 0 2px rgba(111,191,162,0.18); }
-        #scene-editor-shell .page-chip-header { display:grid; gap:4px; cursor:pointer; }
-        #scene-editor-shell .page-chip-header strong, #scene-editor-shell .card-item-head strong { display:block; font:700 14px/1.1 "Aptos","Segoe UI",sans-serif; color:#203041; }
-        #scene-editor-shell .page-chip-actions, #scene-editor-shell .card-actions, #scene-editor-shell .card-add { display:flex; gap:8px; flex-wrap:wrap; }
-        #scene-editor-shell .inspector-grid, #scene-editor-shell .card-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
-        #scene-editor-shell .field { display:grid; gap:6px; }
-        #scene-editor-shell .field.is-wide { grid-column:1 / -1; }
-        #scene-editor-shell .field label { font:12px/1.25 "Aptos","Segoe UI",sans-serif; color:rgba(32,48,65,0.72); }
-        #scene-editor-shell input, #scene-editor-shell select { width:100%; min-height:40px; border-radius:12px; border:1px solid rgba(32,48,65,0.12); background:rgba(255,255,255,0.92); padding:0 12px; color:#203041; }
-        #scene-editor-shell .ha-search { margin-bottom: 10px; }
-        #scene-editor-shell .ha-list { display:grid; gap:8px; }
-        #scene-editor-shell .ha-entity { display:grid; gap:6px; padding:10px 12px; border-radius:16px; border:1px solid rgba(32,48,65,0.08); background:rgba(255,255,255,0.88); }
-        #scene-editor-shell .ha-entity strong { font:700 13px/1.15 "Aptos","Segoe UI",sans-serif; color:#203041; }
-        #scene-editor-shell .ha-entity code { font:12px/1.25 Consolas, monospace; color:#385268; }
-        #scene-editor-shell .ha-entity-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-        #scene-editor-shell .ha-state { font:12px/1.3 "Aptos","Segoe UI",sans-serif; color:#4f6a7c; }
-        @media (max-width: 1280px) {
-          #scene-editor-shell .scene-editor-main { grid-template-columns: 180px minmax(0, 1fr) 280px; }
-        }
-        @media (max-width: 980px) {
-          #scene-editor-shell .scene-editor-main {
-            grid-template-columns: 1fr;
-          }
-          #scene-editor-shell .scene-editor-pages,
-          #scene-editor-shell .scene-editor-inspector,
-          #scene-editor-shell .scene-editor-ha {
-            border: 0;
-            border-top: 1px solid rgba(32,48,65,0.08);
-          }
-        }
-      </style>
-      <div class="scene-editor-topbar">
-        <div class="scene-editor-title">
-          <strong>${copy.title}</strong>
-          <span>${copy.subtitle(options.packId)}</span>
+    dashboardHost.innerHTML = `
+      <div class="scene-dashboard-topbar">
+        <div class="scene-dashboard-title">
+          <strong>${copy.dashboardTitle}</strong>
+          <span>${copy.dashboardSubtitle}</span>
           <div class="scene-editor-status" data-tone="${state.statusTone}">${escapeHtml(state.status)}</div>
         </div>
         <div class="scene-editor-actions">
@@ -696,10 +1148,14 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
           <button class="scene-editor-button" type="button" data-action="toggle-panel">${wrapper.dataset.collapsed === "true" ? copy.showPanel : copy.hidePanel}</button>
         </div>
       </div>
-      <div class="scene-editor-main">
-        <section class="scene-editor-pages">
-          <h2>${copy.pages}</h2>
-          <div class="page-list">
+      <div class="scene-dashboard-body">
+        <div class="scene-settings-stack">
+          <section class="scene-settings-card">
+            <div class="scene-settings-head">
+              <h2>${copy.pages}</h2>
+              <div class="meta">${copy.subtitle(options.packId)}</div>
+            </div>
+            <div class="page-list">
             ${ordered.map((page, index) => `
               <article class="page-chip ${page.id === (selectedPage?.id || "") ? "is-active" : ""}">
                 <div class="page-chip-header" data-action="select-page" data-page-id="${escapeHtml(page.id)}">
@@ -713,13 +1169,15 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
                 </div>
               </article>
             `).join("") || `<div class="meta">${copy.statusLoading}</div>`}
-          </div>
-        </section>
-        <section class="scene-editor-inspector">
-          <h2>${copy.inspector}</h2>
+            </div>
+          </section>
+          <section class="scene-settings-card">
+            <div class="scene-settings-head">
+              <h2>${copy.inspector}</h2>
+              <div class="meta">${copy.pageSettings}</div>
+            </div>
           ${selectedPage ? `
-            <div class="meta">${copy.pageSettings}</div>
-            <div class="inspector-grid" style="margin-top:12px;">
+            <div class="inspector-grid">
               ${renderPageField(copy.fieldPageId, "id", pageFieldValue(selectedPage, "id"), true)}
               ${renderPageSelect(copy.fieldKind, "kind", pageFieldValue(selectedPage, "kind"), PAGE_KIND_OPTIONS.map((item) => ({ value: item, label: pageKindLabel(copy, item) })))}
               ${renderPageField(copy.fieldTitle, "title", pageFieldValue(selectedPage, "title"), true)}
@@ -740,10 +1198,29 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               ${selectedCards.length ? selectedCards.map((card, index) => renderCard(copy, card, index, selectedCards.length)).join("") : `<div class="meta">${copy.noCards}</div>`}
             </div>
           ` : `<div class="meta">${copy.statusLoading}</div>`}
-        </section>
-        <section class="scene-editor-ha">
-          <h2>${copy.homeAssistant}</h2>
-          <div class="meta">${escapeHtml(bindingLabel)}</div>
+          </section>
+          <section class="scene-settings-card">
+            <div class="scene-settings-head">
+              <h2>${copy.displaySettings}</h2>
+              <div class="meta">${copy.displaySubtitle}</div>
+            </div>
+          ${config ? `
+            <div class="inspector-grid">
+              ${renderDisplayField(copy.fieldDisplaySafeTop, "safeTop", readDisplayFieldValue(config, "safeTop"))}
+              ${renderDisplayField(copy.fieldDisplaySafeRight, "safeRight", readDisplayFieldValue(config, "safeRight"))}
+              ${renderDisplayField(copy.fieldDisplaySafeBottom, "safeBottom", readDisplayFieldValue(config, "safeBottom"))}
+              ${renderDisplayField(copy.fieldDisplaySafeLeft, "safeLeft", readDisplayFieldValue(config, "safeLeft"))}
+              ${renderDisplayField(copy.fieldDisplayPadding, "layoutPaddingPx", readDisplayFieldValue(config, "layoutPaddingPx"))}
+              ${renderDisplayField(copy.fieldDisplayGap, "layoutGapPx", readDisplayFieldValue(config, "layoutGapPx"))}
+              ${renderDisplayField(copy.fieldDisplayScale, "globalScale", readDisplayFieldValue(config, "globalScale"))}
+            </div>
+          ` : `<div class="meta">${copy.statusLoading}</div>`}
+          </section>
+          <section class="scene-settings-card">
+            <div class="scene-settings-head">
+              <h2>${copy.homeAssistant}</h2>
+              <div class="meta">${escapeHtml(bindingLabel)}</div>
+            </div>
           <div class="field ha-search" style="margin-top:12px;">
             <label for="ha-entity-search">${copy.entitySearch}</label>
             <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
@@ -763,9 +1240,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               </article>
             `).join("") : `<div class="meta">${copy.noEntities}</div>`}
           </div>
-        </section>
+          </section>
+        </div>
       </div>
     `;
+    applyPreviewLayout();
   };
 
   const setStatus = (text: string, tone: EditorState["statusTone"]): void => {
@@ -832,6 +1311,35 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     }
     markDirty();
     syncSelection();
+  };
+
+  const updateDisplayField = (field: DisplayFieldKey, value: string): void => {
+    if (!state.config) {
+      return;
+    }
+    const display = ensureDisplayConfig(state.config);
+    const safeArea = display.safeArea || {};
+    const numericValue = value === "" ? null : Number(value);
+    const normalized = Number.isFinite(numericValue) ? numericValue : null;
+
+    if (field === "safeTop") {
+      safeArea.top = normalized ?? 0;
+    } else if (field === "safeRight") {
+      safeArea.right = normalized ?? 0;
+    } else if (field === "safeBottom") {
+      safeArea.bottom = normalized ?? 0;
+    } else if (field === "safeLeft") {
+      safeArea.left = normalized ?? 0;
+    } else if (field === "layoutPaddingPx") {
+      display.layoutPaddingPx = normalized ?? 16;
+    } else if (field === "layoutGapPx") {
+      display.layoutGapPx = normalized ?? 16;
+    } else if (field === "globalScale") {
+      display.globalScale = normalized ?? 1;
+    }
+
+    display.safeArea = safeArea;
+    markDirty();
   };
 
   const updateCardField = (cardIndex: number, field: string, value: string): void => {
@@ -1007,10 +1515,24 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   wrapper.addEventListener("input", (event) => {
     const target = event.target as HTMLInputElement | HTMLSelectElement | null;
     if (!target || !state.config) {
+      if (target?.dataset.previewDisplay) {
+        state.previewDisplayId = target.value || DEFAULT_PREVIEW_DISPLAY_ID;
+        applyPreviewLayout();
+      }
+      return;
+    }
+    if (target.dataset.previewDisplay) {
+      state.previewDisplayId = target.value || DEFAULT_PREVIEW_DISPLAY_ID;
+      applyPreviewLayout();
       return;
     }
     if (target.dataset.pageField) {
       updatePageField(target.dataset.pageField as keyof ScenePageV1, target.value);
+      render();
+      return;
+    }
+    if (target.dataset.displayField) {
+      updateDisplayField(target.dataset.displayField as DisplayFieldKey, target.value);
       render();
       return;
     }

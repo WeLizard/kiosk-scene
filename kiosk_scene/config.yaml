@@ -1,7 +1,7 @@
 name: Kiosk Scene
-version: "0.1.0-welizard.12"
+version: "0.2.0"
 slug: kiosk_scene
-description: Host kiosk-scene as a separate Home Assistant add-on.
+description: Хостинг kiosk-scene как отдельного add-on Home Assistant.
 url: https://github.com/WeLizard/kiosk-scene
 arch:
   - amd64

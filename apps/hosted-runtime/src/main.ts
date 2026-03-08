@@ -1,4 +1,12 @@
-import { bootstrapSceneShellApp } from "@kiosk-scene/shell-browser";
+import {
+  bootstrapSceneShellApp,
+  createHomeAssistantWeatherReader,
+  DEFAULT_SCENE_SHELL_COPY_EN,
+  DEFAULT_SCENE_SHELL_LABELS_EN,
+  DEFAULT_SCENE_SHELL_PRESET_LABELS_EN,
+  type SceneShellLabels,
+  type WeatherOverviewPayload,
+} from "@kiosk-scene/shell-browser";
 import "@kiosk-scene/shell-browser/styles";
 import { mountNativeEditorShell } from "./editor-mode";
 
@@ -20,6 +28,111 @@ interface SceneHostBootstrap {
 }
 
 const DEFAULT_BOOTSTRAP_URL = "../scene-api/bootstrap";
+const WEATHER_ENTITY = "weather.forecast_home_assistant";
+const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast?latitude=60.0712&longitude=30.3923&current=temperature_2m,relative_humidity_2m,apparent_temperature,surface_pressure,wind_speed_10m,cloud_cover,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Europe%2FMoscow&forecast_days=6";
+
+const NEIRI_COPY_RU = {
+  ...DEFAULT_SCENE_SHELL_COPY_EN,
+  offlineLabel: "Не в сети",
+  busyLabel: "Думаю",
+  speakingLabel: "Отвечаю",
+  idleLabel: "Жду",
+  technicalHealthyLabel: "Онлайн",
+  messageCaption: "Монолог",
+  statusCaption: "Статус",
+  modeCaption: "Режим",
+  offlineBody: "Нейри временно недоступна.",
+  busyBody: "Нейри готовит ответ.",
+  idleBody: "Нейри рядом и продолжает работать в фоне.",
+};
+
+const NEIRI_LABELS_RU: SceneShellLabels = {
+  ...DEFAULT_SCENE_SHELL_LABELS_EN,
+  humidity: "Влажность",
+  pressure: "Давление",
+  wind: "Ветер",
+  clouds: "Облачность",
+  rangeStamp: "Период",
+  pageStamp: "Страница",
+  noCardsConfigured: "Карточки ещё не настроены",
+};
+
+const NEIRI_PRESET_LABELS_RU = {
+  ...DEFAULT_SCENE_SHELL_PRESET_LABELS_EN,
+  full: "Полный рост",
+  torso: "Голова и туловище",
+  head: "Только лицо",
+};
+
+const NEIRI_DEFAULT_WEATHER_RU: Partial<WeatherOverviewPayload> = {
+  title: "Погода",
+  location: "Санкт-Петербург",
+  todayCaption: "Сегодня",
+  todayValue: "7 марта",
+  todayLabel: "суббота",
+  updatedCaption: "Обновлено",
+  updatedAt: "13:52",
+  temperature: "4,3",
+  unit: "C",
+  condition: "Ясно",
+  feelsLike: "Ощущается как 1,5°C",
+  badgeSummary: "Ясно",
+  badgeRange: "6° / 0° сегодня",
+  metrics: {
+    humidity: "66%",
+    pressure: "765 мм рт. ст.",
+    wind: "4,1 м/с",
+    clouds: "0%",
+  },
+  forecastTitle: "Недельный ритм",
+  forecast: [
+    {
+      name: "вс",
+      dayNumber: "8",
+      monthShort: "март",
+      note: "Пасмурно",
+      max: "4°",
+      min: "-1° · 0%",
+      icon: "./assets/cloud.svg",
+    },
+    {
+      name: "пн",
+      dayNumber: "9",
+      monthShort: "март",
+      note: "Морось",
+      max: "2°",
+      min: "0° · 18%",
+      icon: "./assets/cloud-rain.svg",
+    },
+    {
+      name: "вт",
+      dayNumber: "10",
+      monthShort: "март",
+      note: "Морось",
+      max: "3°",
+      min: "0° · 4%",
+      icon: "./assets/cloud-rain.svg",
+    },
+    {
+      name: "ср",
+      dayNumber: "11",
+      monthShort: "март",
+      note: "Пасмурно",
+      max: "2°",
+      min: "1° · 6%",
+      icon: "./assets/cloud.svg",
+    },
+    {
+      name: "чт",
+      dayNumber: "12",
+      monthShort: "март",
+      note: "Морось",
+      max: "5°",
+      min: "1° · 8%",
+      icon: "./assets/cloud-rain.svg",
+    },
+  ],
+};
 
 type UiLang = "ru" | "en";
 
@@ -309,6 +422,8 @@ void (async () => {
   const bootstrapUrl = resolveBootstrapUrl();
   try {
     const bootstrap = await loadBootstrap(bootstrapUrl);
+    const packId = String(bootstrap.packId || "").trim();
+    const isNeiriPack = packId.toLowerCase() === "neiri";
     const rendererConfigUrl = resolveHostedUrl(
       String(bootstrap.files?.rendererConfigUrl || "").trim(),
       bootstrapUrl,
@@ -323,19 +438,33 @@ void (async () => {
       return;
     }
 
-    document.documentElement.dataset.packId = String(bootstrap.packId || "");
-    document.title = bootstrap.packId
-      ? `kiosk-scene hosted runtime (${bootstrap.packId})`
-      : "kiosk-scene hosted runtime";
+    document.documentElement.dataset.packId = packId;
+    document.title = isNeiriPack
+      ? "Нейри"
+      : (packId ? `kiosk-scene hosted runtime (${packId})` : "kiosk-scene hosted runtime");
 
     await bootstrapSceneShellApp(root, {
       rendererConfigUrl,
+      weatherUrl: isNeiriPack ? "./weather.json" : undefined,
+      weatherReader: isNeiriPack
+        ? createHomeAssistantWeatherReader({
+            weatherEntity: WEATHER_ENTITY,
+            openMeteoUrl: OPEN_METEO_URL,
+            locale: "ru-RU",
+            iconBaseUrl: "./assets",
+            allowApiFallback: true,
+          })
+        : undefined,
       iconBaseUrl: "./assets",
+      copy: isNeiriPack ? NEIRI_COPY_RU : undefined,
+      labels: isNeiriPack ? NEIRI_LABELS_RU : undefined,
+      presetLabels: isNeiriPack ? NEIRI_PRESET_LABELS_RU : undefined,
+      defaultWeather: isNeiriPack ? NEIRI_DEFAULT_WEATHER_RU : undefined,
     });
 
     if (isEditorMode()) {
       await mountNativeEditorShell({
-        packId: String(bootstrap.packId || "").trim(),
+        packId,
         sceneApiUrl: resolveHostedUrl(
           String(bootstrap.sceneEditorApiUrl || "").trim(),
           bootstrapUrl,

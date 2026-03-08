@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -91,21 +91,64 @@
 <body>
   <main>
     <section class="card">
-      <h1>Kiosk Scene</h1>
-      <p>Dedicated Home Assistant add-on for hosting <code>kiosk-scene</code>, active scene packs and the ingress scene editor.</p>
+      <h1 id="landing-title">Kiosk Scene</h1>
+      <p id="landing-subtitle">Отдельный Home Assistant add-on, который хостит <code>kiosk-scene</code>, активные scene-pack и редактор сцены через ingress.</p>
       <div class="row">
-        <a href="./scene/">Open Scene</a>
-        <a href="./scene-editor/" class="secondary">Open Scene Editor</a>
-        <a href="./health" class="secondary">Health</a>
+        <a href="./scene/" id="link-open-scene">Открыть сцену</a>
+        <a href="./scene-editor/" class="secondary" id="link-open-editor">Открыть редактор сцены</a>
+        <a href="./health" class="secondary" id="link-health">Проверка сервиса</a>
       </div>
     </section>
     <section class="card meta">
-      <h2>Runtime</h2>
-      <div>Canonical scene root: <code>/config/kiosk-scene</code></div>
-      <div>Runtime files: <code>/config/kiosk-scene/scene-runtime</code></div>
-      <div>Pack files: <code>/config/kiosk-scene/scene-packs/&lt;active-pack&gt;</code></div>
-      <div>Direct kiosk URL: <code>http://homeassistant.local:48123/scene/</code></div>
+      <h2 id="runtime-title">Runtime</h2>
+      <div id="runtime-root">Корневой каталог сцены: <code>/config/kiosk-scene</code></div>
+      <div id="runtime-files">Runtime-файлы: <code>/config/kiosk-scene/scene-runtime</code></div>
+      <div id="pack-files">Файлы pack: <code>/config/kiosk-scene/scene-packs/&lt;active-pack&gt;</code></div>
+      <div id="direct-url">Прямой URL сцены: <code>http://homeassistant.local:48123/scene/</code></div>
     </section>
   </main>
+  <script>
+    (function () {
+      const lang = String(navigator.language || "").toLowerCase().startsWith("ru") ? "ru" : "en";
+      const copy = {
+        ru: {
+          title: "Kiosk Scene",
+          subtitle: "Отдельный Home Assistant add-on, который хостит <code>kiosk-scene</code>, активные scene-pack и редактор сцены через ingress.",
+          openScene: "Открыть сцену",
+          openEditor: "Открыть редактор сцены",
+          health: "Проверка сервиса",
+          runtimeTitle: "Runtime",
+          runtimeRoot: "Корневой каталог сцены: <code>/config/kiosk-scene</code>",
+          runtimeFiles: "Runtime-файлы: <code>/config/kiosk-scene/scene-runtime</code>",
+          packFiles: "Файлы pack: <code>/config/kiosk-scene/scene-packs/&lt;active-pack&gt;</code>",
+          directUrl: "Прямой URL сцены: <code>http://homeassistant.local:48123/scene/</code>",
+        },
+        en: {
+          title: "Kiosk Scene",
+          subtitle: "A dedicated Home Assistant add-on that hosts <code>kiosk-scene</code>, active scene packs, and the ingress scene editor.",
+          openScene: "Open Scene",
+          openEditor: "Open Scene Editor",
+          health: "Health",
+          runtimeTitle: "Runtime",
+          runtimeRoot: "Canonical scene root: <code>/config/kiosk-scene</code>",
+          runtimeFiles: "Runtime files: <code>/config/kiosk-scene/scene-runtime</code>",
+          packFiles: "Pack files: <code>/config/kiosk-scene/scene-packs/&lt;active-pack&gt;</code>",
+          directUrl: "Direct scene URL: <code>http://homeassistant.local:48123/scene/</code>",
+        },
+      }[lang];
+
+      document.documentElement.lang = lang;
+      document.getElementById("landing-title").textContent = copy.title;
+      document.getElementById("landing-subtitle").innerHTML = copy.subtitle;
+      document.getElementById("link-open-scene").textContent = copy.openScene;
+      document.getElementById("link-open-editor").textContent = copy.openEditor;
+      document.getElementById("link-health").textContent = copy.health;
+      document.getElementById("runtime-title").textContent = copy.runtimeTitle;
+      document.getElementById("runtime-root").innerHTML = copy.runtimeRoot;
+      document.getElementById("runtime-files").innerHTML = copy.runtimeFiles;
+      document.getElementById("pack-files").innerHTML = copy.packFiles;
+      document.getElementById("direct-url").innerHTML = copy.directUrl;
+    })();
+  </script>
 </body>
 </html>

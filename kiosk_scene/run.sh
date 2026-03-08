@@ -61,7 +61,7 @@ if [ -d "$IMAGE_SCENE_RUNTIME_SEED_DIR" ]; then
   fi
 fi
 
-for scene_file in renderer.kiosk-scene.json scene.default.json entity-map.json avatar.manifest.json neiri-control.json; do
+for scene_file in renderer.kiosk-scene.json scene.default.json entity-map.json avatar.manifest.json neiri-control.json weather.json; do
   if [ -f "${LEGACY_NEIRI_SCENE_DIR}/${scene_file}" ] && [ ! -f "${DEFAULT_PACK_DIR}/${scene_file}" ]; then
     cp "${LEGACY_NEIRI_SCENE_DIR}/${scene_file}" "${DEFAULT_PACK_DIR}/${scene_file}"
   fi
