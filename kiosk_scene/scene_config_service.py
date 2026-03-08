@@ -139,6 +139,158 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       font-size: 13px;
       color: var(--muted);
     }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(420px, 0.95fr) minmax(400px, 1.05fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .column {
+      display: grid;
+      gap: 18px;
+      min-width: 0;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .stat {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    }
+    .stat-label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .stat-value {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .visual-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    input, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--text);
+      background: var(--paper);
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: 1px solid rgba(104,195,163,0.45);
+      border-color: rgba(104,195,163,0.45);
+    }
+    .pages {
+      display: grid;
+      gap: 14px;
+    }
+    .page-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
+      overflow: hidden;
+    }
+    .page-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    }
+    .page-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .page-order {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(104,195,163,0.14);
+      border: 1px solid rgba(104,195,163,0.28);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .page-title-text {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+    .page-title-text strong,
+    .page-title-text span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .page-title-text span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .page-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .page-body {
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+    }
+    .section-note {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 12px;
+    }
+    .details {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(255,255,255,0.02);
+    }
+    #editor {
+      min-height: 720px;
+    }
+    @media (max-width: 1180px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      #editor {
+        min-height: 420px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -150,6 +302,8 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     <section class="panel">
       <div class="row">
         <button id="loadBtn" type="button">Load</button>
+        <button id="applyVisualBtn" type="button">Apply Visual -> JSON</button>
+        <button id="jsonToVisualBtn" type="button">Reload Visual from JSON</button>
         <button id="validateBtn" type="button">Validate JSON</button>
         <button id="formatBtn" type="button">Format</button>
         <button id="newPageBtn" type="button">+ Page</button>
@@ -159,25 +313,79 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       <div id="status" class="status"></div>
     </section>
     <section class="panel">
-      <h2>Scene Config</h2>
-      <textarea id="editor" spellcheck="false"></textarea>
+      <div class="overview-grid">
+        <div class="stat">
+          <span class="stat-label">Active pack</span>
+          <div class="stat-value"><code>__ACTIVE_PACK_ID__</code></div>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Primary path</span>
+          <div class="stat-value"><code>__SCENE_EDITOR_CONFIG_PATH__</code></div>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Legacy fallback</span>
+          <div class="stat-value"><code>__LEGACY_SCENE_EDITOR_CONFIG_PATHS__</code></div>
+        </div>
+      </div>
     </section>
-    <section class="panel meta">
-      <div>Active pack: <code>__ACTIVE_PACK_ID__</code></div>
-      <div>Primary path: <code>__SCENE_EDITOR_CONFIG_PATH__</code></div>
-      <div>Legacy read-only fallback: <code>__LEGACY_SCENE_EDITOR_CONFIG_PATHS__</code></div>
-      <div>Saving always writes to the primary path so the hosted scene app and editor share one source of truth.</div>
-    </section>
+    <div class="layout">
+      <div class="column">
+        <section class="panel">
+          <div class="visual-header">
+            <div>
+              <h2>Visual Editor</h2>
+              <p>Scene order, dwell time and page metadata can be edited here without touching raw JSON.</p>
+            </div>
+            <button id="visualSyncBtn" type="button">Sync Visual</button>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="dwellInput">Default dwell seconds</label>
+              <input id="dwellInput" type="number" min="5" step="1">
+            </div>
+          </div>
+          <p class="section-note">Page order follows the visual stack below and is mirrored into <code>rotation.order</code>.</p>
+        </section>
+        <section class="panel">
+          <h2>Pages</h2>
+          <div id="pages" class="pages"></div>
+        </section>
+        <section class="panel">
+          <h2>Extra Root Fields</h2>
+          <p class="section-note">Unknown top-level fields are preserved here so the visual editor does not strip them.</p>
+          <textarea id="rootExtras" spellcheck="false"></textarea>
+        </section>
+      </div>
+      <div class="column">
+        <section class="panel">
+          <h2>Scene Config JSON</h2>
+          <textarea id="editor" spellcheck="false"></textarea>
+        </section>
+        <section class="panel meta">
+          <div>Saving always writes to the primary path so the hosted scene app and editor share one source of truth.</div>
+          <div>Visual changes sync into the JSON editor. Manual JSON edits can be pushed back into the form with <code>Reload Visual from JSON</code>.</div>
+          <div>MVP note: card contents and unknown fields still use raw JSON blocks until a fuller visual card editor lands.</div>
+        </section>
+      </div>
+    </div>
   </div>
   <script>
     const editorEl = document.getElementById('editor');
     const statusEl = document.getElementById('status');
     const loadBtn = document.getElementById('loadBtn');
+    const applyVisualBtn = document.getElementById('applyVisualBtn');
+    const jsonToVisualBtn = document.getElementById('jsonToVisualBtn');
     const saveBtn = document.getElementById('saveBtn');
     const validateBtn = document.getElementById('validateBtn');
     const formatBtn = document.getElementById('formatBtn');
     const newPageBtn = document.getElementById('newPageBtn');
     const starterBtn = document.getElementById('starterBtn');
+    const visualSyncBtn = document.getElementById('visualSyncBtn');
+    const dwellInput = document.getElementById('dwellInput');
+    const pagesEl = document.getElementById('pages');
+    const rootExtrasEl = document.getElementById('rootExtras');
+
+    let lastEditedMode = 'visual';
 
     function setStatus(text, kind) {
       statusEl.textContent = text || '';
@@ -207,11 +415,118 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       };
     }
 
-    function setEditorValue(config, statusMessage) {
-      editorEl.value = JSON.stringify(config, null, 2);
-      if (statusMessage) {
-        setStatus(statusMessage, 'ok');
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function trimText(value, fallback = '') {
+      const text = String(value ?? '').trim();
+      return text || fallback;
+    }
+
+    function readNumber(value, fallback, minimum = 0) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return fallback;
       }
+      return Math.max(minimum, parsed);
+    }
+
+    function parseJsonObject(text, label) {
+      const trimmed = String(text || '').trim();
+      if (!trimmed) {
+        return {};
+      }
+      const parsed = JSON.parse(trimmed);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error(`${label} must be a JSON object.`);
+      }
+      return parsed;
+    }
+
+    function parseCardsJson(text, pageId) {
+      const trimmed = String(text || '').trim();
+      if (!trimmed) {
+        return [];
+      }
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) {
+        throw new Error(`Cards for ${pageId} must be a JSON array.`);
+      }
+      return parsed;
+    }
+
+    function pageExtras(page) {
+      const extras = {};
+      if (!page || typeof page !== 'object' || Array.isArray(page)) {
+        return extras;
+      }
+      for (const [key, value] of Object.entries(page)) {
+        if ([
+          'id',
+          'kind',
+          'layout',
+          'slot',
+          'cardStyle',
+          'title',
+          'subtitle',
+          'stampCaption',
+          'stampValue',
+          'cards'
+        ].includes(key)) {
+          continue;
+        }
+        extras[key] = value;
+      }
+      return extras;
+    }
+
+    function rootExtras(config) {
+      const extras = {};
+      if (!config || typeof config !== 'object' || Array.isArray(config)) {
+        return extras;
+      }
+      for (const [key, value] of Object.entries(config)) {
+        if (['version', 'rotation', 'pages'].includes(key)) {
+          continue;
+        }
+        extras[key] = value;
+      }
+      return extras;
+    }
+
+    function normalizeVisualPage(page, index) {
+      const source = page && typeof page === 'object' && !Array.isArray(page) ? page : {};
+      const kindSource = trimText(source.kind || source.layout, 'cards');
+      const kind = ['overview', 'cards', 'forecast+cards'].includes(kindSource) ? kindSource : 'cards';
+      return {
+        id: trimText(source.id, `page-${index + 1}`),
+        kind,
+        slot: source.slot === '' || source.slot == null ? '' : String(readNumber(source.slot, 0, 0)),
+        cardStyle: trimText(source.cardStyle, 'full') === 'mini' ? 'mini' : 'full',
+        title: trimText(source.title, `Page ${index + 1}`),
+        subtitle: trimText(source.subtitle),
+        stampCaption: trimText(source.stampCaption),
+        stampValue: trimText(source.stampValue),
+        cardsText: JSON.stringify(Array.isArray(source.cards) ? source.cards : [], null, 2),
+        extrasText: JSON.stringify(pageExtras(source), null, 2),
+      };
+    }
+
+    function normalizeVisualConfig(config) {
+      const source = config && typeof config === 'object' && !Array.isArray(config) ? config : starterConfig();
+      const pages = Array.isArray(source.pages) && source.pages.length
+        ? source.pages.map((page, index) => normalizeVisualPage(page, index))
+        : starterConfig().pages.map((page, index) => normalizeVisualPage(page, index));
+      return {
+        dwell: readNumber(source.rotation && source.rotation.defaultDwellSeconds, 18, 5),
+        pages,
+        rootExtrasText: JSON.stringify(rootExtras(source), null, 2),
+      };
     }
 
     function parseConfig() {
@@ -225,32 +540,223 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       return parseConfig();
     }
 
+    function writeEditorJson(config) {
+      editorEl.value = JSON.stringify(config, null, 2);
+    }
+
+    function renderVisualEditor(config) {
+      dwellInput.value = String(config.dwell);
+      rootExtrasEl.value = config.rootExtrasText && config.rootExtrasText !== '{}' ? config.rootExtrasText : '';
+      pagesEl.innerHTML = config.pages.map((page, index) => `
+        <article class="page-card" data-page-index="${index}">
+          <div class="page-top">
+            <div class="page-title">
+              <div class="page-order">${index + 1}</div>
+              <div class="page-title-text">
+                <strong>${escapeHtml(page.title || page.id)}</strong>
+                <span>${escapeHtml(page.kind)}${page.slot !== '' ? ` · slot ${escapeHtml(page.slot)}` : ''}</span>
+              </div>
+            </div>
+            <div class="page-actions">
+              <button type="button" data-action="move-up" ${index === 0 ? 'disabled' : ''}>Up</button>
+              <button type="button" data-action="move-down" ${index === config.pages.length - 1 ? 'disabled' : ''}>Down</button>
+              <button type="button" data-action="remove" ${config.pages.length <= 1 ? 'disabled' : ''}>Remove</button>
+            </div>
+          </div>
+          <div class="page-body">
+            <div class="field-grid">
+              <div class="field">
+                <label>Page ID</label>
+                <input type="text" data-field="id" value="${escapeHtml(page.id)}">
+              </div>
+              <div class="field">
+                <label>Kind</label>
+                <select data-field="kind">
+                  <option value="overview" ${page.kind === 'overview' ? 'selected' : ''}>overview</option>
+                  <option value="cards" ${page.kind === 'cards' ? 'selected' : ''}>cards</option>
+                  <option value="forecast+cards" ${page.kind === 'forecast+cards' ? 'selected' : ''}>forecast+cards</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Slot</label>
+                <input type="number" min="0" step="1" data-field="slot" value="${escapeHtml(page.slot)}">
+              </div>
+              <div class="field">
+                <label>Card style</label>
+                <select data-field="cardStyle">
+                  <option value="full" ${page.cardStyle === 'full' ? 'selected' : ''}>full</option>
+                  <option value="mini" ${page.cardStyle === 'mini' ? 'selected' : ''}>mini</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Title</label>
+                <input type="text" data-field="title" value="${escapeHtml(page.title)}">
+              </div>
+              <div class="field">
+                <label>Subtitle</label>
+                <input type="text" data-field="subtitle" value="${escapeHtml(page.subtitle)}">
+              </div>
+              <div class="field">
+                <label>Stamp caption</label>
+                <input type="text" data-field="stampCaption" value="${escapeHtml(page.stampCaption)}">
+              </div>
+              <div class="field">
+                <label>Stamp value</label>
+                <input type="text" data-field="stampValue" value="${escapeHtml(page.stampValue)}">
+              </div>
+            </div>
+            <div class="field">
+              <label>Cards (JSON array)</label>
+              <textarea data-field="cards" spellcheck="false">${escapeHtml(page.cardsText)}</textarea>
+            </div>
+            <div class="field">
+              <label>Extra page fields (JSON object)</label>
+              <textarea data-field="extras" spellcheck="false">${escapeHtml(page.extrasText && page.extrasText !== '{}' ? page.extrasText : '')}</textarea>
+            </div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function readVisualConfig() {
+      const root = parseJsonObject(rootExtrasEl.value, 'Extra root fields');
+      const pages = Array.from(pagesEl.querySelectorAll('[data-page-index]')).map((pageNode, index) => {
+        const getValue = (name) => pageNode.querySelector(`[data-field="${name}"]`).value;
+        const id = trimText(getValue('id'), `page-${index + 1}`);
+        const kindValue = trimText(getValue('kind'), 'cards');
+        const kind = ['overview', 'cards', 'forecast+cards'].includes(kindValue) ? kindValue : 'cards';
+        const slotRaw = trimText(getValue('slot'));
+        const extras = parseJsonObject(getValue('extras'), `Extra page fields for ${id}`);
+        const cards = parseCardsJson(getValue('cards'), id);
+        const page = {
+          ...extras,
+          id,
+          kind,
+          title: trimText(getValue('title'), `Page ${index + 1}`),
+        };
+        const subtitle = trimText(getValue('subtitle'));
+        const stampCaption = trimText(getValue('stampCaption'));
+        const stampValue = trimText(getValue('stampValue'));
+        if (slotRaw) {
+          page.slot = readNumber(slotRaw, 0, 0);
+        }
+        if (kind !== 'overview' || 'cardStyle' in extras || getValue('cardStyle')) {
+          page.cardStyle = trimText(getValue('cardStyle'), 'full') === 'mini' ? 'mini' : 'full';
+        }
+        if (subtitle) {
+          page.subtitle = subtitle;
+        }
+        if (stampCaption) {
+          page.stampCaption = stampCaption;
+        }
+        if (stampValue) {
+          page.stampValue = stampValue;
+        }
+        if (cards.length || kind !== 'overview') {
+          page.cards = cards;
+        }
+        return page;
+      });
+
+      if (!pages.length) {
+        throw new Error('At least one page is required.');
+      }
+
+      const seen = new Set();
+      for (const page of pages) {
+        if (seen.has(page.id)) {
+          throw new Error(`Duplicate page id: ${page.id}`);
+        }
+        seen.add(page.id);
+      }
+
+      return {
+        ...root,
+        version: 1,
+        rotation: {
+          order: pages.map((page) => page.id),
+          defaultDwellSeconds: readNumber(dwellInput.value, 18, 5),
+        },
+        pages,
+      };
+    }
+
+    function applyConfigToEditors(config, statusMessage) {
+      writeEditorJson(config);
+      renderVisualEditor(normalizeVisualConfig(config));
+      lastEditedMode = 'visual';
+      if (statusMessage) {
+        setStatus(statusMessage, 'ok');
+      }
+    }
+
+    function syncVisualToJson(statusMessage) {
+      const config = readVisualConfig();
+      writeEditorJson(config);
+      lastEditedMode = 'visual';
+      if (statusMessage) {
+        setStatus(statusMessage, 'ok');
+      }
+      return config;
+    }
+
+    function syncJsonToVisual(statusMessage) {
+      renderVisualEditor(normalizeVisualConfig(readConfigOrDefault()));
+      lastEditedMode = 'json';
+      if (statusMessage) {
+        setStatus(statusMessage, 'ok');
+      }
+    }
+
     function formatJsonInEditor() {
-      setEditorValue(readConfigOrDefault(), 'JSON formatted.');
+      writeEditorJson(readConfigOrDefault());
+      lastEditedMode = 'json';
+      setStatus('JSON formatted.', 'ok');
     }
 
     function addPage() {
-      const config = readConfigOrDefault();
-      if (!config.rotation || typeof config.rotation !== 'object') {
-        config.rotation = { order: [], defaultDwellSeconds: 18 };
-      }
-      if (!Array.isArray(config.rotation.order)) {
-        config.rotation.order = [];
-      }
-      if (!Array.isArray(config.pages)) {
-        config.pages = [];
-      }
+      const config = normalizeVisualConfig(lastEditedMode === 'json' ? readConfigOrDefault() : readVisualConfig());
       const nextIndex = config.pages.length + 1;
-      const pageId = `page-${nextIndex}`;
       config.pages.push({
-        id: pageId,
+        id: `page-${nextIndex}`,
         kind: 'cards',
+        slot: '',
+        cardStyle: 'full',
         title: `Page ${nextIndex}`,
         subtitle: 'New scene section',
-        cards: []
+        stampCaption: '',
+        stampValue: '',
+        cardsText: '[]',
+        extrasText: '',
       });
-      config.rotation.order.push(pageId);
-      setEditorValue(config, `Added ${pageId}.`);
+      renderVisualEditor(config);
+      syncVisualToJson(`Added page-${nextIndex}.`);
+    }
+
+    function movePage(index, direction) {
+      const config = normalizeVisualConfig(readVisualConfig());
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= config.pages.length) {
+        return;
+      }
+      const pages = config.pages.slice();
+      const current = pages[index];
+      pages[index] = pages[nextIndex];
+      pages[nextIndex] = current;
+      config.pages = pages;
+      renderVisualEditor(config);
+      syncVisualToJson('Updated page order.');
+    }
+
+    function removePage(index) {
+      const config = normalizeVisualConfig(readVisualConfig());
+      if (config.pages.length <= 1) {
+        throw new Error('At least one page must remain.');
+      }
+      const removed = config.pages[index];
+      config.pages = config.pages.filter((_, pageIndex) => pageIndex !== index);
+      renderVisualEditor(config);
+      syncVisualToJson(`Removed ${removed.id}.`);
     }
 
     async function loadConfig() {
@@ -260,16 +766,15 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       if (!response.ok || !data.success) {
         throw new Error(data.error || `HTTP ${response.status}`);
       }
-      editorEl.value = JSON.stringify(data.config, null, 2);
       if (data.loadedFrom && data.loadedFrom !== data.path) {
-        setStatus(`Loaded legacy config from ${data.loadedFrom}. Save to migrate into ${data.path}.`, 'ok');
+        applyConfigToEditors(data.config, `Loaded legacy config from ${data.loadedFrom}. Save to migrate into ${data.path}.`);
       } else {
-        setStatus(`Loaded ${data.path}.`, 'ok');
+        applyConfigToEditors(data.config, `Loaded ${data.path}.`);
       }
     }
 
     async function saveConfig() {
-      const parsed = parseConfig();
+      const parsed = lastEditedMode === 'visual' ? syncVisualToJson() : parseConfig();
       setStatus('Saving...');
       const response = await fetch(apiUrl(), {
         method: 'POST',
@@ -280,12 +785,23 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       if (!response.ok || !data.success) {
         throw new Error(data.error || `HTTP ${response.status}`);
       }
-      editorEl.value = JSON.stringify(data.config, null, 2);
-      setStatus(`Saved ${data.path}.`, 'ok');
+      applyConfigToEditors(data.config, `Saved ${data.path}.`);
     }
 
     loadBtn.addEventListener('click', async () => {
       try { await loadConfig(); } catch (error) { setStatus(String(error), 'bad'); }
+    });
+
+    applyVisualBtn.addEventListener('click', () => {
+      try { syncVisualToJson('Visual editor synced into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
+    });
+
+    visualSyncBtn.addEventListener('click', () => {
+      try { syncVisualToJson('Visual editor synced into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
+    });
+
+    jsonToVisualBtn.addEventListener('click', () => {
+      try { syncJsonToVisual('Visual editor reloaded from JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
     });
 
     validateBtn.addEventListener('click', () => {
@@ -306,11 +822,75 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     });
 
     starterBtn.addEventListener('click', () => {
-      try { setEditorValue(starterConfig(), 'Applied starter template.'); } catch (error) { setStatus(String(error), 'bad'); }
+      try { applyConfigToEditors(starterConfig(), 'Applied starter template.'); } catch (error) { setStatus(String(error), 'bad'); }
     });
 
     saveBtn.addEventListener('click', async () => {
       try { await saveConfig(); } catch (error) { setStatus(String(error), 'bad'); }
+    });
+
+    editorEl.addEventListener('input', () => {
+      lastEditedMode = 'json';
+    });
+
+    dwellInput.addEventListener('input', () => {
+      try { syncVisualToJson('Visual changes mirrored into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
+    });
+
+    rootExtrasEl.addEventListener('change', () => {
+      try { syncVisualToJson('Visual changes mirrored into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
+    });
+
+    pagesEl.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      lastEditedMode = 'visual';
+      if (target.matches('input, select')) {
+        try { syncVisualToJson('Visual changes mirrored into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
+      }
+    });
+
+    pagesEl.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      lastEditedMode = 'visual';
+      if (target.matches('textarea, input, select')) {
+        try { syncVisualToJson('Visual changes mirrored into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
+      }
+    });
+
+    pagesEl.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      const button = target.closest('button[data-action]');
+      if (!button) {
+        return;
+      }
+      const pageNode = button.closest('[data-page-index]');
+      if (!pageNode) {
+        return;
+      }
+      const index = Number(pageNode.dataset.pageIndex);
+      if (!Number.isFinite(index)) {
+        return;
+      }
+      try {
+        if (button.dataset.action === 'move-up') {
+          movePage(index, -1);
+        } else if (button.dataset.action === 'move-down') {
+          movePage(index, 1);
+        } else if (button.dataset.action === 'remove') {
+          removePage(index);
+        }
+      } catch (error) {
+        setStatus(String(error), 'bad');
+      }
     });
 
     loadConfig().catch((error) => setStatus(String(error), 'bad'));
@@ -405,7 +985,7 @@ def save_scene_config(config: Any) -> tuple[dict[str, Any], Path]:
 
 
 class SceneConfigHandler(BaseHTTPRequestHandler):
-    server_version = "OpenClawSceneEditor/1.0"
+    server_version = "KioskSceneEditor/1.0"
 
     def log_message(self, fmt: str, *args: Any) -> None:
         logging.info("%s - %s", self.address_string(), fmt % args)
