@@ -102,7 +102,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     }
     textarea {
       width: 100%;
-      min-height: 560px;
+      min-height: 180px;
       border: 1px solid var(--line);
       border-radius: 14px;
       padding: 12px 14px;
@@ -280,8 +280,63 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       padding: 12px;
       background: rgba(255,255,255,0.02);
     }
+    details.advanced {
+      display: grid;
+      gap: 12px;
+    }
+    details.advanced summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text);
+      list-style: none;
+    }
+    details.advanced summary::-webkit-details-marker {
+      display: none;
+    }
+    details.advanced summary::before {
+      content: '▸';
+      margin-right: 8px;
+      color: var(--accent);
+    }
+    details.advanced[open] summary::before {
+      content: '▾';
+    }
+    .cards-toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .card-stack {
+      display: grid;
+      gap: 12px;
+    }
+    .card-editor {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.025);
+      overflow: hidden;
+    }
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+    }
+    .card-body {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+    }
+    .subsection-label {
+      font-size: 12px;
+      color: var(--muted);
+    }
     #editor {
-      min-height: 720px;
+      min-height: 360px;
     }
     @media (max-width: 1180px) {
       .layout {
@@ -333,10 +388,10 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         <section class="panel">
           <div class="visual-header">
             <div>
-              <h2>Visual Editor</h2>
-              <p>Scene order, dwell time and page metadata can be edited here without touching raw JSON.</p>
+              <h2>Page Composer</h2>
+              <p>Build the carousel from reusable page templates and card blocks instead of editing raw JSON.</p>
             </div>
-            <button id="visualSyncBtn" type="button">Sync Visual</button>
+            <button id="visualSyncBtn" type="button">Sync Form</button>
           </div>
           <div class="field-grid">
             <div class="field">
@@ -350,21 +405,25 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
           <h2>Pages</h2>
           <div id="pages" class="pages"></div>
         </section>
-        <section class="panel">
-          <h2>Extra Root Fields</h2>
-          <p class="section-note">Unknown top-level fields are preserved here so the visual editor does not strip them.</p>
-          <textarea id="rootExtras" spellcheck="false"></textarea>
-        </section>
       </div>
       <div class="column">
         <section class="panel">
-          <h2>Scene Config JSON</h2>
-          <textarea id="editor" spellcheck="false"></textarea>
+          <details class="advanced">
+            <summary>Advanced root fields</summary>
+            <p class="section-note">Unknown top-level fields are preserved here so the visual composer does not strip them.</p>
+            <textarea id="rootExtras" spellcheck="false"></textarea>
+          </details>
+        </section>
+        <section class="panel">
+          <details class="advanced">
+            <summary>Advanced JSON</summary>
+            <p class="section-note">Optional raw access for migration and debugging. The main editing path should stay in the visual composer.</p>
+            <textarea id="editor" spellcheck="false"></textarea>
+          </details>
         </section>
         <section class="panel meta">
           <div>Saving always writes to the primary path so the hosted scene app and editor share one source of truth.</div>
-          <div>Visual changes sync into the JSON editor. Manual JSON edits can be pushed back into the form with <code>Reload Visual from JSON</code>.</div>
-          <div>MVP note: card contents and unknown fields still use raw JSON blocks until a fuller visual card editor lands.</div>
+          <div>The visual composer is the main workflow for carousel pages and cards. Raw JSON stays only as an advanced fallback.</div>
         </section>
       </div>
     </div>
@@ -499,6 +558,107 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       return extras;
     }
 
+    function cardExtras(card) {
+      const extras = {};
+      if (!card || typeof card !== 'object' || Array.isArray(card)) {
+        return extras;
+      }
+      for (const [key, value] of Object.entries(card)) {
+        if ([
+          'type',
+          'caption',
+          'hint',
+          'entity',
+          'stateEntity',
+          'downEntity',
+          'upEntity',
+          'onText',
+          'offText',
+          'value',
+          'unit',
+          'digits'
+        ].includes(key)) {
+          continue;
+        }
+        extras[key] = value;
+      }
+      return extras;
+    }
+
+    const CARD_TYPE_OPTIONS = [
+      'entity',
+      'text',
+      'todo',
+      'onoff',
+      'battery',
+      'network',
+      'time',
+      'percent',
+      'number'
+    ];
+
+    function defaultCardForType(type, index) {
+      const normalizedType = trimText(type, 'entity');
+      const card = {
+        type: normalizedType,
+        caption: `Card ${index + 1}`,
+        hint: '',
+        entity: '',
+        stateEntity: '',
+        downEntity: '',
+        upEntity: '',
+        onText: 'On',
+        offText: 'Off',
+        value: '',
+        unit: '',
+        digits: normalizedType === 'number' || normalizedType === 'percent' ? '0' : '',
+        extrasText: '',
+      };
+      if (normalizedType === 'todo') {
+        card.caption = 'To-do';
+      } else if (normalizedType === 'onoff') {
+        card.caption = 'Device';
+      } else if (normalizedType === 'battery') {
+        card.caption = 'Battery';
+      } else if (normalizedType === 'network') {
+        card.caption = 'Network';
+      } else if (normalizedType === 'time') {
+        card.caption = 'Time';
+      } else if (normalizedType === 'percent') {
+        card.caption = 'Percent';
+      } else if (normalizedType === 'number') {
+        card.caption = 'Number';
+      } else if (normalizedType === 'text') {
+        card.caption = 'Note';
+        card.value = '—';
+      }
+      return card;
+    }
+
+    function normalizeVisualCard(card, index) {
+      const source = card && typeof card === 'object' && !Array.isArray(card) ? card : {};
+      const type = CARD_TYPE_OPTIONS.includes(trimText(source.type, 'entity'))
+        ? trimText(source.type, 'entity')
+        : 'entity';
+      const defaults = defaultCardForType(type, index);
+      return {
+        ...defaults,
+        type,
+        caption: trimText(source.caption, defaults.caption),
+        hint: trimText(source.hint),
+        entity: trimText(source.entity),
+        stateEntity: trimText(source.stateEntity),
+        downEntity: trimText(source.downEntity),
+        upEntity: trimText(source.upEntity),
+        onText: trimText(source.onText, defaults.onText),
+        offText: trimText(source.offText, defaults.offText),
+        value: trimText(source.value, defaults.value),
+        unit: trimText(source.unit),
+        digits: source.digits == null || source.digits === '' ? defaults.digits : String(source.digits),
+        extrasText: JSON.stringify(cardExtras(source), null, 2),
+      };
+    }
+
     function normalizeVisualPage(page, index) {
       const source = page && typeof page === 'object' && !Array.isArray(page) ? page : {};
       const kindSource = trimText(source.kind || source.layout, 'cards');
@@ -512,7 +672,9 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         subtitle: trimText(source.subtitle),
         stampCaption: trimText(source.stampCaption),
         stampValue: trimText(source.stampValue),
-        cardsText: JSON.stringify(Array.isArray(source.cards) ? source.cards : [], null, 2),
+        cards: Array.isArray(source.cards)
+          ? source.cards.map((card, cardIndex) => normalizeVisualCard(card, cardIndex))
+          : [],
         extrasText: JSON.stringify(pageExtras(source), null, 2),
       };
     }
@@ -542,6 +704,93 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
 
     function writeEditorJson(config) {
       editorEl.value = JSON.stringify(config, null, 2);
+    }
+
+    function renderField(label, field, value, options = {}) {
+      const type = options.type || 'text';
+      const min = options.min != null ? ` min="${escapeHtml(options.min)}"` : '';
+      const step = options.step != null ? ` step="${escapeHtml(options.step)}"` : '';
+      if (type === 'select') {
+        const choices = Array.isArray(options.choices) ? options.choices : [];
+        return `
+          <div class="field">
+            <label>${escapeHtml(label)}</label>
+            <select data-card-field="${escapeHtml(field)}">
+              ${choices.map((choice) => `
+                <option value="${escapeHtml(choice)}" ${String(value) === String(choice) ? 'selected' : ''}>${escapeHtml(choice)}</option>
+              `).join('')}
+            </select>
+          </div>
+        `;
+      }
+      return `
+        <div class="field">
+          <label>${escapeHtml(label)}</label>
+          <input type="${escapeHtml(type)}" data-card-field="${escapeHtml(field)}" value="${escapeHtml(value || '')}"${min}${step}>
+        </div>
+      `;
+    }
+
+    function renderCardSpecificFields(card) {
+      const sections = [];
+      if (['entity', 'todo', 'onoff', 'battery', 'time', 'percent', 'number'].includes(card.type)) {
+        sections.push(renderField('Entity', 'entity', card.entity));
+      }
+      if (card.type === 'battery') {
+        sections.push(renderField('State entity', 'stateEntity', card.stateEntity));
+      }
+      if (card.type === 'network') {
+        sections.push(renderField('Down entity', 'downEntity', card.downEntity));
+        sections.push(renderField('Up entity', 'upEntity', card.upEntity));
+      }
+      if (card.type === 'onoff') {
+        sections.push(renderField('On text', 'onText', card.onText));
+        sections.push(renderField('Off text', 'offText', card.offText));
+      }
+      if (card.type === 'text') {
+        sections.push(renderField('Static value', 'value', card.value));
+      }
+      if (card.type === 'number') {
+        sections.push(renderField('Unit', 'unit', card.unit));
+        sections.push(renderField('Digits', 'digits', card.digits, { type: 'number', min: 0, step: 1 }));
+      }
+      if (card.type === 'percent') {
+        sections.push(renderField('Digits', 'digits', card.digits, { type: 'number', min: 0, step: 1 }));
+      }
+      if (card.type === 'entity') {
+        sections.push(renderField('Fallback value', 'value', card.value));
+      }
+      return sections.join('');
+    }
+
+    function renderCardEditor(card, cardIndex, totalCards) {
+      return `
+        <article class="card-editor" data-card-index="${cardIndex}">
+          <div class="card-top">
+            <div class="page-title-text">
+              <strong>${escapeHtml(card.caption || `Card ${cardIndex + 1}`)}</strong>
+              <span>${escapeHtml(card.type)}</span>
+            </div>
+            <div class="page-actions">
+              <button type="button" data-action="card-up" ${cardIndex === 0 ? 'disabled' : ''}>Up</button>
+              <button type="button" data-action="card-down" ${cardIndex === totalCards - 1 ? 'disabled' : ''}>Down</button>
+              <button type="button" data-action="card-remove">Remove</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="field-grid">
+              ${renderField('Type', 'type', card.type, { type: 'select', choices: CARD_TYPE_OPTIONS })}
+              ${renderField('Caption', 'caption', card.caption)}
+              ${renderField('Hint', 'hint', card.hint)}
+              ${renderCardSpecificFields(card)}
+            </div>
+            <details class="advanced">
+              <summary>Advanced card fields</summary>
+              <textarea data-card-field="extras" spellcheck="false">${escapeHtml(card.extrasText && card.extrasText !== '{}' ? card.extrasText : '')}</textarea>
+            </details>
+          </div>
+        </article>
+      `;
     }
 
     function renderVisualEditor(config) {
@@ -605,14 +854,29 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
                 <input type="text" data-field="stampValue" value="${escapeHtml(page.stampValue)}">
               </div>
             </div>
-            <div class="field">
-              <label>Cards (JSON array)</label>
-              <textarea data-field="cards" spellcheck="false">${escapeHtml(page.cardsText)}</textarea>
+            <div class="cards-toolbar">
+              <div>
+                <div class="subsection-label">Cards</div>
+                <p class="section-note">Fill the page with typed card blocks. The renderer template stays the same; you only control content.</p>
+              </div>
+              <div class="row">
+                <select data-field="newCardType">
+                  ${CARD_TYPE_OPTIONS.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join('')}
+                </select>
+                <button type="button" data-action="add-card">+ Card</button>
+              </div>
             </div>
-            <div class="field">
-              <label>Extra page fields (JSON object)</label>
+            <div class="card-stack">
+              ${page.kind === 'overview'
+                ? `<p class="section-note">Overview pages use the built-in weather/assistant template and usually do not need manual cards.</p>`
+                : (page.cards.length
+                    ? page.cards.map((card, cardIndex) => renderCardEditor(card, cardIndex, page.cards.length)).join('')
+                    : `<p class="section-note">No cards yet. Add the first block for this page.</p>`)}
+            </div>
+            <details class="advanced">
+              <summary>Advanced page fields</summary>
               <textarea data-field="extras" spellcheck="false">${escapeHtml(page.extrasText && page.extrasText !== '{}' ? page.extrasText : '')}</textarea>
-            </div>
+            </details>
           </div>
         </article>
       `).join('');
@@ -627,7 +891,64 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         const kind = ['overview', 'cards', 'forecast+cards'].includes(kindValue) ? kindValue : 'cards';
         const slotRaw = trimText(getValue('slot'));
         const extras = parseJsonObject(getValue('extras'), `Extra page fields for ${id}`);
-        const cards = parseCardsJson(getValue('cards'), id);
+        const cards = Array.from(pageNode.querySelectorAll('[data-card-index]')).map((cardNode, cardIndex) => {
+          const getCardValue = (name) => {
+            const field = cardNode.querySelector(`[data-card-field="${name}"]`);
+            return field ? field.value : '';
+          };
+          const typeValue = trimText(getCardValue('type'), 'entity');
+          const type = CARD_TYPE_OPTIONS.includes(typeValue) ? typeValue : 'entity';
+          const caption = trimText(getCardValue('caption'));
+          const hint = trimText(getCardValue('hint'));
+          const extras = parseJsonObject(getCardValue('extras'), `Advanced card fields for ${id}/${cardIndex + 1}`);
+          const card = {
+            ...extras,
+            type,
+          };
+          if (caption) {
+            card.caption = caption;
+          }
+          if (hint) {
+            card.hint = hint;
+          }
+          const entity = trimText(getCardValue('entity'));
+          const stateEntity = trimText(getCardValue('stateEntity'));
+          const downEntity = trimText(getCardValue('downEntity'));
+          const upEntity = trimText(getCardValue('upEntity'));
+          const onText = trimText(getCardValue('onText'));
+          const offText = trimText(getCardValue('offText'));
+          const value = trimText(getCardValue('value'));
+          const unit = trimText(getCardValue('unit'));
+          const digits = trimText(getCardValue('digits'));
+          if (entity) {
+            card.entity = entity;
+          }
+          if (stateEntity) {
+            card.stateEntity = stateEntity;
+          }
+          if (downEntity) {
+            card.downEntity = downEntity;
+          }
+          if (upEntity) {
+            card.upEntity = upEntity;
+          }
+          if (onText) {
+            card.onText = onText;
+          }
+          if (offText) {
+            card.offText = offText;
+          }
+          if (value) {
+            card.value = value;
+          }
+          if (unit) {
+            card.unit = unit;
+          }
+          if (digits) {
+            card.digits = readNumber(digits, 0, 0);
+          }
+          return card;
+        });
         const page = {
           ...extras,
           id,
@@ -652,7 +973,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         if (stampValue) {
           page.stampValue = stampValue;
         }
-        if (cards.length || kind !== 'overview') {
+        if (cards.length && kind !== 'overview') {
           page.cards = cards;
         }
         return page;
@@ -726,11 +1047,22 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         subtitle: 'New scene section',
         stampCaption: '',
         stampValue: '',
-        cardsText: '[]',
+        cards: [],
         extrasText: '',
       });
       renderVisualEditor(config);
       syncVisualToJson(`Added page-${nextIndex}.`);
+    }
+
+    function addCard(pageIndex, type) {
+      const config = normalizeVisualConfig(readVisualConfig());
+      const page = config.pages[pageIndex];
+      if (!page || page.kind === 'overview') {
+        return;
+      }
+      page.cards.push(defaultCardForType(type, page.cards.length));
+      renderVisualEditor(config);
+      syncVisualToJson(`Added ${type} card.`);
     }
 
     function movePage(index, direction) {
@@ -757,6 +1089,36 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       config.pages = config.pages.filter((_, pageIndex) => pageIndex !== index);
       renderVisualEditor(config);
       syncVisualToJson(`Removed ${removed.id}.`);
+    }
+
+    function moveCard(pageIndex, cardIndex, direction) {
+      const config = normalizeVisualConfig(readVisualConfig());
+      const page = config.pages[pageIndex];
+      if (!page) {
+        return;
+      }
+      const nextIndex = cardIndex + direction;
+      if (nextIndex < 0 || nextIndex >= page.cards.length) {
+        return;
+      }
+      const cards = page.cards.slice();
+      const current = cards[cardIndex];
+      cards[cardIndex] = cards[nextIndex];
+      cards[nextIndex] = current;
+      page.cards = cards;
+      renderVisualEditor(config);
+      syncVisualToJson('Updated card order.');
+    }
+
+    function removeCard(pageIndex, cardIndex) {
+      const config = normalizeVisualConfig(readVisualConfig());
+      const page = config.pages[pageIndex];
+      if (!page) {
+        return;
+      }
+      page.cards = page.cards.filter((_, index) => index !== cardIndex);
+      renderVisualEditor(config);
+      syncVisualToJson('Removed card.');
     }
 
     async function loadConfig() {
@@ -859,7 +1221,15 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       }
       lastEditedMode = 'visual';
       if (target.matches('textarea, input, select')) {
-        try { syncVisualToJson('Visual changes mirrored into JSON.'); } catch (error) { setStatus(String(error), 'bad'); }
+        try {
+          if (target.matches('[data-card-field="type"], [data-field="kind"]')) {
+            const config = normalizeVisualConfig(readVisualConfig());
+            renderVisualEditor(config);
+          }
+          syncVisualToJson('Visual changes mirrored into JSON.');
+        } catch (error) {
+          setStatus(String(error), 'bad');
+        }
       }
     });
 
@@ -880,6 +1250,8 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       if (!Number.isFinite(index)) {
         return;
       }
+      const cardNode = button.closest('[data-card-index]');
+      const cardIndex = cardNode ? Number(cardNode.dataset.cardIndex) : -1;
       try {
         if (button.dataset.action === 'move-up') {
           movePage(index, -1);
@@ -887,6 +1259,15 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
           movePage(index, 1);
         } else if (button.dataset.action === 'remove') {
           removePage(index);
+        } else if (button.dataset.action === 'add-card') {
+          const typeField = pageNode.querySelector('[data-field="newCardType"]');
+          addCard(index, typeField ? typeField.value : 'entity');
+        } else if (button.dataset.action === 'card-up' && cardIndex >= 0) {
+          moveCard(index, cardIndex, -1);
+        } else if (button.dataset.action === 'card-down' && cardIndex >= 0) {
+          moveCard(index, cardIndex, 1);
+        } else if (button.dataset.action === 'card-remove' && cardIndex >= 0) {
+          removeCard(index, cardIndex);
         }
       } catch (error) {
         setStatus(String(error), 'bad');
