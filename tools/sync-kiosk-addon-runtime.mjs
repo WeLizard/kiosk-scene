@@ -7,7 +7,6 @@ const repoRoot = path.resolve(__dirname, "..");
 const sourceDir = path.resolve(repoRoot, "apps/hosted-runtime/dist");
 const targetDir = path.resolve(
   repoRoot,
-  "addons",
   "kiosk_scene",
   "scene-runtime-seed",
 );

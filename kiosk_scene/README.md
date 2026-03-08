@@ -24,5 +24,5 @@ pnpm build:hosted
 pnpm sync:kiosk-addon-runtime
 ```
 
-After syncing, `addons/kiosk_scene/scene-runtime-seed/` contains the hosted
+After syncing, `kiosk_scene/scene-runtime-seed/` contains the hosted
 runtime bundle that the add-on seeds into persistent HA storage on first boot.

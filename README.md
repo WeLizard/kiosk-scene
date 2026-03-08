@@ -27,10 +27,10 @@ The shell contract for the current Home Assistant deployment is also explicit:
 ## Repository Layout
 
 ```text
-addons/kiosk_scene/          Standalone Home Assistant add-on source for Kiosk Scene
 apps/demo-generic/            Generic demo app notes
 apps/hosted-runtime/          Hosted runtime entrypoint for the Kiosk Scene add-on
 docs/                         Architecture and compliance docs
+kiosk_scene/                  Standalone Home Assistant add-on source for Kiosk Scene
 packages/core/                Contracts and runtime boundaries
 packages/adapter-live2d/      Live2D adapter and compatibility bridge
 packages/adapter-unity-webgl/ Unity WebGL adapter boundary
@@ -82,7 +82,7 @@ The repository is already runnable:
 - `packages/shell-browser` owns the current left-avatar/right-carousel browser shell
 - `apps/demo-generic` is a thin Vite wrapper around that shell and selects the avatar backend from `avatar.manifest.json`
 - `apps/hosted-runtime` is the canonical add-on-hosted runtime that boots from `/scene-api/bootstrap`
-- `addons/kiosk_scene` is the standalone HA add-on source that hosts the generic runtime and editor
+- `kiosk_scene` is the standalone HA add-on source that hosts the generic runtime and editor
 
 The next migration step is instance work: move the real `neiri-scene` deployment onto these public contracts and keep the private model/runtime assets outside this repo.
 
@@ -112,8 +112,8 @@ The demo app is a redistribution-safe browser scene that exercises:
 - static avatar adapter behavior
 - Live2D compatibility bridge wiring for legacy `avatar.html`
 
-The hosted runtime is the add-on-facing variant used by `addons/kiosk_scene`:
+The hosted runtime is the add-on-facing variant used by `kiosk_scene`:
 
 - it fetches `/scene-api/bootstrap`
 - it loads the active pack's `renderer.kiosk-scene.json`
-- it is synced into `F:\OPENCLAW\kiosk-scene\addons\kiosk_scene\scene-runtime-seed`
+- it is synced into `F:\OPENCLAW\kiosk-scene\kiosk_scene\scene-runtime-seed`
