@@ -1,16 +1,16 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk update && apk add --no-cache \
     bash \
     ca-certificates \
     jq \
     nginx \
     python3 \
     rsync \
-    tzdata \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+    tzdata
+
+RUN mkdir -p /run/nginx /opt/kiosk-scene/www /opt/kiosk-scene/scene-runtime-seed
 
 COPY run.sh /run.sh
 COPY nginx.conf /etc/nginx/nginx.conf
