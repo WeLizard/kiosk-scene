@@ -199,6 +199,39 @@ function withTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
+function resolveUrlAgainst(baseUrl: string, candidate: string): string {
+  const normalized = trimText(candidate, 1024);
+  if (!normalized) {
+    return "";
+  }
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized) || normalized.startsWith("/")) {
+    return normalized;
+  }
+  return new URL(normalized, baseUrl).toString();
+}
+
+function resolveBaseUrl(candidate: string): string {
+  return new URL(".", candidate).toString();
+}
+
+function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: string): AvatarManifestV1 {
+  const manifestBaseUrl = resolveBaseUrl(manifestUrl);
+  const assetRoot = resolveUrlAgainst(
+    manifestBaseUrl,
+    trimText(manifest.assetRoot, 1024) || "./assets",
+  );
+  return {
+    ...manifest,
+    assetRoot,
+    runtimeUrl: resolveUrlAgainst(manifestBaseUrl, manifest.runtimeUrl || ""),
+    presetThumbs: Object.fromEntries(
+      Object.entries(manifest.presetThumbs || {})
+        .map(([key, value]) => [key, resolveUrlAgainst(manifestBaseUrl, value)])
+        .filter(([, value]) => Boolean(value)),
+    ),
+  };
+}
+
 function buildWeatherOverview(payload?: WeatherOverviewPatch): WeatherOverviewPayload {
   return {
     ...DEFAULT_WEATHER_OVERVIEW,
@@ -539,12 +572,49 @@ export class BrowserSceneShellApp {
   }
 
   async init(): Promise<void> {
-    this.rendererConfig = sanitizeRendererConfigV1(await this.readJson(this.getRendererConfigUrl()));
-    this.avatarManifest = sanitizeAvatarManifestV1(await this.readJson(this.rendererConfig.avatar.manifestUrl));
+    const rendererConfigUrl = resolveUrlAgainst(window.location.href, this.getRendererConfigUrl());
+    const rendererConfigBaseUrl = resolveBaseUrl(rendererConfigUrl);
+    const rawRendererConfig = sanitizeRendererConfigV1(await this.readJson(rendererConfigUrl));
+    const resolvedRendererConfig = sanitizeRendererConfigV1({
+      ...rawRendererConfig,
+      links: Object.fromEntries(
+        Object.entries(rawRendererConfig.links || {}).map(([key, value]) => [key, resolveUrlAgainst(rendererConfigBaseUrl, value)]),
+      ),
+      avatar: {
+        ...rawRendererConfig.avatar,
+        manifestUrl: resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.avatar.manifestUrl),
+      },
+      scene: {
+        ...rawRendererConfig.scene,
+        configUrl: resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.scene.configUrl),
+      },
+      state: {
+        ...rawRendererConfig.state,
+        stateUrl: resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.state.stateUrl),
+        idleLinesUrl: resolveUrlAgainst(
+          rendererConfigBaseUrl,
+          rawRendererConfig.state.idleLinesUrl || "./idle-lines.json",
+        ),
+        entityMapUrl: rawRendererConfig.state.entityMapUrl
+          ? resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.state.entityMapUrl)
+          : undefined,
+      },
+      control: {
+        ...rawRendererConfig.control,
+        controlUrl: resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.control.controlUrl),
+      },
+    });
+
+    this.rendererConfig = resolvedRendererConfig;
+    const manifestUrl = this.rendererConfig.avatar.manifestUrl;
+    this.avatarManifest = resolveAvatarManifestUrls(
+      sanitizeAvatarManifestV1(await this.readJson(manifestUrl)),
+      manifestUrl,
+    );
     this.sceneConfig = await this.readJson(this.rendererConfig.scene.configUrl);
     this.entityMap = await this.readEntityMap();
     this.idleLines = await createJsonLinesProvider({
-      url: this.rendererConfig.state.idleLinesUrl || "./idle-lines.json",
+      url: this.rendererConfig.state.idleLinesUrl || resolveUrlAgainst(rendererConfigBaseUrl, "./idle-lines.json"),
       defaultValue: [],
     }).read();
     this.weatherData = await this.readWeatherData();

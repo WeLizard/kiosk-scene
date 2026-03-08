@@ -28,6 +28,7 @@ The shell contract for the current Home Assistant deployment is also explicit:
 
 ```text
 apps/demo-generic/            Generic demo app notes
+apps/hosted-runtime/          Hosted runtime entrypoint for OpenClaw Assistant
 docs/                         Architecture and compliance docs
 packages/core/                Contracts and runtime boundaries
 packages/adapter-live2d/      Live2D adapter and compatibility bridge
@@ -79,6 +80,7 @@ The repository is already runnable:
 - `packages/adapter-live2d` can host the current legacy `avatar.html` runtime through a compatibility iframe bridge
 - `packages/shell-browser` owns the current left-avatar/right-carousel browser shell
 - `apps/demo-generic` is a thin Vite wrapper around that shell and selects the avatar backend from `avatar.manifest.json`
+- `apps/hosted-runtime` is the canonical add-on-hosted runtime that boots from `/scene-api/bootstrap`
 
 The next migration step is instance work: move the real `neiri-scene` deployment onto these public contracts and keep the private model/runtime assets outside this repo.
 
@@ -95,6 +97,8 @@ Useful commands:
 - `pnpm typecheck`
 - `pnpm validate:demo`
 - `pnpm build:demo`
+- `pnpm build:hosted`
+- `pnpm release:hosted-runtime`
 
 The demo app is a redistribution-safe browser scene that exercises:
 
@@ -104,3 +108,9 @@ The demo app is a redistribution-safe browser scene that exercises:
 - avatar backend selection from `avatar.manifest.json`
 - static avatar adapter behavior
 - Live2D compatibility bridge wiring for legacy `avatar.html`
+
+The hosted runtime is the add-on-facing variant used by `OpenClawHomeAssistant`:
+
+- it fetches `/scene-api/bootstrap`
+- it loads the active pack's `renderer.kiosk-scene.json`
+- it is synced into `F:\OPENCLAW\FORK\OpenClawHomeAssistant\openclaw_assistant\scene-runtime-seed`

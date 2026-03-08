@@ -7,13 +7,18 @@
   "packageManager": "pnpm@10.6.0",
   "scripts": {
     "dev:demo": "pnpm --filter @kiosk-scene/demo-generic dev",
+    "dev:hosted": "pnpm --filter @kiosk-scene/hosted-runtime dev",
     "build:demo": "pnpm --filter @kiosk-scene/demo-generic build",
+    "build:hosted": "pnpm --filter @kiosk-scene/hosted-runtime build",
+    "sync:openclaw-ha-runtime": "node ./tools/sync-openclaw-ha-runtime.mjs",
+    "release:hosted-runtime": "pnpm build:hosted && pnpm sync:openclaw-ha-runtime",
     "preview:demo": "pnpm --filter @kiosk-scene/demo-generic preview",
+    "preview:hosted": "pnpm --filter @kiosk-scene/hosted-runtime preview",
     "validate:config": "node ./tools/validate-config.mjs",
     "validate:demo": "node ./tools/validate-demo.mjs",
     "typecheck:packages": "tsc -p tsconfig.base.json --noEmit",
-    "typecheck": "pnpm typecheck:packages && pnpm --filter @kiosk-scene/demo-generic typecheck",
-    "verify": "pnpm typecheck && pnpm validate:demo && pnpm build:demo"
+    "typecheck": "pnpm typecheck:packages && pnpm --filter @kiosk-scene/demo-generic typecheck && pnpm --filter @kiosk-scene/hosted-runtime typecheck",
+    "verify": "pnpm typecheck && pnpm validate:demo && pnpm build:demo && pnpm build:hosted"
   },
   "devDependencies": {
     "ajv": "^8.17.1",
