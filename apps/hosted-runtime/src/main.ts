@@ -1,5 +1,6 @@
 import { bootstrapSceneShellApp } from "@kiosk-scene/shell-browser";
 import "@kiosk-scene/shell-browser/styles";
+import { mountNativeEditorShell } from "./editor-mode";
 
 interface SceneHostBootstrap {
   success?: boolean;
@@ -333,13 +334,9 @@ void (async () => {
     });
 
     if (isEditorMode()) {
-      mountEditorShell({
+      await mountNativeEditorShell({
         packId: String(bootstrap.packId || "").trim(),
-        editorFormUrl: resolveHostedUrl(
-          String(bootstrap.sceneEditorFormUrl || bootstrap.sceneEditorUrl || "").trim(),
-          bootstrapUrl,
-        ),
-        editorApiUrl: resolveHostedUrl(
+        sceneApiUrl: resolveHostedUrl(
           String(bootstrap.sceneEditorApiUrl || "").trim(),
           bootstrapUrl,
         ),
