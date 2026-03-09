@@ -14,7 +14,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 
 HOST = os.environ.get("SCENE_HOST_BIND", "127.0.0.1")
@@ -79,6 +79,7 @@ def build_bootstrap() -> dict[str, Any]:
             "avatarManifestUrl": pack_base_url + "avatar.manifest.json",
             "avatarCatalogUrl": f"{PATH_PREFIX}/avatar-catalog",
             "avatarImportUrl": f"{PATH_PREFIX}/avatar-import",
+            "avatarPackApiUrl": f"{PATH_PREFIX}/avatar-pack",
         },
         "availability": {
             "runtimeIndex": (RUNTIME_DIR / "index.html").exists(),
@@ -532,6 +533,93 @@ def load_avatar_catalog() -> dict[str, Any]:
     }
 
 
+def resolve_pack_id(query_string: str) -> str:
+    query = parse_qs(query_string or "", keep_blank_values=False)
+    for key in ("packId", "id"):
+        values = query.get(key)
+        if not values:
+            continue
+        candidate = str(values[0] or "").strip()
+        if candidate:
+            return candidate
+    raise ValueError("Missing packId query parameter.")
+
+
+def load_avatar_pack_details(pack_id: str) -> dict[str, Any]:
+    normalized_pack_id = slugify(pack_id)
+    if normalized_pack_id != pack_id:
+        raise ValueError("Invalid packId.")
+
+    pack_dir = AVATAR_PACKS_DIR / pack_id
+    manifest_path = pack_dir / "avatar.manifest.json"
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"Avatar pack not found: {pack_id}")
+
+    manifest = read_json_file(manifest_path)
+    motion_map_rel = str(manifest.get("motionMapUrl") or "").strip()
+    asset_root = str(manifest.get("assetRoot") or "").strip()
+    asset_root_dir = pack_dir
+    if asset_root and not asset_root.startswith("/") and "://" not in asset_root:
+        asset_root_dir = pack_dir / asset_root.removeprefix("./")
+    motion_map_path = (
+        asset_root_dir / motion_map_rel.removeprefix("./")
+        if motion_map_rel and not motion_map_rel.startswith("/")
+        else None
+    )
+    motion_map = {}
+    if motion_map_path and motion_map_path.exists():
+        motion_map = read_json_file(motion_map_path)
+
+    preview_url = _resolve_avatar_asset_url(
+        pack_id,
+        str(manifest.get("fallbackPortrait") or ""),
+        asset_root,
+    )
+
+    return {
+        "success": True,
+        "packId": pack_id,
+        "packDir": str(pack_dir),
+        "manifestPath": str(manifest_path),
+        "motionMapPath": str(motion_map_path) if motion_map_path else "",
+        "manifest": manifest,
+        "motionMap": motion_map,
+        "summary": {
+            "id": pack_id,
+            "name": str(manifest.get("name") or pack_id),
+            "manifestUrl": f"/avatar-packs/{quote(pack_id)}/avatar.manifest.json",
+            "previewUrl": preview_url,
+        },
+    }
+
+
+def save_avatar_pack_motion_map(pack_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    details = load_avatar_pack_details(pack_id)
+    motion_map_path = Path(str(details.get("motionMapPath") or ""))
+    manifest = details.get("manifest") or {}
+    motion_map = payload.get("motionMap")
+    if not isinstance(motion_map, dict):
+        raise ValueError("Request must provide a motionMap object.")
+    motions = motion_map.get("motions")
+    semantic = motion_map.get("semantic")
+    if not isinstance(motions, list) or not isinstance(semantic, dict):
+        raise ValueError("motionMap must contain motions[] and semantic{}.")
+    if not motion_map_path:
+        raise ValueError("Avatar pack does not define a writable motionMapUrl.")
+    motion_map_path.parent.mkdir(parents=True, exist_ok=True)
+    motion_map_path.write_text(
+        json.dumps(motion_map, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "success": True,
+        "packId": pack_id,
+        "motionMapPath": str(motion_map_path),
+        "manifest": manifest,
+        "motionMap": motion_map,
+    }
+
+
 class SceneHostHandler(BaseHTTPRequestHandler):
     server_version = "KioskSceneHost/1.0"
 
@@ -550,7 +638,8 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
-        path = urlsplit(self.path).path.rstrip("/") or "/"
+        parsed = urlsplit(self.path)
+        path = parsed.path.rstrip("/") or "/"
         if path == "/health":
             self.send_json(
                 {
@@ -568,15 +657,33 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         if path == f"{PATH_PREFIX}/avatar-catalog":
             self.send_json(load_avatar_catalog())
             return
+        if path == f"{PATH_PREFIX}/avatar-pack":
+            try:
+                self.send_json(load_avatar_pack_details(resolve_pack_id(parsed.query)))
+            except FileNotFoundError as exc:
+                self.send_json(
+                    {"success": False, "error": str(exc)},
+                    status=HTTPStatus.NOT_FOUND,
+                )
+            except ValueError as exc:
+                self.send_json(
+                    {"success": False, "error": str(exc)},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+            return
         self.send_json(
             {"success": False, "error": f"Endpoint not found: {path}"},
             status=HTTPStatus.NOT_FOUND,
         )
 
     def do_POST(self) -> None:
-        path = urlsplit(self.path).path.rstrip("/") or "/"
+        parsed = urlsplit(self.path)
+        path = parsed.path.rstrip("/") or "/"
         if path == f"{PATH_PREFIX}/avatar-import":
             self.handle_avatar_import()
+            return
+        if path == f"{PATH_PREFIX}/avatar-pack":
+            self.handle_avatar_pack_save(parsed.query)
             return
         self.send_json(
             {"success": False, "error": f"Endpoint not found: {path}"},
@@ -649,6 +756,35 @@ class SceneHostHandler(BaseHTTPRequestHandler):
             logging.exception("Avatar import failed")
             self.send_json(
                 {"success": False, "error": f"Avatar import failed: {exc}"},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+    def handle_avatar_pack_save(self, query_string: str) -> None:
+        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        if content_length <= 0:
+            self.send_json(
+                {"success": False, "error": "Request body is empty."},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+            return
+        try:
+            pack_id = resolve_pack_id(query_string)
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            self.send_json(save_avatar_pack_motion_map(pack_id, payload))
+        except FileNotFoundError as exc:
+            self.send_json(
+                {"success": False, "error": str(exc)},
+                status=HTTPStatus.NOT_FOUND,
+            )
+        except ValueError as exc:
+            self.send_json(
+                {"success": False, "error": str(exc)},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        except Exception as exc:
+            logging.exception("Avatar pack save failed")
+            self.send_json(
+                {"success": False, "error": f"Avatar pack save failed: {exc}"},
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
 

@@ -26,6 +26,7 @@ Editor model:
 - bottom: a normal scrollable settings page
 - avatar choice belongs to the current instance-pack and points at separate `avatar-packs`
 - avatar packs can be imported from `.zip` archives directly in the editor; the add-on scaffolds `avatar.manifest.json` and a draft `motion-map.json`
+- imported avatar packs expose their semantic motion-map in the Avatar section, so the user can bind runtime cues like `idle`, `think`, `busy`, or `greet` to actual model motions
 
 Development workflow:
 

@@ -36,6 +36,26 @@ type EditorCopy = {
   avatarImporting: string;
   avatarImportSuccess: (name: string) => string;
   avatarImportError: string;
+  avatarMapping: string;
+  avatarMappingSubtitle: string;
+  avatarMappingEmpty: string;
+  avatarMappingLoading: string;
+  avatarMappingLoadError: string;
+  avatarMappingSaveError: string;
+  avatarMappingMotion: string;
+  avatarMappingSaveHint: string;
+  avatarMotionNone: string;
+  avatarSemanticIdle: string;
+  avatarSemanticTouch: string;
+  avatarSemanticReplySoft: string;
+  avatarSemanticThink: string;
+  avatarSemanticBusy: string;
+  avatarSemanticCalm: string;
+  avatarSemanticHappy: string;
+  avatarSemanticSurprise: string;
+  avatarSemanticWarning: string;
+  avatarSemanticGreet: string;
+  avatarSemanticSpeaking: string;
   pages: string;
   pageKind: string;
   pageCards: (count: number) => string;
@@ -111,6 +131,7 @@ export interface NativeEditorShellOptions {
   sceneApiUrl: string;
   avatarCatalogUrl?: string;
   avatarImportUrl?: string;
+  avatarPackApiUrl?: string;
   sceneUrl: string;
 }
 
@@ -190,6 +211,26 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarImporting: "Импортирую avatar-pack...",
     avatarImportSuccess: (name) => `Импортирован avatar-pack: ${name}`,
     avatarImportError: "Не удалось импортировать avatar-pack",
+    avatarMapping: "Маппинг анимаций",
+    avatarMappingSubtitle: "Здесь задаётся, какие движения модель использует для semantic cue/activity в runtime.",
+    avatarMappingEmpty: "Выбери отдельный avatar-pack, чтобы редактировать его motion-map.",
+    avatarMappingLoading: "Загружаю motion-map avatar-pack...",
+    avatarMappingLoadError: "Не удалось загрузить motion-map avatar-pack",
+    avatarMappingSaveError: "Не удалось сохранить motion-map avatar-pack",
+    avatarMappingMotion: "Движение",
+    avatarMappingSaveHint: "Изменения в motion-map сохраняются общей кнопкой «Сохранить» сверху вместе с конфигом сцены.",
+    avatarMotionNone: "Не назначено",
+    avatarSemanticIdle: "Idle / ожидание",
+    avatarSemanticTouch: "Touch / касание",
+    avatarSemanticReplySoft: "Reply soft / мягкий ответ",
+    avatarSemanticThink: "Think / размышление",
+    avatarSemanticBusy: "Busy / занята",
+    avatarSemanticCalm: "Calm / спокойствие",
+    avatarSemanticHappy: "Happy / радость",
+    avatarSemanticSurprise: "Surprise / удивление",
+    avatarSemanticWarning: "Warning / предупреждение",
+    avatarSemanticGreet: "Greet / приветствие",
+    avatarSemanticSpeaking: "Speaking / говорит",
     pages: "Страницы",
     pageKind: "Тип",
     pageCards: (count) => `${count} карточ${count === 1 ? "ка" : count < 5 ? "ки" : "ек"}`,
@@ -292,6 +333,26 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarImporting: "Importing avatar pack...",
     avatarImportSuccess: (name) => `Imported avatar pack: ${name}`,
     avatarImportError: "Failed to import avatar pack",
+    avatarMapping: "Animation mapping",
+    avatarMappingSubtitle: "Map semantic cue/activity slots to actual model motions used by the runtime.",
+    avatarMappingEmpty: "Choose a separate avatar pack to edit its motion map.",
+    avatarMappingLoading: "Loading avatar pack motion map...",
+    avatarMappingLoadError: "Failed to load avatar pack motion map",
+    avatarMappingSaveError: "Failed to save avatar pack motion map",
+    avatarMappingMotion: "Motion",
+    avatarMappingSaveHint: "Motion-map changes are saved by the main Save button together with the scene config.",
+    avatarMotionNone: "Not assigned",
+    avatarSemanticIdle: "Idle",
+    avatarSemanticTouch: "Touch",
+    avatarSemanticReplySoft: "Reply soft",
+    avatarSemanticThink: "Think",
+    avatarSemanticBusy: "Busy",
+    avatarSemanticCalm: "Calm",
+    avatarSemanticHappy: "Happy",
+    avatarSemanticSurprise: "Surprise",
+    avatarSemanticWarning: "Warning",
+    avatarSemanticGreet: "Greet",
+    avatarSemanticSpeaking: "Speaking",
     pages: "Pages",
     pageKind: "Kind",
     pageCards: (count) => `${count} cards`,
@@ -381,6 +442,10 @@ type EditorState = {
   avatarImporting: boolean;
   avatarImportStatus: string;
   avatarImportTone: "muted" | "ok" | "bad";
+  avatarPackDetails: AvatarPackDetails | null;
+  avatarPackLoading: boolean;
+  avatarPackDirty: boolean;
+  avatarPackSaving: boolean;
 };
 
 type HaEntitySummary = {
@@ -403,6 +468,39 @@ type AvatarImportPayload = {
   item?: AvatarPackSummary;
   error?: string;
 };
+
+type AvatarMotionDef = {
+  index: number;
+  id: string;
+  label: string;
+  group?: string;
+  tags?: string[];
+};
+
+type AvatarPackDetails = {
+  packId: string;
+  manifest: Record<string, unknown>;
+  motionMap: {
+    motions: AvatarMotionDef[];
+    semantic: Record<string, number | number[]>;
+  };
+};
+
+const AVATAR_SEMANTIC_FIELDS = [
+  { key: "idle", labelKey: "avatarSemanticIdle" },
+  { key: "touch", labelKey: "avatarSemanticTouch" },
+  { key: "reply_soft", labelKey: "avatarSemanticReplySoft" },
+  { key: "think", labelKey: "avatarSemanticThink" },
+  { key: "busy", labelKey: "avatarSemanticBusy" },
+  { key: "calm", labelKey: "avatarSemanticCalm" },
+  { key: "happy", labelKey: "avatarSemanticHappy" },
+  { key: "surprise", labelKey: "avatarSemanticSurprise" },
+  { key: "warning", labelKey: "avatarSemanticWarning" },
+  { key: "greet", labelKey: "avatarSemanticGreet" },
+  { key: "speaking", labelKey: "avatarSemanticSpeaking" },
+] as const;
+
+type AvatarSemanticField = (typeof AVATAR_SEMANTIC_FIELDS)[number];
 
 type PreviewDisplayProfile = {
   id: string;
@@ -909,6 +1007,129 @@ async function importAvatarPack(url: string, archive: File): Promise<AvatarPackS
   };
 }
 
+async function loadAvatarPackDetails(url: string, packId: string): Promise<AvatarPackDetails> {
+  const target = String(url || "").trim();
+  const normalizedPackId = String(packId || "").trim();
+  if (!target || !normalizedPackId) {
+    throw new Error("Avatar pack API is not configured.");
+  }
+  const response = await fetch(`${target}?packId=${encodeURIComponent(normalizedPackId)}`, {
+    cache: "no-store",
+  });
+  const payload = await response.json() as {
+    success?: boolean;
+    packId?: string;
+    manifest?: Record<string, unknown>;
+    motionMap?: { motions?: AvatarMotionDef[]; semantic?: Record<string, number | number[]> };
+    error?: string;
+  };
+  if (!response.ok || payload.success === false || !payload.packId) {
+    throw new Error(String(payload.error || `HTTP ${response.status}`));
+  }
+  return {
+    packId: String(payload.packId || "").trim(),
+    manifest: payload.manifest || {},
+    motionMap: {
+      motions: Array.isArray(payload.motionMap?.motions)
+        ? payload.motionMap?.motions.map((item) => ({
+            index: Number(item.index),
+            id: String(item.id || "").trim(),
+            label: String(item.label || item.id || "").trim(),
+            group: String(item.group || "").trim(),
+            tags: Array.isArray(item.tags) ? item.tags.map((tag) => String(tag || "").trim()).filter(Boolean) : [],
+          })).filter((item) => Number.isFinite(item.index))
+        : [],
+      semantic: typeof payload.motionMap?.semantic === "object" && payload.motionMap?.semantic
+        ? Object.fromEntries(Object.entries(payload.motionMap.semantic))
+        : {},
+    },
+  };
+}
+
+async function saveAvatarPackDetails(url: string, details: AvatarPackDetails): Promise<AvatarPackDetails> {
+  const target = String(url || "").trim();
+  if (!target || !details.packId) {
+    throw new Error("Avatar pack API is not configured.");
+  }
+  const response = await fetch(`${target}?packId=${encodeURIComponent(details.packId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ motionMap: details.motionMap }),
+  });
+  const payload = await response.json() as {
+    success?: boolean;
+    packId?: string;
+    manifest?: Record<string, unknown>;
+    motionMap?: { motions?: AvatarMotionDef[]; semantic?: Record<string, number | number[]> };
+    error?: string;
+  };
+  if (!response.ok || payload.success === false || !payload.packId) {
+    throw new Error(String(payload.error || `HTTP ${response.status}`));
+  }
+  return {
+    packId: String(payload.packId || "").trim(),
+    manifest: payload.manifest || details.manifest,
+    motionMap: {
+      motions: Array.isArray(payload.motionMap?.motions) ? payload.motionMap.motions : details.motionMap.motions,
+      semantic: typeof payload.motionMap?.semantic === "object" && payload.motionMap?.semantic
+        ? Object.fromEntries(Object.entries(payload.motionMap.semantic))
+        : details.motionMap.semantic,
+    },
+  };
+}
+
+function selectedSemanticMotion(value: number | number[] | undefined): string {
+  if (Array.isArray(value)) {
+    const first = value.find((item) => Number.isFinite(Number(item)));
+    return first === undefined ? "" : String(Number(first));
+  }
+  return Number.isFinite(Number(value)) ? String(Number(value)) : "";
+}
+
+function avatarSemanticLabel(copy: EditorCopy, field: AvatarSemanticField): string {
+  const value = copy[field.labelKey as keyof EditorCopy];
+  return typeof value === "string" ? value : field.key;
+}
+
+function renderAvatarMapping(
+  copy: EditorCopy,
+  details: AvatarPackDetails,
+): string {
+  const motions = details.motionMap.motions || [];
+  return `
+    <div class="card-stack" style="margin-top:16px;">
+      <div class="meta">${copy.avatarMappingSubtitle}</div>
+      <div class="inspector-grid avatar-mapping-grid">
+        ${AVATAR_SEMANTIC_FIELDS.map((field) => `
+          <div class="field">
+            <label for="avatar-semantic-${escapeHtml(field.key)}">${escapeHtml(avatarSemanticLabel(copy, field))}</label>
+            <select id="avatar-semantic-${escapeHtml(field.key)}" data-avatar-semantic="${escapeHtml(field.key)}">
+              <option value="">${escapeHtml(copy.avatarMotionNone)}</option>
+              ${motions.map((motion) => `
+                <option value="${escapeHtml(String(motion.index))}"${selectedSemanticMotion(details.motionMap.semantic[field.key]) === String(motion.index) ? " selected" : ""}>
+                  ${escapeHtml(`${motion.label || motion.id} · #${motion.index}`)}
+                </option>
+              `).join("")}
+            </select>
+          </div>
+        `).join("")}
+      </div>
+      <div class="cards-list">
+        ${motions.map((motion) => `
+          <article class="card-list-item">
+            <div class="card-list-select">
+              <strong>${escapeHtml(motion.label || motion.id || `Motion ${motion.index}`)}</strong>
+              <span class="meta">${escapeHtml(`${copy.avatarMappingMotion} #${motion.index} · ${motion.group || "motion"}`)}</span>
+              <code>${escapeHtml(motion.id || "")}</code>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+      <div class="meta">${copy.avatarMappingSaveHint}</div>
+    </div>
+  `;
+}
+
 function isEntityBindingField(field: string): boolean {
   return ["entity", "stateEntity", "downEntity", "upEntity"].includes(field);
 }
@@ -1384,6 +1605,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
       }
+      #scene-editor-shell .avatar-mapping-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
       #scene-editor-shell .card-stack {
         display: grid;
         gap: 16px;
@@ -1426,6 +1650,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         align-items: center;
       }
       #scene-editor-shell .ha-entity code {
+        font: 12px/1.25 Consolas, monospace;
+        color: #385268;
+      }
+      #scene-editor-shell code {
         font: 12px/1.25 Consolas, monospace;
         color: #385268;
       }
@@ -1519,6 +1747,32 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     avatarImporting: false,
     avatarImportStatus: "",
     avatarImportTone: "muted",
+    avatarPackDetails: null,
+    avatarPackLoading: false,
+    avatarPackDirty: false,
+    avatarPackSaving: false,
+  };
+
+  const loadSelectedAvatarPackDetails = async (packId: string | null | undefined): Promise<void> => {
+    const normalizedPackId = String(packId || "").trim();
+    if (!normalizedPackId || !options.avatarPackApiUrl) {
+      state.avatarPackDetails = null;
+      state.avatarPackLoading = false;
+      state.avatarPackDirty = false;
+      return;
+    }
+    state.avatarPackLoading = true;
+    render();
+    try {
+      state.avatarPackDetails = await loadAvatarPackDetails(options.avatarPackApiUrl, normalizedPackId);
+      state.avatarPackDirty = false;
+    } catch (error) {
+      state.avatarPackDetails = null;
+      state.avatarPackDirty = false;
+      setStatus(`${copy.avatarMappingLoadError}: ${String(error)}`, "bad");
+    } finally {
+      state.avatarPackLoading = false;
+    }
   };
 
   const applyPreviewLayout = (): void => {
@@ -1568,7 +1822,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         </div>
         <div class="scene-editor-actions">
           <a class="scene-editor-button" href="${escapeHtml(options.sceneUrl)}">${copy.viewOnly}</a>
-          <button class="scene-editor-button is-accent" type="button" data-action="save"${state.saving || !config ? " disabled" : ""}>${state.saving ? copy.saving : copy.save}</button>
+          <button class="scene-editor-button is-accent" type="button" data-action="save"${state.saving || state.avatarPackSaving || !config ? " disabled" : ""}>${state.saving || state.avatarPackSaving ? copy.saving : copy.save}</button>
           <button class="scene-editor-button" type="button" data-action="add-page"${!config ? " disabled" : ""}>${copy.addPage}</button>
         </div>
       </div>
@@ -1611,6 +1865,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               </div>
               ${avatarImportStatus}
             </div>
+            ${selectedAvatarPackId
+              ? state.avatarPackLoading
+                ? `<div class="meta" style="margin-top:16px;">${copy.avatarMappingLoading}</div>`
+                : state.avatarPackDetails
+                  ? renderAvatarMapping(copy, state.avatarPackDetails)
+                  : `<div class="meta" style="margin-top:16px;">${copy.avatarMappingEmpty}</div>`
+              : `<div class="meta" style="margin-top:16px;">${copy.avatarMappingEmpty}</div>`}
           ` : `<div class="meta">${copy.statusLoading}</div>`}
           </section>
           <section class="scene-settings-card">
@@ -1917,6 +2178,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
           ? await loadAvatarCatalog(options.avatarCatalogUrl)
           : [importedPack];
         ensureAvatarConfig(state.config).packId = importedPack.id;
+        await loadSelectedAvatarPackDetails(importedPack.id);
         state.pendingAvatarZip = null;
         state.pendingAvatarZipName = "";
         state.avatarImporting = false;
@@ -2096,16 +2358,27 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     }
     if (action === "save") {
       state.saving = true;
+      state.avatarPackSaving = state.avatarPackDirty;
       setStatus(copy.saving, "muted");
       try {
+        if (state.avatarPackDirty && state.avatarPackDetails && options.avatarPackApiUrl) {
+          try {
+            state.avatarPackDetails = await saveAvatarPackDetails(options.avatarPackApiUrl, state.avatarPackDetails);
+          } catch (error) {
+            throw new Error(`${copy.avatarMappingSaveError}: ${String(error)}`);
+          }
+          state.avatarPackDirty = false;
+        }
         state.config = await saveConfig(options.sceneApiUrl, cloneConfig(state.config));
         state.dirty = false;
         state.saving = false;
+        state.avatarPackSaving = false;
         syncSelection();
         setStatus(copy.statusSaved, "ok");
         window.setTimeout(() => reloadPreview(), 250);
       } catch (error) {
         state.saving = false;
+        state.avatarPackSaving = false;
         setStatus(`${copy.saveError}: ${String(error)}`, "bad");
       }
       return;
@@ -2133,6 +2406,23 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     if (target.dataset.avatarPack !== undefined) {
       ensureAvatarConfig(state.config).packId = target.value.trim() || null;
       markDirty();
+      void loadSelectedAvatarPackDetails(target.value.trim() || null).finally(() => render());
+      render();
+      return;
+    }
+    if (target.dataset.avatarSemantic !== undefined) {
+      const selectedPackId = readAvatarPackId(state.config);
+      if (!state.avatarPackDetails || !selectedPackId || state.avatarPackDetails.packId !== selectedPackId) {
+        return;
+      }
+      const selectedValue = target.value.trim();
+      if (selectedValue) {
+        state.avatarPackDetails.motionMap.semantic[target.dataset.avatarSemantic] = Number(selectedValue);
+      } else {
+        delete state.avatarPackDetails.motionMap.semantic[target.dataset.avatarSemantic];
+      }
+      state.avatarPackDirty = true;
+      setStatus(copy.statusDirty, "muted");
       render();
       return;
     }
@@ -2201,6 +2491,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     state.selectedCardIndex = 0;
     state.status = copy.statusSaved;
     state.statusTone = "ok";
+    await loadSelectedAvatarPackDetails(readAvatarPackId(state.config));
     syncSelection();
   } catch (error) {
     state.status = `${copy.loadError}: ${String(error)}`;
