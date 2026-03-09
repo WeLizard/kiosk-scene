@@ -2655,13 +2655,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   wrapper.addEventListener("input", (event) => {
     const target = event.target as HTMLInputElement | HTMLSelectElement | null;
     if (!target || !state.config) {
-      if (target?.dataset.previewDisplay) {
+      if (target && target.dataset.previewDisplay !== undefined) {
         state.previewDisplayId = target.value || DEFAULT_PREVIEW_DISPLAY_ID;
         applyPreviewLayout();
       }
       return;
     }
-    if (target.dataset.previewDisplay) {
+    if (target.dataset.previewDisplay !== undefined) {
       state.previewDisplayId = target.value || DEFAULT_PREVIEW_DISPLAY_ID;
       applyPreviewLayout();
       return;
@@ -2829,7 +2829,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
 
   wrapper.addEventListener("change", (event) => {
     const target = event.target as HTMLInputElement | null;
-    if (!target?.dataset.avatarArchive) {
+    if (!target || target.dataset.avatarArchive === undefined) {
       return;
     }
     const archive = target.files?.[0] || null;
