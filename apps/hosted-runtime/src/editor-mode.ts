@@ -2237,6 +2237,86 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       handleAvatarArchiveSelection(liveAvatarArchiveInput.files?.[0] || null);
     });
 
+    for (const pageChip of Array.from(dashboardHost.querySelectorAll<HTMLElement>(".page-chip[data-page-id]"))) {
+      pageChip.draggable = true;
+      pageChip.addEventListener("dragstart", (event) => {
+        const pageId = String(pageChip.dataset.pageId || "").trim();
+        dragPayload = pageId ? { kind: "page", pageId } : null;
+        if (!dragPayload || !event.dataTransfer) {
+          return;
+        }
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", JSON.stringify(dragPayload));
+      });
+      pageChip.addEventListener("dragover", (event) => {
+        if (!dragPayload || dragPayload.kind !== "page") {
+          return;
+        }
+        event.preventDefault();
+        clearDropTargets(wrapper);
+        pageChip.classList.add("is-drop-target");
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = "move";
+        }
+      });
+      pageChip.addEventListener("drop", (event) => {
+        if (!dragPayload || dragPayload.kind !== "page") {
+          return;
+        }
+        event.preventDefault();
+        const targetPageId = String(pageChip.dataset.pageId || "").trim();
+        if (targetPageId) {
+          reorderPagesById(dragPayload.pageId, targetPageId);
+        }
+        dragPayload = null;
+        clearDropTargets(wrapper);
+      });
+      pageChip.addEventListener("dragend", () => {
+        dragPayload = null;
+        clearDropTargets(wrapper);
+      });
+    }
+
+    for (const cardItem of Array.from(dashboardHost.querySelectorAll<HTMLElement>(".card-list-item[data-card-index]"))) {
+      cardItem.draggable = true;
+      cardItem.addEventListener("dragstart", (event) => {
+        const cardIndex = Number(cardItem.dataset.cardIndex || "-1");
+        dragPayload = Number.isFinite(cardIndex) && cardIndex >= 0 ? { kind: "card", cardIndex } : null;
+        if (!dragPayload || !event.dataTransfer) {
+          return;
+        }
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", JSON.stringify(dragPayload));
+      });
+      cardItem.addEventListener("dragover", (event) => {
+        if (!dragPayload || dragPayload.kind !== "card") {
+          return;
+        }
+        event.preventDefault();
+        clearDropTargets(wrapper);
+        cardItem.classList.add("is-drop-target");
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = "move";
+        }
+      });
+      cardItem.addEventListener("drop", (event) => {
+        if (!dragPayload || dragPayload.kind !== "card") {
+          return;
+        }
+        event.preventDefault();
+        const targetIndex = Number(cardItem.dataset.cardIndex || "-1");
+        if (Number.isFinite(targetIndex) && targetIndex >= 0) {
+          reorderCardsByIndex(dragPayload.cardIndex, targetIndex);
+        }
+        dragPayload = null;
+        clearDropTargets(wrapper);
+      });
+      cardItem.addEventListener("dragend", () => {
+        dragPayload = null;
+        clearDropTargets(wrapper);
+      });
+    }
+
     applyPreviewLayout();
     syncPreviewSelection();
   };
@@ -2774,83 +2854,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       return;
     }
-  });
-
-  wrapper.addEventListener("dragstart", (event) => {
-    const element = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-drag-kind]");
-    if (!element) {
-      dragPayload = null;
-      return;
-    }
-    if (element.dataset.dragKind === "page") {
-      const pageId = String(element.dataset.pageId || "").trim();
-      dragPayload = pageId ? { kind: "page", pageId } : null;
-    } else if (element.dataset.dragKind === "card") {
-      const cardIndex = Number(element.dataset.cardIndex || "-1");
-      dragPayload = Number.isFinite(cardIndex) && cardIndex >= 0 ? { kind: "card", cardIndex } : null;
-    } else {
-      dragPayload = null;
-    }
-    if (!dragPayload) {
-      return;
-    }
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", JSON.stringify(dragPayload));
-    }
-  });
-
-  wrapper.addEventListener("dragover", (event) => {
-    if (!dragPayload) {
-      return;
-    }
-    const target = event.target as HTMLElement | null;
-    const pageTarget = dragPayload.kind === "page"
-      ? target?.closest<HTMLElement>(".page-chip[data-page-id]")
-      : null;
-    const cardTarget = dragPayload.kind === "card"
-      ? target?.closest<HTMLElement>(".card-list-item[data-card-index]")
-      : null;
-    const dropTarget = pageTarget || cardTarget;
-    if (!dropTarget) {
-      clearDropTargets(wrapper);
-      return;
-    }
-    event.preventDefault();
-    clearDropTargets(wrapper);
-    dropTarget.classList.add("is-drop-target");
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = "move";
-    }
-  });
-
-  wrapper.addEventListener("drop", (event) => {
-    if (!dragPayload) {
-      return;
-    }
-    const target = event.target as HTMLElement | null;
-    if (dragPayload.kind === "page") {
-      const dropTarget = target?.closest<HTMLElement>(".page-chip[data-page-id]");
-      const targetPageId = String(dropTarget?.dataset.pageId || "").trim();
-      if (targetPageId) {
-        event.preventDefault();
-        reorderPagesById(dragPayload.pageId, targetPageId);
-      }
-    } else if (dragPayload.kind === "card") {
-      const dropTarget = target?.closest<HTMLElement>(".card-list-item[data-card-index]");
-      const targetIndex = Number(dropTarget?.dataset.cardIndex || "-1");
-      if (Number.isFinite(targetIndex) && targetIndex >= 0) {
-        event.preventDefault();
-        reorderCardsByIndex(dragPayload.cardIndex, targetIndex);
-      }
-    }
-    dragPayload = null;
-    clearDropTargets(wrapper);
-  });
-
-  wrapper.addEventListener("dragend", () => {
-    dragPayload = null;
-    clearDropTargets(wrapper);
   });
 
   wrapper.addEventListener("change", (event) => {
