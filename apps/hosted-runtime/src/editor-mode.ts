@@ -209,48 +209,48 @@ const COPY: Record<UiLang, EditorCopy> = {
     saving: "Сохраняю...",
     addPage: "+ Страница",
     avatar: "Аватар",
-    avatarSubtitle: "Сейчас сцена использует аватар из текущего scene-pack. Ниже можно импортировать отдельные Live2D-модели и переключаться между ними.",
+    avatarSubtitle: "Здесь выбирается модель для текущей сцены. Можно оставить встроенную модель или добавить новую Live2D-модель из ZIP.",
     avatarPack: "Набор аватара",
-    avatarPackCurrent: "Встроенный avatar.manifest.json",
-    avatarPackHint: "Ниже можно выбрать встроенный аватар текущего пакета или один из отдельно импортированных avatar-pack.",
-    avatarPackEmpty: "Отдельные avatar-pack ещё не импортированы. Пока используется встроенный аватар текущего scene-pack.",
-    avatarPackAppliedAfterSave: "Выбранный avatar-pack вступит в силу после сохранения и автоматической перезагрузки превью.",
-    avatarPackDefaultTile: "Аватар текущего пакета",
-    avatarPackDefaultHint: "Использовать встроенный аватар из scene-pack без отдельного avatar-pack.",
+    avatarPackCurrent: "встроенная модель сцены",
+    avatarPackHint: "Выбранная модель применяется после сохранения. Встроенная модель доступна всегда, отдельные модели появляются после импорта ZIP.",
+    avatarPackEmpty: "Сейчас доступна только встроенная модель сцены. Новые модели можно добавить ZIP-архивом ниже.",
+    avatarPackAppliedAfterSave: "Смена модели применяется после сохранения и перезагрузки превью.",
+    avatarPackDefaultTile: "Встроенная модель сцены",
+    avatarPackDefaultHint: "Использовать модель, которая уже лежит внутри текущего scene-pack.",
     avatarPackSelect: "Использовать",
     avatarPackSelected: "Текущий выбор",
-    avatarPackMotionCount: (count) => `${count} motion`,
-    avatarCapabilityMotion: "Motion",
-    avatarCapabilityEmotion: "Emotion",
-    avatarCapabilityLipSync: "LipSync",
+    avatarPackMotionCount: (count) => `${count} анимац.`,
+    avatarCapabilityMotion: "Анимации",
+    avatarCapabilityEmotion: "Эмоции",
+    avatarCapabilityLipSync: "Липсинк",
     avatarImport: "Импорт аватара",
-    avatarImportHint: "Выбери zip-архив с Live2D-моделью. Kiosk Scene сразу импортирует его в avatar-packs, найдёт model3.json и создаст draft motion-map.",
-    avatarImportSelect: "Выбрать ZIP аватара",
+    avatarImportHint: "Импорт сразу создаёт отдельный avatar-pack, находит model3.json и подготавливает черновик motion-map.",
+    avatarImportSelect: "ZIP-архив Live2D-модели",
     avatarImportSelected: (name) => `Выбран архив: ${name}`,
-    avatarImportButton: "Выбрать и импортировать ZIP",
+    avatarImportButton: "Выбрать ZIP и импортировать",
     avatarImporting: "Импортирую avatar-pack...",
     avatarImportSuccess: (name) => `Импортирован avatar-pack: ${name}`,
     avatarImportError: "Не удалось импортировать avatar-pack",
     avatarMapping: "Маппинг анимаций",
     avatarMappingSubtitle: "Здесь задаётся, какие движения модель использует для semantic cue/activity в runtime.",
-    avatarMappingEmpty: "Выбери отдельный avatar-pack, чтобы редактировать его motion-map.",
+    avatarMappingEmpty: "У встроенной модели нет отдельного motion-map редактора.",
     avatarMappingLoading: "Загружаю motion-map avatar-pack...",
     avatarMappingLoadError: "Не удалось загрузить motion-map avatar-pack",
     avatarMappingSaveError: "Не удалось сохранить motion-map avatar-pack",
     avatarMappingMotion: "Движение",
     avatarMappingSaveHint: "Изменения в motion-map сохраняются общей кнопкой «Сохранить» сверху вместе с конфигом сцены.",
     avatarMotionNone: "Не назначено",
-    avatarSemanticIdle: "Idle / ожидание",
-    avatarSemanticTouch: "Touch / касание",
-    avatarSemanticReplySoft: "Reply soft / мягкий ответ",
-    avatarSemanticThink: "Think / размышление",
-    avatarSemanticBusy: "Busy / занята",
-    avatarSemanticCalm: "Calm / спокойствие",
-    avatarSemanticHappy: "Happy / радость",
-    avatarSemanticSurprise: "Surprise / удивление",
-    avatarSemanticWarning: "Warning / предупреждение",
-    avatarSemanticGreet: "Greet / приветствие",
-    avatarSemanticSpeaking: "Speaking / говорит",
+    avatarSemanticIdle: "Ожидание",
+    avatarSemanticTouch: "Касание",
+    avatarSemanticReplySoft: "Мягкий ответ",
+    avatarSemanticThink: "Размышление",
+    avatarSemanticBusy: "Занята",
+    avatarSemanticCalm: "Спокойствие",
+    avatarSemanticHappy: "Радость",
+    avatarSemanticSurprise: "Удивление",
+    avatarSemanticWarning: "Предупреждение",
+    avatarSemanticGreet: "Приветствие",
+    avatarSemanticSpeaking: "Речь",
     pages: "Страницы",
     pageKind: "Тип",
     pageCards: (count) => `${count} карточ${count === 1 ? "ка" : count < 5 ? "ки" : "ек"}`,
@@ -343,14 +343,14 @@ const COPY: Record<UiLang, EditorCopy> = {
     saving: "Saving...",
     addPage: "+ Page",
     avatar: "Avatar",
-    avatarSubtitle: "The scene currently uses the avatar bundled with this scene-pack. You can import separate Live2D models below and switch between them.",
+    avatarSubtitle: "Choose the model for this scene. You can keep the bundled model or import a new Live2D model from a ZIP archive.",
     avatarPack: "Avatar pack",
-    avatarPackCurrent: "Bundled avatar.manifest.json",
-    avatarPackHint: "Choose either the bundled avatar from the current scene-pack or one of the imported avatar packs below.",
-    avatarPackEmpty: "No separate avatar packs have been imported yet. The bundled scene-pack avatar is active for now.",
-    avatarPackAppliedAfterSave: "The selected avatar pack will apply after saving and reloading the preview.",
-    avatarPackDefaultTile: "Bundled scene avatar",
-    avatarPackDefaultHint: "Use the avatar bundled directly with the scene-pack, without a separate avatar-pack.",
+    avatarPackCurrent: "bundled scene model",
+    avatarPackHint: "The selected model applies after saving. The bundled scene model is always available; imported models appear here after ZIP import.",
+    avatarPackEmpty: "Only the bundled scene model is available right now. Import a ZIP archive below to add more models.",
+    avatarPackAppliedAfterSave: "Model switch applies after saving and reloading the preview.",
+    avatarPackDefaultTile: "Bundled scene model",
+    avatarPackDefaultHint: "Use the model that is already bundled with the active scene-pack.",
     avatarPackSelect: "Use avatar",
     avatarPackSelected: "Current selection",
     avatarPackMotionCount: (count) => `${count} motions`,
@@ -358,7 +358,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarCapabilityEmotion: "Emotion",
     avatarCapabilityLipSync: "LipSync",
     avatarImport: "Import avatar",
-    avatarImportHint: "Choose a Live2D zip archive. Kiosk Scene will immediately import it into avatar-packs, detect model3.json and create a draft motion map.",
+    avatarImportHint: "Import creates a separate avatar pack, detects model3.json and prepares a draft motion map.",
     avatarImportSelect: "Choose avatar ZIP",
     avatarImportSelected: (name) => `Selected archive: ${name}`,
     avatarImportButton: "Choose and import ZIP",
@@ -367,7 +367,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarImportError: "Failed to import avatar pack",
     avatarMapping: "Animation mapping",
     avatarMappingSubtitle: "Map semantic cue/activity slots to actual model motions used by the runtime.",
-    avatarMappingEmpty: "Choose a separate avatar pack to edit its motion map.",
+    avatarMappingEmpty: "The bundled scene model does not have a separate motion-map editor.",
     avatarMappingLoading: "Loading avatar pack motion map...",
     avatarMappingLoadError: "Failed to load avatar pack motion map",
     avatarMappingSaveError: "Failed to save avatar pack motion map",
@@ -736,39 +736,41 @@ function uniquePageId(config: SceneConfigV1, seed: string): string {
 
 function createPage(config: SceneConfigV1): ScenePageV1 {
   const index = config.pages.length + 1;
+  const isRu = resolveUiLang() === "ru";
   return {
     id: uniquePageId(config, `page-${index}`),
     kind: "cards",
-    title: `Page ${index}`,
+    title: isRu ? `Новая страница ${index}` : `New Page ${index}`,
     subtitle: "",
     slot: index - 1,
     cardStyle: "mini",
-    stampCaption: "Page",
+    stampCaption: isRu ? "Страница" : "Page",
     stampValue: `${index} / ${index}`,
     cards: [],
   };
 }
 
 function createCard(type: string): SceneCardV1 {
+  const isRu = resolveUiLang() === "ru";
   switch (type) {
     case "text":
-      return { type, caption: "Text", value: "—", hint: "" };
+      return { type, caption: isRu ? "Текст" : "Text", value: "—", hint: "" };
     case "todo":
-      return { type, caption: "Todo", entity: "", hint: "" };
+      return { type, caption: isRu ? "Задачи" : "Todo", entity: "", hint: "" };
     case "onoff":
-      return { type, caption: "Switch", entity: "", hint: "", onText: "On", offText: "Off" };
+      return { type, caption: isRu ? "Переключатель" : "Switch", entity: "", hint: "", onText: isRu ? "Вкл" : "On", offText: isRu ? "Выкл" : "Off" };
     case "battery":
-      return { type, caption: "Battery", entity: "", stateEntity: "", hint: "" };
+      return { type, caption: isRu ? "Батарея" : "Battery", entity: "", stateEntity: "", hint: "" };
     case "network":
-      return { type, caption: "Network", downEntity: "", upEntity: "", hint: "" };
+      return { type, caption: isRu ? "Сеть" : "Network", downEntity: "", upEntity: "", hint: "" };
     case "time":
-      return { type, caption: "Time", entity: "", hint: "" };
+      return { type, caption: isRu ? "Время" : "Time", entity: "", hint: "" };
     case "percent":
-      return { type, caption: "Percent", entity: "", digits: 0, hint: "" };
+      return { type, caption: isRu ? "Процент" : "Percent", entity: "", digits: 0, hint: "" };
     case "number":
-      return { type, caption: "Number", entity: "", digits: 0, unit: "", hint: "" };
+      return { type, caption: isRu ? "Значение" : "Number", entity: "", digits: 0, unit: "", hint: "" };
     default:
-      return { type: "entity", caption: "Entity", entity: "", hint: "" };
+      return { type: "entity", caption: isRu ? "Сущность" : "Entity", entity: "", hint: "" };
   }
 }
 
@@ -1176,8 +1178,8 @@ function renderAvatarMapping(
         ${motions.map((motion) => `
           <article class="card-list-item">
             <div class="card-list-select">
-              <strong>${escapeHtml(motion.label || motion.id || `Motion ${motion.index}`)}</strong>
-              <span class="meta">${escapeHtml(`${copy.avatarMappingMotion} #${motion.index} · ${motion.group || "motion"}`)}</span>
+              <strong>${escapeHtml(motion.label || motion.id || `${copy.avatarMappingMotion} ${motion.index}`)}</strong>
+              <span class="meta">${escapeHtml(`${copy.avatarMappingMotion} #${motion.index} · ${motion.group || copy.avatarMappingMotion.toLowerCase()}`)}</span>
               <code>${escapeHtml(motion.id || "")}</code>
             </div>
           </article>
@@ -2111,6 +2113,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       ? `<div class="scene-editor-status" data-tone="${state.avatarImportTone}">${escapeHtml(state.avatarImportStatus)}</div>`
       : "";
     const hasSeparateAvatarPacks = state.avatarCatalog.length > 0;
+    const avatarPackMeta = hasSeparateAvatarPacks ? copy.avatarPackHint : copy.avatarPackEmpty;
 
     dashboardHost.innerHTML = `
       <div class="scene-dashboard-topbar">
@@ -2134,8 +2137,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
           ${config ? `
             <div class="avatar-pack-box">
-              <div class="meta">${hasSeparateAvatarPacks ? copy.avatarPackHint : copy.avatarPackEmpty}</div>
-              ${hasSeparateAvatarPacks ? `<div class="meta">${copy.avatarPackAppliedAfterSave}</div>` : ""}
+              <div class="meta">${avatarPackMeta}</div>
+              <div class="meta">${copy.avatarPackAppliedAfterSave}</div>
               <div class="avatar-pack-grid">
                 ${renderAvatarPackTile(copy, null, selectedAvatarPackId)}
                 ${state.avatarCatalog.map((item) => renderAvatarPackTile(copy, item, selectedAvatarPackId)).join("")}
@@ -2143,11 +2146,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
             <div class="card-stack" style="margin-top:16px;">
               <div class="field is-wide">
-                <label for="avatar-pack-archive">${copy.avatarImportSelect}</label>
                 <input id="avatar-pack-archive" type="file" accept=".zip,application/zip" data-avatar-archive hidden>
                 <button class="scene-editor-button" type="button" data-action="open-avatar-archive"${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}>
                   ${state.avatarImporting ? copy.avatarImporting : copy.avatarImportButton}
                 </button>
+                <div class="meta">${copy.avatarImportSelect}</div>
               </div>
               <div class="meta">${escapeHtml(avatarArchiveLabel)}</div>
               ${avatarImportStatus}
@@ -2157,8 +2160,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
                 ? `<div class="meta" style="margin-top:16px;">${copy.avatarMappingLoading}</div>`
                 : state.avatarPackDetails
                   ? renderAvatarMapping(copy, state.avatarPackDetails)
-                  : `<div class="meta" style="margin-top:16px;">${copy.avatarMappingEmpty}</div>`
-              : `<div class="meta" style="margin-top:16px;">${copy.avatarMappingEmpty}</div>`}
+                  : ""
+              : ""}
           ` : `<div class="meta">${copy.statusLoading}</div>`}
           </section>
           <section class="scene-settings-card" data-editor-section="cards">
@@ -2170,7 +2173,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             ${ordered.map((page, index) => `
               <article class="page-chip ${page.id === (selectedPage?.id || "") ? "is-active" : ""}" draggable="true" data-drag-kind="page" data-page-id="${escapeHtml(page.id)}">
                 <div class="page-chip-header" data-action="select-page" data-page-id="${escapeHtml(page.id)}">
-                  <strong>${escapeHtml(page.title || page.id || `Page ${index + 1}`)}</strong>
+                  <strong>${escapeHtml(page.title || page.id || (resolveUiLang() === "ru" ? `Страница ${index + 1}` : `Page ${index + 1}`))}</strong>
                   <span class="meta">${escapeHtml(pageKindLabel(copy, page.kind))} · ${escapeHtml(copy.pageCards(Array.isArray(page.cards) ? page.cards.length : 0))}</span>
                 </div>
                 <div class="page-chip-actions">

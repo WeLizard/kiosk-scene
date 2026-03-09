@@ -84,6 +84,10 @@ export interface SceneShellLabels {
   rangeStamp: string;
   pageStamp: string;
   noCardsConfigured: string;
+  avatarPresetGroup: string;
+  carouselRegion: string;
+  pagesRegion: string;
+  forecastRangeFallback: string;
 }
 
 export interface SceneShellIconUrls {
@@ -138,6 +142,10 @@ export const DEFAULT_SCENE_SHELL_LABELS_EN: SceneShellLabels = {
   rangeStamp: "Range",
   pageStamp: "Page",
   noCardsConfigured: "No cards configured",
+  avatarPresetGroup: "Avatar view presets",
+  carouselRegion: "Scene carousel",
+  pagesRegion: "Display pages",
+  forecastRangeFallback: "Five-day forecast",
 };
 
 export const DEFAULT_SCENE_SHELL_PRESET_LABELS_EN: SceneShellPresetLabels = {
@@ -541,7 +549,7 @@ export class BrowserSceneShellApp {
         <div class="layout">
           <section class="panel avatar-panel">
             <div class="avatar-shell">
-              <div class="avatar-presets" aria-label="Avatar view presets">
+              <div class="avatar-presets" aria-label="${escapeHtml(this.labels.avatarPresetGroup)}">
                 <button class="avatar-preset is-active" type="button" data-avatar-preset="full" title="${escapeHtml(this.presetLabels.full)}" aria-label="${escapeHtml(this.presetLabels.full)}">
                   <img src="" alt="" aria-hidden="true" data-preset-thumb="full">
                 </button>
@@ -557,9 +565,9 @@ export class BrowserSceneShellApp {
           </section>
 
           <section class="panel content-panel">
-            <div class="carousel-shell" data-carousel-shell tabindex="0" aria-label="Scene carousel">
+            <div class="carousel-shell" data-carousel-shell tabindex="0" aria-label="${escapeHtml(this.labels.carouselRegion)}">
               <div class="carousel-track" data-carousel-track></div>
-              <div class="carousel-dots" data-dots aria-label="Display pages"></div>
+              <div class="carousel-dots" data-dots aria-label="${escapeHtml(this.labels.pagesRegion)}"></div>
             </div>
           </section>
         </div>
@@ -826,7 +834,7 @@ export class BrowserSceneShellApp {
         type="button"
         data-slide-index="${index}"
         data-scene-page-id="${escapeHtml(page.id)}"
-        aria-label="${escapeHtml(trimText(page.title, 40) || `Page ${index + 1}`)}"
+        aria-label="${escapeHtml(trimText(page.title, 40) || trimText(page.id, 40) || `${this.labels.pageStamp} ${index + 1}`)}"
       ></button>
     `).join("");
 
@@ -936,14 +944,16 @@ export class BrowserSceneShellApp {
       ? `<div class="dynamic-forecast-grid">${this.weatherData.forecast.slice(0, 5).map((day) => this.renderForecastDay(day)).join("")}</div>`
       : "";
     const cardGridClass = page.cardStyle === "mini" ? "dynamic-cards-grid is-mini" : "dynamic-cards-grid is-full";
+    const title = trimText(page.title, 64) || trimText(page.id, 64) || `${this.labels.pageStamp} ${index + 1}`;
+    const subtitle = trimText(page.subtitle, 140);
 
     return `
       <section class="slide slide-dynamic" data-slide-id="${escapeHtml(page.id)}" data-scene-page-id="${escapeHtml(page.id)}" data-slide-order="${index}">
         <div class="dynamic-slide slide-body" data-dynamic-layout="${escapeHtml(page.kind)}" data-dynamic-card-style="${escapeHtml(page.cardStyle || "full")}">
           <div class="slide-top">
             <div>
-              <h1 class="headline">${escapeHtml(trimText(page.title, 64) || "Scene")}</h1>
-              <p class="subline">${escapeHtml(trimText(page.subtitle, 140) || "Configured by scene.json")}</p>
+              <h1 class="headline">${escapeHtml(title)}</h1>
+              ${subtitle ? `<p class="subline">${escapeHtml(subtitle)}</p>` : ""}
             </div>
             <div class="stamp compact-stamp">
               <span class="caption">${escapeHtml(stampCaption)}</span>
@@ -981,7 +991,7 @@ export class BrowserSceneShellApp {
   private resolveForecastRange(): string {
     const forecast = this.weatherData.forecast || [];
     if (!forecast.length) {
-      return "5 days";
+      return this.labels.forecastRangeFallback;
     }
     const first = forecast[0];
     const last = forecast[forecast.length - 1];

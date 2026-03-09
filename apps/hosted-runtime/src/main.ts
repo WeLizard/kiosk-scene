@@ -102,6 +102,10 @@ const NEIRI_LABELS_RU: SceneShellLabels = {
   rangeStamp: "Период",
   pageStamp: "Страница",
   noCardsConfigured: "Карточки ещё не настроены",
+  avatarPresetGroup: "Варианты ракурса аватара",
+  carouselRegion: "Карусель сцены",
+  pagesRegion: "Переключение страниц",
+  forecastRangeFallback: "Прогноз на несколько дней",
 };
 
 const NEIRI_PRESET_LABELS_RU = {

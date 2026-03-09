@@ -938,7 +938,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         kind,
         slot: source.slot === '' || source.slot == null ? '' : String(readNumber(source.slot, 0, 0)),
         cardStyle: trimText(source.cardStyle, 'full') === 'mini' ? 'mini' : 'full',
-        title: trimText(source.title, `Page ${index + 1}`),
+        title: trimText(source.title, `Страница ${index + 1}`),
         subtitle: trimText(source.subtitle),
         stampCaption: trimText(source.stampCaption),
         stampValue: trimText(source.stampValue),
@@ -1231,7 +1231,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
           ...extras,
           id,
           kind,
-          title: trimText(getValue('title'), `Page ${index + 1}`),
+          title: trimText(getValue('title'), `Страница ${index + 1}`),
         };
         const subtitle = trimText(getValue('subtitle'));
         const stampCaption = trimText(getValue('stampCaption'));
@@ -1411,7 +1411,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     }
 
     async function loadConfig() {
-      setStatus('Loading...');
+      setStatus('Загружаю конфигурацию...');
       const response = await fetch(apiUrl(), { cache: 'no-store' });
       const data = await response.json();
       if (!response.ok || !data.success) {
