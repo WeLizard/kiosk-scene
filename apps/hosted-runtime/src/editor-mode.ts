@@ -1987,6 +1987,19 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     appRoot.style.height = `${profile.height}px`;
   };
 
+  const handlePreviewDisplaySelection = (value: string | null | undefined): void => {
+    state.previewDisplayId = String(value || "").trim() || DEFAULT_PREVIEW_DISPLAY_ID;
+    applyPreviewLayout();
+  };
+
+  const handleAvatarArchiveSelection = (archive: File | null): void => {
+    state.pendingAvatarZip = archive;
+    state.pendingAvatarZipName = archive?.name || "";
+    state.avatarImportStatus = "";
+    state.avatarImportTone = "muted";
+    render();
+  };
+
   const resizeObserver = typeof ResizeObserver !== "undefined"
     ? new ResizeObserver(() => applyPreviewLayout())
     : null;
@@ -2210,6 +2223,20 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         </div>
       </div>
     `;
+
+    const livePreviewDisplaySelect = dashboardHost.querySelector<HTMLSelectElement>("[data-preview-display]");
+    livePreviewDisplaySelect?.addEventListener("change", () => {
+      handlePreviewDisplaySelection(livePreviewDisplaySelect.value);
+    });
+    livePreviewDisplaySelect?.addEventListener("input", () => {
+      handlePreviewDisplaySelection(livePreviewDisplaySelect.value);
+    });
+
+    const liveAvatarArchiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
+    liveAvatarArchiveInput?.addEventListener("change", () => {
+      handleAvatarArchiveSelection(liveAvatarArchiveInput.files?.[0] || null);
+    });
+
     applyPreviewLayout();
     syncPreviewSelection();
   };
@@ -2422,7 +2449,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       return;
     }
     if (action === "apply-display-profile" && state.config) {
-      applyDisplayProfile(state.config, resolvePreviewDisplayProfile(state.previewDisplayId));
+      const activePreviewDisplayId = previewDisplaySelect.value || state.previewDisplayId;
+      applyDisplayProfile(state.config, resolvePreviewDisplayProfile(activePreviewDisplayId));
       markDirty();
       render();
       return;
@@ -2656,14 +2684,12 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const target = event.target as HTMLInputElement | HTMLSelectElement | null;
     if (!target || !state.config) {
       if (target && target.dataset.previewDisplay !== undefined) {
-        state.previewDisplayId = target.value || DEFAULT_PREVIEW_DISPLAY_ID;
-        applyPreviewLayout();
+        handlePreviewDisplaySelection(target.value);
       }
       return;
     }
     if (target.dataset.previewDisplay !== undefined) {
-      state.previewDisplayId = target.value || DEFAULT_PREVIEW_DISPLAY_ID;
-      applyPreviewLayout();
+      handlePreviewDisplaySelection(target.value);
       return;
     }
     if (target.dataset.avatarSemantic !== undefined) {
@@ -2832,12 +2858,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     if (!target || target.dataset.avatarArchive === undefined) {
       return;
     }
-    const archive = target.files?.[0] || null;
-    state.pendingAvatarZip = archive;
-    state.pendingAvatarZipName = archive?.name || "";
-    state.avatarImportStatus = "";
-    state.avatarImportTone = "muted";
-    render();
+    handleAvatarArchiveSelection(target.files?.[0] || null);
   });
 
   wrapper.addEventListener("focusin", (event) => {
