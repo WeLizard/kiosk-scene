@@ -1262,6 +1262,12 @@ function scrollEditorSection(section: "pages" | "cards" | "homeAssistant"): void
   target?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function clearDropTargets(root: ParentNode): void {
+  for (const element of Array.from(root.querySelectorAll<HTMLElement>(".is-drop-target"))) {
+    element.classList.remove("is-drop-target");
+  }
+}
+
 function firstBindableFieldForType(type: string): string | null {
   return cardFieldsForType(type).find((field) => isEntityBindingField(field)) || null;
 }
@@ -1388,7 +1394,7 @@ function renderCardListItem(
     || cardTypeDescription(type);
 
   return `
-    <article class="card-list-item${selected ? " is-active" : ""}">
+    <article class="card-list-item${selected ? " is-active" : ""}" draggable="true" data-drag-kind="card" data-card-index="${index}">
       <button class="card-list-select" type="button" data-action="select-card" data-card-index="${index}">
         <strong>${escapeHtml(title)}</strong>
         <span class="meta">${escapeHtml(cardTypeLabel(copy, type))}</span>
@@ -1750,6 +1756,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         border-color: rgba(77,147,121,0.34);
         box-shadow: 0 0 0 2px rgba(111,191,162,0.18);
       }
+      #scene-editor-shell .page-chip.is-drop-target,
+      #scene-editor-shell .card-list-item.is-drop-target {
+        border-color: rgba(45,98,162,0.34);
+        box-shadow: 0 0 0 2px rgba(45,98,162,0.18);
+      }
       #scene-editor-shell .page-chip-header {
         display: grid;
         gap: 4px;
@@ -1980,6 +1991,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     ? new ResizeObserver(() => applyPreviewLayout())
     : null;
   resizeObserver?.observe(previewStage);
+  let dragPayload: { kind: "page"; pageId: string } | { kind: "card"; cardIndex: number } | null = null;
 
   const syncPreviewSelection = (): void => {
     const pageId = state.selectedPageId || "";
@@ -2090,7 +2102,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
             <div class="page-list">
             ${ordered.map((page, index) => `
-              <article class="page-chip ${page.id === (selectedPage?.id || "") ? "is-active" : ""}">
+              <article class="page-chip ${page.id === (selectedPage?.id || "") ? "is-active" : ""}" draggable="true" data-drag-kind="page" data-page-id="${escapeHtml(page.id)}">
                 <div class="page-chip-header" data-action="select-page" data-page-id="${escapeHtml(page.id)}">
                   <strong>${escapeHtml(page.title || page.id || `Page ${index + 1}`)}</strong>
                   <span class="meta">${escapeHtml(pageKindLabel(copy, page.kind))} · ${escapeHtml(copy.pageCards(Array.isArray(page.cards) ? page.cards.length : 0))}</span>
@@ -2333,6 +2345,43 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       (card as Record<string, unknown>)[field] = value;
     }
     markDirty();
+  };
+
+  const reorderPagesById = (sourcePageId: string, targetPageId: string): void => {
+    if (!state.config || !sourcePageId || !targetPageId || sourcePageId === targetPageId) {
+      return;
+    }
+    const order = orderedPages(state.config).map((page) => page.id);
+    const sourceIndex = order.indexOf(sourcePageId);
+    const targetIndex = order.indexOf(targetPageId);
+    if (sourceIndex < 0 || targetIndex < 0) {
+      return;
+    }
+    order.splice(sourceIndex, 1);
+    order.splice(targetIndex, 0, sourcePageId);
+    state.config.rotation.order = order;
+    state.selectedPageId = sourcePageId;
+    state.selectedCardIndex = 0;
+    state.focusedBinding = null;
+    markDirty();
+    syncSelection();
+    render();
+  };
+
+  const reorderCardsByIndex = (sourceIndex: number, targetIndex: number): void => {
+    if (!state.config || !state.selectedPageId || sourceIndex === targetIndex) {
+      return;
+    }
+    const page = state.config.pages.find((item) => item.id === state.selectedPageId);
+    if (!page || !Array.isArray(page.cards) || sourceIndex < 0 || targetIndex < 0 || sourceIndex >= page.cards.length || targetIndex >= page.cards.length) {
+      return;
+    }
+    const [moved] = page.cards.splice(sourceIndex, 1);
+    page.cards.splice(targetIndex, 0, moved);
+    state.selectedCardIndex = targetIndex;
+    state.focusedBinding = null;
+    markDirty();
+    render();
   };
 
   const bindEntityToFocusedField = (entityId: string): void => {
@@ -2699,6 +2748,83 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       return;
     }
+  });
+
+  wrapper.addEventListener("dragstart", (event) => {
+    const element = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-drag-kind]");
+    if (!element) {
+      dragPayload = null;
+      return;
+    }
+    if (element.dataset.dragKind === "page") {
+      const pageId = String(element.dataset.pageId || "").trim();
+      dragPayload = pageId ? { kind: "page", pageId } : null;
+    } else if (element.dataset.dragKind === "card") {
+      const cardIndex = Number(element.dataset.cardIndex || "-1");
+      dragPayload = Number.isFinite(cardIndex) && cardIndex >= 0 ? { kind: "card", cardIndex } : null;
+    } else {
+      dragPayload = null;
+    }
+    if (!dragPayload) {
+      return;
+    }
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", JSON.stringify(dragPayload));
+    }
+  });
+
+  wrapper.addEventListener("dragover", (event) => {
+    if (!dragPayload) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    const pageTarget = dragPayload.kind === "page"
+      ? target?.closest<HTMLElement>(".page-chip[data-page-id]")
+      : null;
+    const cardTarget = dragPayload.kind === "card"
+      ? target?.closest<HTMLElement>(".card-list-item[data-card-index]")
+      : null;
+    const dropTarget = pageTarget || cardTarget;
+    if (!dropTarget) {
+      clearDropTargets(wrapper);
+      return;
+    }
+    event.preventDefault();
+    clearDropTargets(wrapper);
+    dropTarget.classList.add("is-drop-target");
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+  });
+
+  wrapper.addEventListener("drop", (event) => {
+    if (!dragPayload) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (dragPayload.kind === "page") {
+      const dropTarget = target?.closest<HTMLElement>(".page-chip[data-page-id]");
+      const targetPageId = String(dropTarget?.dataset.pageId || "").trim();
+      if (targetPageId) {
+        event.preventDefault();
+        reorderPagesById(dragPayload.pageId, targetPageId);
+      }
+    } else if (dragPayload.kind === "card") {
+      const dropTarget = target?.closest<HTMLElement>(".card-list-item[data-card-index]");
+      const targetIndex = Number(dropTarget?.dataset.cardIndex || "-1");
+      if (Number.isFinite(targetIndex) && targetIndex >= 0) {
+        event.preventDefault();
+        reorderCardsByIndex(dragPayload.cardIndex, targetIndex);
+      }
+    }
+    dragPayload = null;
+    clearDropTargets(wrapper);
+  });
+
+  wrapper.addEventListener("dragend", () => {
+    dragPayload = null;
+    clearDropTargets(wrapper);
   });
 
   wrapper.addEventListener("change", (event) => {

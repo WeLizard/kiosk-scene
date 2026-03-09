@@ -30,6 +30,7 @@ Editor model:
 - the Avatar section now renders a visual catalog of available avatar packs with previews, motion count, and capabilities instead of only a raw dropdown
 - the Home Assistant section now exposes explicit binding targets for the selected card, so entity assignment does not depend on guessing the currently focused field
 - the editor preview is now interactive: clicking a page or card inside the simulated display selects it in the settings dashboard below
+- page order and card order can now be changed by drag-and-drop directly in the editor lists, in addition to the existing move buttons
 
 Development workflow:
 
