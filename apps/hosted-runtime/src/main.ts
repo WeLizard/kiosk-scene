@@ -24,6 +24,7 @@ interface SceneHostBootstrap {
     entityMapUrl?: string;
     avatarManifestUrl?: string;
     avatarCatalogUrl?: string;
+    avatarImportUrl?: string;
   };
   availability?: Record<string, boolean>;
 }
@@ -614,6 +615,10 @@ void (async () => {
         ),
         avatarCatalogUrl: resolveHostedUrl(
           String(bootstrap.files?.avatarCatalogUrl || "").trim(),
+          bootstrapUrl,
+        ),
+        avatarImportUrl: resolveHostedUrl(
+          String(bootstrap.files?.avatarImportUrl || "").trim(),
           bootstrapUrl,
         ),
         sceneUrl: resolveHostedUrl(

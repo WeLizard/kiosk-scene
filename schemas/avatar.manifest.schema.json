@@ -15,6 +15,9 @@
       "type": "integer",
       "const": 1
     },
+    "name": {
+      "type": "string"
+    },
     "adapter": {
       "type": "string",
       "enum": [

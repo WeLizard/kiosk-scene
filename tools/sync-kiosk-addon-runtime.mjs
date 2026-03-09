@@ -10,6 +10,11 @@ const targetDir = path.resolve(
   "kiosk_scene",
   "scene-runtime-seed",
 );
+const sharedDir = path.resolve(
+  repoRoot,
+  "kiosk_scene",
+  "scene-runtime-shared",
+);
 
 if (!fs.existsSync(sourceDir)) {
   console.error(`Hosted runtime build is missing: ${sourceDir}`);
@@ -20,5 +25,8 @@ if (!fs.existsSync(sourceDir)) {
 fs.rmSync(targetDir, { recursive: true, force: true });
 fs.mkdirSync(targetDir, { recursive: true });
 fs.cpSync(sourceDir, targetDir, { recursive: true });
+if (fs.existsSync(sharedDir)) {
+  fs.cpSync(sharedDir, targetDir, { recursive: true, force: true });
+}
 
 console.log(`Synced hosted runtime bundle to ${targetDir}`);

@@ -8,6 +8,7 @@ What this add-on owns:
 - `/scene/`
 - `/scene-api/bootstrap`
 - `/scene-api/avatar-catalog`
+- `/scene-api/avatar-import`
 - `/scene-editor/`
 - `/config/kiosk-scene/scene-runtime/`
 - `/config/kiosk-scene/scene-packs/<pack-id>/`
@@ -24,6 +25,7 @@ Editor model:
 - top: one honest display preview for the selected screen profile
 - bottom: a normal scrollable settings page
 - avatar choice belongs to the current instance-pack and points at separate `avatar-packs`
+- avatar packs can be imported from `.zip` archives directly in the editor; the add-on scaffolds `avatar.manifest.json` and a draft `motion-map.json`
 
 Development workflow:
 

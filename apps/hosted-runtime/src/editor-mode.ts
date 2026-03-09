@@ -28,6 +28,14 @@ type EditorCopy = {
   avatarPackHint: string;
   avatarPackEmpty: string;
   avatarPackAppliedAfterSave: string;
+  avatarImport: string;
+  avatarImportHint: string;
+  avatarImportSelect: string;
+  avatarImportSelected: (name: string) => string;
+  avatarImportButton: string;
+  avatarImporting: string;
+  avatarImportSuccess: (name: string) => string;
+  avatarImportError: string;
   pages: string;
   pageKind: string;
   pageCards: (count: number) => string;
@@ -102,6 +110,7 @@ export interface NativeEditorShellOptions {
   packId: string;
   sceneApiUrl: string;
   avatarCatalogUrl?: string;
+  avatarImportUrl?: string;
   sceneUrl: string;
 }
 
@@ -173,6 +182,14 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarPackHint: "Другие модели лежат отдельно в /config/kiosk-scene/avatar-packs/<id>/avatar.manifest.json.",
     avatarPackEmpty: "В каталоге avatar-packs пока нет отдельных моделей.",
     avatarPackAppliedAfterSave: "Выбранный avatar-pack вступит в силу после сохранения и автоматической перезагрузки превью.",
+    avatarImport: "Импорт аватара",
+    avatarImportHint: "Загрузи zip-архив с Live2D-моделью. Kiosk Scene сам распакует его в avatar-packs, найдёт model3.json и создаст draft motion-map.",
+    avatarImportSelect: "ZIP архив аватара",
+    avatarImportSelected: (name) => `Выбран архив: ${name}`,
+    avatarImportButton: "Импортировать ZIP",
+    avatarImporting: "Импортирую avatar-pack...",
+    avatarImportSuccess: (name) => `Импортирован avatar-pack: ${name}`,
+    avatarImportError: "Не удалось импортировать avatar-pack",
     pages: "Страницы",
     pageKind: "Тип",
     pageCards: (count) => `${count} карточ${count === 1 ? "ка" : count < 5 ? "ки" : "ек"}`,
@@ -267,6 +284,14 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarPackHint: "Additional models live in /config/kiosk-scene/avatar-packs/<id>/avatar.manifest.json.",
     avatarPackEmpty: "No separate avatar packs are available yet.",
     avatarPackAppliedAfterSave: "The selected avatar pack will apply after saving and reloading the preview.",
+    avatarImport: "Import avatar",
+    avatarImportHint: "Upload a Live2D zip archive. Kiosk Scene will unpack it into avatar-packs, detect model3.json and create a draft motion map.",
+    avatarImportSelect: "Avatar ZIP archive",
+    avatarImportSelected: (name) => `Selected archive: ${name}`,
+    avatarImportButton: "Import ZIP",
+    avatarImporting: "Importing avatar pack...",
+    avatarImportSuccess: (name) => `Imported avatar pack: ${name}`,
+    avatarImportError: "Failed to import avatar pack",
     pages: "Pages",
     pageKind: "Kind",
     pageCards: (count) => `${count} cards`,
@@ -351,6 +376,11 @@ type EditorState = {
   entitySearch: string;
   focusedBinding: { cardIndex: number; field: string } | null;
   previewDisplayId: string;
+  pendingAvatarZip: File | null;
+  pendingAvatarZipName: string;
+  avatarImporting: boolean;
+  avatarImportStatus: string;
+  avatarImportTone: "muted" | "ok" | "bad";
 };
 
 type HaEntitySummary = {
@@ -366,6 +396,12 @@ type AvatarPackSummary = {
   name: string;
   manifestUrl: string;
   previewUrl: string;
+};
+
+type AvatarImportPayload = {
+  success?: boolean;
+  item?: AvatarPackSummary;
+  error?: string;
 };
 
 type PreviewDisplayProfile = {
@@ -848,6 +884,29 @@ async function loadAvatarCatalog(url: string): Promise<AvatarPackSummary[]> {
       }))
       .filter((item) => item.id && item.manifestUrl)
     : [];
+}
+
+async function importAvatarPack(url: string, archive: File): Promise<AvatarPackSummary> {
+  const target = String(url || "").trim();
+  if (!target) {
+    throw new Error("Avatar import API is not configured.");
+  }
+  const formData = new FormData();
+  formData.set("archive", archive, archive.name);
+  const response = await fetch(target, {
+    method: "POST",
+    body: formData,
+  });
+  const payload = await response.json() as AvatarImportPayload;
+  if (!response.ok || payload.success === false || !payload.item) {
+    throw new Error(String(payload.error || `HTTP ${response.status}`));
+  }
+  return {
+    id: String(payload.item.id || "").trim(),
+    name: String(payload.item.name || payload.item.id || "").trim(),
+    manifestUrl: String(payload.item.manifestUrl || "").trim(),
+    previewUrl: String(payload.item.previewUrl || "").trim(),
+  };
 }
 
 function isEntityBindingField(field: string): boolean {
@@ -1455,6 +1514,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     entitySearch: "",
     focusedBinding: null,
     previewDisplayId: DEFAULT_PREVIEW_DISPLAY_ID,
+    pendingAvatarZip: null,
+    pendingAvatarZipName: "",
+    avatarImporting: false,
+    avatarImportStatus: "",
+    avatarImportTone: "muted",
   };
 
   const applyPreviewLayout = (): void => {
@@ -1488,6 +1552,12 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       : copy.entityBindingEmpty;
     const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
     const selectedAvatarPack = state.avatarCatalog.find((item) => item.id === selectedAvatarPackId) || null;
+    const avatarArchiveLabel = state.pendingAvatarZipName
+      ? copy.avatarImportSelected(state.pendingAvatarZipName)
+      : copy.avatarImportHint;
+    const avatarImportStatus = state.avatarImportStatus
+      ? `<div class="scene-editor-status" data-tone="${state.avatarImportTone}">${escapeHtml(state.avatarImportStatus)}</div>`
+      : "";
 
     dashboardHost.innerHTML = `
       <div class="scene-dashboard-topbar">
@@ -1527,6 +1597,19 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
                   ? `<img src="${escapeHtml(selectedAvatarPack.previewUrl)}" alt="${escapeHtml(selectedAvatarPack.name || selectedAvatarPack.id)}">`
                   : `<span>${escapeHtml(selectedAvatarPack?.name || copy.avatarPackCurrent)}</span>`}
               </div>
+            </div>
+            <div class="card-stack" style="margin-top:16px;">
+              <div class="field is-wide">
+                <label for="avatar-pack-archive">${copy.avatarImportSelect}</label>
+                <input id="avatar-pack-archive" type="file" accept=".zip,application/zip" data-avatar-archive>
+              </div>
+              <div class="meta">${escapeHtml(avatarArchiveLabel)}</div>
+              <div class="page-chip-actions">
+                <button class="scene-editor-button" type="button" data-action="import-avatar"${state.avatarImporting || !state.pendingAvatarZip || !options.avatarImportUrl ? " disabled" : ""}>
+                  ${state.avatarImporting ? copy.avatarImporting : copy.avatarImportButton}
+                </button>
+              </div>
+              ${avatarImportStatus}
             </div>
           ` : `<div class="meta">${copy.statusLoading}</div>`}
           </section>
@@ -1820,6 +1903,35 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       render();
       return;
     }
+    if (action === "import-avatar") {
+      if (!state.config || !options.avatarImportUrl || !state.pendingAvatarZip || state.avatarImporting) {
+        return;
+      }
+      state.avatarImporting = true;
+      state.avatarImportStatus = copy.avatarImporting;
+      state.avatarImportTone = "muted";
+      render();
+      try {
+        const importedPack = await importAvatarPack(options.avatarImportUrl, state.pendingAvatarZip);
+        state.avatarCatalog = options.avatarCatalogUrl
+          ? await loadAvatarCatalog(options.avatarCatalogUrl)
+          : [importedPack];
+        ensureAvatarConfig(state.config).packId = importedPack.id;
+        state.pendingAvatarZip = null;
+        state.pendingAvatarZipName = "";
+        state.avatarImporting = false;
+        state.avatarImportStatus = copy.avatarImportSuccess(importedPack.name || importedPack.id);
+        state.avatarImportTone = "ok";
+        markDirty();
+        render();
+      } catch (error) {
+        state.avatarImporting = false;
+        state.avatarImportStatus = `${copy.avatarImportError}: ${String(error)}`;
+        state.avatarImportTone = "bad";
+        render();
+      }
+      return;
+    }
     if (!state.config) {
       return;
     }
@@ -2044,6 +2156,19 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.entitySearch = target.value;
       render();
     }
+  });
+
+  wrapper.addEventListener("change", (event) => {
+    const target = event.target as HTMLInputElement | null;
+    if (!target?.dataset.avatarArchive) {
+      return;
+    }
+    const archive = target.files?.[0] || null;
+    state.pendingAvatarZip = archive;
+    state.pendingAvatarZipName = archive?.name || "";
+    state.avatarImportStatus = "";
+    state.avatarImportTone = "muted";
+    render();
   });
 
   wrapper.addEventListener("focusin", (event) => {

@@ -36,6 +36,7 @@ export interface AvatarAdapterCapabilities {
 
 export interface AvatarManifestV1 {
   version: 1;
+  name?: string;
   adapter: "live2d" | "unity-webgl" | "static";
   assetRoot: string;
   runtimeUrl?: string;
