@@ -208,25 +208,25 @@ const COPY: Record<UiLang, EditorCopy> = {
     saving: "Сохраняю...",
     addPage: "+ Страница",
     avatar: "Аватар",
-    avatarSubtitle: "Выбор Live2D-модели для текущего instance-pack. Применяется после сохранения и перезагрузки превью.",
+    avatarSubtitle: "Сейчас сцена использует аватар из текущего scene-pack. Ниже можно импортировать отдельные Live2D-модели и переключаться между ними.",
     avatarPack: "Набор аватара",
-    avatarPackCurrent: "Текущий avatar.manifest.json instance-pack",
-    avatarPackHint: "Другие модели лежат отдельно в /config/kiosk-scene/avatar-packs/<id>/avatar.manifest.json.",
-    avatarPackEmpty: "В каталоге avatar-packs пока нет отдельных моделей.",
+    avatarPackCurrent: "Встроенный avatar.manifest.json",
+    avatarPackHint: "Ниже можно выбрать встроенный аватар текущего пакета или один из отдельно импортированных avatar-pack.",
+    avatarPackEmpty: "Отдельные avatar-pack ещё не импортированы. Пока используется встроенный аватар текущего scene-pack.",
     avatarPackAppliedAfterSave: "Выбранный avatar-pack вступит в силу после сохранения и автоматической перезагрузки превью.",
-    avatarPackDefaultTile: "Текущий instance-pack",
-    avatarPackDefaultHint: "Оставить аватар из scene-pack без отдельного avatar-pack.",
+    avatarPackDefaultTile: "Аватар текущего пакета",
+    avatarPackDefaultHint: "Использовать встроенный аватар из scene-pack без отдельного avatar-pack.",
     avatarPackSelect: "Использовать",
-    avatarPackSelected: "Будет применён после сохранения",
+    avatarPackSelected: "Текущий выбор",
     avatarPackMotionCount: (count) => `${count} motion`,
     avatarCapabilityMotion: "Motion",
     avatarCapabilityEmotion: "Emotion",
     avatarCapabilityLipSync: "LipSync",
     avatarImport: "Импорт аватара",
-    avatarImportHint: "Загрузи zip-архив с Live2D-моделью. Kiosk Scene сам распакует его в avatar-packs, найдёт model3.json и создаст draft motion-map.",
-    avatarImportSelect: "ZIP архив аватара",
+    avatarImportHint: "Выбери zip-архив с Live2D-моделью. Kiosk Scene сразу импортирует его в avatar-packs, найдёт model3.json и создаст draft motion-map.",
+    avatarImportSelect: "Выбрать ZIP аватара",
     avatarImportSelected: (name) => `Выбран архив: ${name}`,
-    avatarImportButton: "Импортировать ZIP",
+    avatarImportButton: "Выбрать и импортировать ZIP",
     avatarImporting: "Импортирую avatar-pack...",
     avatarImportSuccess: (name) => `Импортирован avatar-pack: ${name}`,
     avatarImportError: "Не удалось импортировать avatar-pack",
@@ -341,25 +341,25 @@ const COPY: Record<UiLang, EditorCopy> = {
     saving: "Saving...",
     addPage: "+ Page",
     avatar: "Avatar",
-    avatarSubtitle: "Choose the Live2D model for this instance-pack. It applies after save and preview reload.",
+    avatarSubtitle: "The scene currently uses the avatar bundled with this scene-pack. You can import separate Live2D models below and switch between them.",
     avatarPack: "Avatar pack",
-    avatarPackCurrent: "Use the instance-pack avatar.manifest.json",
-    avatarPackHint: "Additional models live in /config/kiosk-scene/avatar-packs/<id>/avatar.manifest.json.",
-    avatarPackEmpty: "No separate avatar packs are available yet.",
+    avatarPackCurrent: "Bundled avatar.manifest.json",
+    avatarPackHint: "Choose either the bundled avatar from the current scene-pack or one of the imported avatar packs below.",
+    avatarPackEmpty: "No separate avatar packs have been imported yet. The bundled scene-pack avatar is active for now.",
     avatarPackAppliedAfterSave: "The selected avatar pack will apply after saving and reloading the preview.",
-    avatarPackDefaultTile: "Current instance-pack",
-    avatarPackDefaultHint: "Keep the avatar bundled directly with the scene pack.",
+    avatarPackDefaultTile: "Bundled scene avatar",
+    avatarPackDefaultHint: "Use the avatar bundled directly with the scene-pack, without a separate avatar-pack.",
     avatarPackSelect: "Use avatar",
-    avatarPackSelected: "Will apply after save",
+    avatarPackSelected: "Current selection",
     avatarPackMotionCount: (count) => `${count} motions`,
     avatarCapabilityMotion: "Motion",
     avatarCapabilityEmotion: "Emotion",
     avatarCapabilityLipSync: "LipSync",
     avatarImport: "Import avatar",
-    avatarImportHint: "Upload a Live2D zip archive. Kiosk Scene will unpack it into avatar-packs, detect model3.json and create a draft motion map.",
-    avatarImportSelect: "Avatar ZIP archive",
+    avatarImportHint: "Choose a Live2D zip archive. Kiosk Scene will immediately import it into avatar-packs, detect model3.json and create a draft motion map.",
+    avatarImportSelect: "Choose avatar ZIP",
     avatarImportSelected: (name) => `Selected archive: ${name}`,
-    avatarImportButton: "Import ZIP",
+    avatarImportButton: "Choose and import ZIP",
     avatarImporting: "Importing avatar pack...",
     avatarImportSuccess: (name) => `Imported avatar pack: ${name}`,
     avatarImportError: "Failed to import avatar pack",
@@ -2000,6 +2000,36 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     render();
   };
 
+  const importAvatarArchive = async (archive: File): Promise<void> => {
+    if (!state.config || !options.avatarImportUrl || state.avatarImporting) {
+      return;
+    }
+    state.avatarImporting = true;
+    state.avatarImportStatus = copy.avatarImporting;
+    state.avatarImportTone = "muted";
+    render();
+    try {
+      const importedPack = await importAvatarPack(options.avatarImportUrl, archive);
+      state.avatarCatalog = options.avatarCatalogUrl
+        ? await loadAvatarCatalog(options.avatarCatalogUrl)
+        : [importedPack];
+      ensureAvatarConfig(state.config).packId = importedPack.id;
+      await loadSelectedAvatarPackDetails(importedPack.id);
+      state.pendingAvatarZip = null;
+      state.pendingAvatarZipName = "";
+      state.avatarImporting = false;
+      state.avatarImportStatus = copy.avatarImportSuccess(importedPack.name || importedPack.id);
+      state.avatarImportTone = "ok";
+      markDirty();
+      render();
+    } catch (error) {
+      state.avatarImporting = false;
+      state.avatarImportStatus = `${copy.avatarImportError}: ${String(error)}`;
+      state.avatarImportTone = "bad";
+      render();
+    }
+  };
+
   const resizeObserver = typeof ResizeObserver !== "undefined"
     ? new ResizeObserver(() => applyPreviewLayout())
     : null;
@@ -2056,6 +2086,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const avatarImportStatus = state.avatarImportStatus
       ? `<div class="scene-editor-status" data-tone="${state.avatarImportTone}">${escapeHtml(state.avatarImportStatus)}</div>`
       : "";
+    const hasSeparateAvatarPacks = state.avatarCatalog.length > 0;
 
     dashboardHost.innerHTML = `
       <div class="scene-dashboard-topbar">
@@ -2079,8 +2110,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
           ${config ? `
             <div class="avatar-pack-box">
-              <div class="meta">${state.avatarCatalog.length ? copy.avatarPackHint : copy.avatarPackEmpty}</div>
-              <div class="meta">${copy.avatarPackAppliedAfterSave}</div>
+              <div class="meta">${hasSeparateAvatarPacks ? copy.avatarPackHint : copy.avatarPackEmpty}</div>
+              ${hasSeparateAvatarPacks ? `<div class="meta">${copy.avatarPackAppliedAfterSave}</div>` : ""}
               <div class="avatar-pack-grid">
                 ${renderAvatarPackTile(copy, null, selectedAvatarPackId)}
                 ${state.avatarCatalog.map((item) => renderAvatarPackTile(copy, item, selectedAvatarPackId)).join("")}
@@ -2089,14 +2120,12 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             <div class="card-stack" style="margin-top:16px;">
               <div class="field is-wide">
                 <label for="avatar-pack-archive">${copy.avatarImportSelect}</label>
-                <input id="avatar-pack-archive" type="file" accept=".zip,application/zip" data-avatar-archive>
-              </div>
-              <div class="meta">${escapeHtml(avatarArchiveLabel)}</div>
-              <div class="page-chip-actions">
-                <button class="scene-editor-button" type="button" data-action="import-avatar"${state.avatarImporting || !state.pendingAvatarZip || !options.avatarImportUrl ? " disabled" : ""}>
+                <input id="avatar-pack-archive" type="file" accept=".zip,application/zip" data-avatar-archive hidden>
+                <button class="scene-editor-button" type="button" data-action="open-avatar-archive"${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}>
                   ${state.avatarImporting ? copy.avatarImporting : copy.avatarImportButton}
                 </button>
               </div>
+              <div class="meta">${escapeHtml(avatarArchiveLabel)}</div>
               ${avatarImportStatus}
             </div>
             ${selectedAvatarPackId
@@ -2234,7 +2263,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
 
     const liveAvatarArchiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
     liveAvatarArchiveInput?.addEventListener("change", () => {
-      handleAvatarArchiveSelection(liveAvatarArchiveInput.files?.[0] || null);
+      const archive = liveAvatarArchiveInput.files?.[0] || null;
+      handleAvatarArchiveSelection(archive);
+      if (archive) {
+        void importAvatarArchive(archive);
+      }
     });
 
     for (const pageChip of Array.from(dashboardHost.querySelectorAll<HTMLElement>(".page-chip[data-page-id]"))) {
@@ -2535,34 +2568,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       render();
       return;
     }
-    if (action === "import-avatar") {
-      if (!state.config || !options.avatarImportUrl || !state.pendingAvatarZip || state.avatarImporting) {
-        return;
-      }
-      state.avatarImporting = true;
-      state.avatarImportStatus = copy.avatarImporting;
-      state.avatarImportTone = "muted";
-      render();
-      try {
-        const importedPack = await importAvatarPack(options.avatarImportUrl, state.pendingAvatarZip);
-        state.avatarCatalog = options.avatarCatalogUrl
-          ? await loadAvatarCatalog(options.avatarCatalogUrl)
-          : [importedPack];
-        ensureAvatarConfig(state.config).packId = importedPack.id;
-        await loadSelectedAvatarPackDetails(importedPack.id);
-        state.pendingAvatarZip = null;
-        state.pendingAvatarZipName = "";
-        state.avatarImporting = false;
-        state.avatarImportStatus = copy.avatarImportSuccess(importedPack.name || importedPack.id);
-        state.avatarImportTone = "ok";
-        markDirty();
-        render();
-      } catch (error) {
-        state.avatarImporting = false;
-        state.avatarImportStatus = `${copy.avatarImportError}: ${String(error)}`;
-        state.avatarImportTone = "bad";
-        render();
-      }
+    if (action === "open-avatar-archive") {
+      const archiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
+      archiveInput?.click();
       return;
     }
     if (!state.config) {
