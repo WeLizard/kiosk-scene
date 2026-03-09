@@ -29,6 +29,7 @@ Editor model:
 - imported avatar packs expose their semantic motion-map in the Avatar section, so the user can bind runtime cues like `idle`, `think`, `busy`, or `greet` to actual model motions
 - the Avatar section now renders a visual catalog of available avatar packs with previews, motion count, and capabilities instead of only a raw dropdown
 - the Home Assistant section now exposes explicit binding targets for the selected card, so entity assignment does not depend on guessing the currently focused field
+- the editor preview is now interactive: clicking a page or card inside the simulated display selects it in the settings dashboard below
 
 Development workflow:
 

@@ -813,7 +813,7 @@ export class BrowserSceneShellApp {
     this.orderedPages = pages.slice();
     this.carouselTrackEl.innerHTML = pages.map((page, index) => {
       if (page.kind === "overview") {
-        return this.renderOverviewSlide(presentation, index);
+        return this.renderOverviewSlide(page, presentation, index);
       }
       return this.renderDynamicSlide(page, index, pages.length);
     }).join("");
@@ -825,6 +825,7 @@ export class BrowserSceneShellApp {
         class="carousel-dot ${index === this.activeIndex ? "is-active" : ""}"
         type="button"
         data-slide-index="${index}"
+        data-scene-page-id="${escapeHtml(page.id)}"
         aria-label="${escapeHtml(trimText(page.title, 40) || `Page ${index + 1}`)}"
       ></button>
     `).join("");
@@ -836,13 +837,13 @@ export class BrowserSceneShellApp {
     }
   }
 
-  private renderOverviewSlide(presentation: AssistantPresentationModel, index: number): string {
+  private renderOverviewSlide(page: ScenePageV1, presentation: AssistantPresentationModel, index: number): string {
     const assistantName = trimText(this.rendererConfig.assistant.name, 40) || "Assistant";
     const weather = this.weatherData || DEFAULT_WEATHER_OVERVIEW;
     const forecastMarkup = weather.forecast.slice(0, 5).map((day) => this.renderForecastDay(day)).join("");
 
     return `
-      <section class="slide slide-overview" data-slide-id="weather" data-slide-order="${index}">
+      <section class="slide slide-overview" data-slide-id="${escapeHtml(page.id)}" data-scene-page-id="${escapeHtml(page.id)}" data-slide-order="${index}">
         <div class="weather-panel slide-body">
           <div class="weather-top">
             <div>
@@ -918,14 +919,14 @@ export class BrowserSceneShellApp {
     const stampValue = trimText(page.stampValue, 32)
       || (page.kind === "forecast+cards" ? weatherRange : `${index + 1} / ${pageCount}`);
     const cardsHtml = page.cardStyle === "mini"
-      ? cards.map((card) => `
-          <article class="mini-card">
+      ? cards.map((card, cardIndex) => `
+          <article class="mini-card" data-scene-card-index="${cardIndex}" data-scene-page-id="${escapeHtml(page.id)}">
             <span class="caption">${escapeHtml(card.caption)}</span>
             <strong>${escapeHtml(card.value)}</strong>
           </article>
         `).join("")
-      : cards.map((card) => `
-          <article class="home-card">
+      : cards.map((card, cardIndex) => `
+          <article class="home-card" data-scene-card-index="${cardIndex}" data-scene-page-id="${escapeHtml(page.id)}">
             <span class="caption">${escapeHtml(card.caption)}</span>
             <strong>${escapeHtml(card.value)}</strong>
             <small>${escapeHtml(card.hint)}</small>
@@ -937,7 +938,7 @@ export class BrowserSceneShellApp {
     const cardGridClass = page.cardStyle === "mini" ? "dynamic-cards-grid is-mini" : "dynamic-cards-grid is-full";
 
     return `
-      <section class="slide slide-dynamic" data-slide-id="${escapeHtml(page.id)}" data-slide-order="${index}">
+      <section class="slide slide-dynamic" data-slide-id="${escapeHtml(page.id)}" data-scene-page-id="${escapeHtml(page.id)}" data-slide-order="${index}">
         <div class="dynamic-slide slide-body" data-dynamic-layout="${escapeHtml(page.kind)}" data-dynamic-card-style="${escapeHtml(page.cardStyle || "full")}">
           <div class="slide-top">
             <div>

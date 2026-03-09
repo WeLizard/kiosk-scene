@@ -131,6 +131,8 @@ type EditorCopy = {
   entityBinding: string;
   entityBindingEmpty: string;
   entityBindingActive: (card: string, field: string) => string;
+  previewSelectPage: string;
+  previewSelectCard: string;
   noEntities: string;
   useEntity: string;
 };
@@ -315,6 +317,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     entityBinding: "Связать с полем",
     entityBindingEmpty: "Кликни в поле Сущность / State / Down / Up у карточки, потом выбери сущность здесь.",
     entityBindingActive: (card, field) => `Сейчас связываем: ${card} → ${field}`,
+    previewSelectPage: "Клик по превью выбирает страницу",
+    previewSelectCard: "Клик по карточке в превью выбирает её в инспекторе",
     noEntities: "Сущности Home Assistant пока недоступны",
     useEntity: "Использовать",
   },
@@ -446,6 +450,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     entityBinding: "Bind into field",
     entityBindingEmpty: "Click an Entity / State / Down / Up field on a card, then choose an entity here.",
     entityBindingActive: (card, field) => `Binding now: ${card} → ${field}`,
+    previewSelectPage: "Click the preview to select a page",
+    previewSelectCard: "Click a card in the preview to inspect it",
     noEntities: "Home Assistant entities are not available yet",
     useEntity: "Use",
   },
@@ -1251,6 +1257,11 @@ function renderBindingTargets(
   `;
 }
 
+function scrollEditorSection(section: "pages" | "cards" | "homeAssistant"): void {
+  const target = document.querySelector<HTMLElement>(`[data-editor-section="${section}"]`);
+  target?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function firstBindableFieldForType(type: string): string | null {
   return cardFieldsForType(type).find((field) => isEntityBindingField(field)) || null;
 }
@@ -1507,6 +1518,19 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         overflow-y: hidden;
         padding: 4px 0 8px;
       }
+      #scene-editor-shell .scene-preview-hint {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      #scene-editor-shell .scene-preview-hint span {
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: rgba(214,225,237,0.72);
+        font-size: 12px;
+        color: #385268;
+      }
       #scene-editor-shell .scene-preview-stage {
         overflow: hidden;
         border-radius: 18px;
@@ -1528,6 +1552,16 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       #scene-editor-shell #app .scene-viewport {
         overflow: hidden;
+      }
+      #scene-editor-shell #app [data-scene-page-id],
+      #scene-editor-shell #app [data-scene-card-index] {
+        cursor: pointer;
+      }
+      #scene-editor-shell #app [data-editor-selected-page="true"] {
+        box-shadow: inset 0 0 0 3px rgba(77,147,121,0.28);
+      }
+      #scene-editor-shell #app [data-editor-selected-card="true"] {
+        box-shadow: 0 0 0 3px rgba(45,98,162,0.2), var(--card-shadow, 0 14px 28px rgba(83, 109, 128, 0.1));
       }
       #scene-editor-shell .scene-dashboard {
         display: grid;
@@ -1861,6 +1895,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             <button class="scene-editor-button" type="button" data-action="apply-display-profile">${copy.previewApplyProfile}</button>
           </div>
         </div>
+        <div class="scene-preview-hint">
+          <span>${copy.previewSelectPage}</span>
+          <span>${copy.previewSelectCard}</span>
+        </div>
         <div class="scene-preview-frame">
           <div class="scene-preview-stage" data-preview-stage></div>
         </div>
@@ -1943,6 +1981,35 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     : null;
   resizeObserver?.observe(previewStage);
 
+  const syncPreviewSelection = (): void => {
+    const pageId = state.selectedPageId || "";
+    const cardIndex = state.selectedCardIndex;
+    for (const el of Array.from(appRoot.querySelectorAll<HTMLElement>("[data-editor-selected-page='true']"))) {
+      delete el.dataset.editorSelectedPage;
+    }
+    for (const el of Array.from(appRoot.querySelectorAll<HTMLElement>("[data-editor-selected-card='true']"))) {
+      delete el.dataset.editorSelectedCard;
+    }
+    if (pageId) {
+      const pageEl = appRoot.querySelector<HTMLElement>(`[data-slide-id="${CSS.escape(pageId)}"]`);
+      if (pageEl) {
+        pageEl.dataset.editorSelectedPage = "true";
+      }
+    }
+    if (pageId && cardIndex !== null) {
+      const selector = `[data-scene-page-id="${CSS.escape(pageId)}"][data-scene-card-index="${cardIndex}"]`;
+      const cardEl = appRoot.querySelector<HTMLElement>(selector);
+      if (cardEl) {
+        cardEl.dataset.editorSelectedCard = "true";
+      }
+    }
+  };
+
+  const previewMutationObserver = typeof MutationObserver !== "undefined"
+    ? new MutationObserver(() => syncPreviewSelection())
+    : null;
+  previewMutationObserver?.observe(appRoot, { childList: true, subtree: true });
+
   const render = (): void => {
     const config = state.config;
     const ordered = config ? orderedPages(config) : [];
@@ -1980,7 +2047,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       </div>
       <div class="scene-dashboard-body">
         <div class="scene-settings-stack">
-          <section class="scene-settings-card">
+          <section class="scene-settings-card" data-editor-section="pages">
             <div class="scene-settings-head">
               <h2>${copy.avatar}</h2>
               <div class="meta">${copy.avatarSubtitle}</div>
@@ -2016,7 +2083,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               : `<div class="meta" style="margin-top:16px;">${copy.avatarMappingEmpty}</div>`}
           ` : `<div class="meta">${copy.statusLoading}</div>`}
           </section>
-          <section class="scene-settings-card">
+          <section class="scene-settings-card" data-editor-section="cards">
             <div class="scene-settings-head">
               <h2>${copy.pages}</h2>
               <div class="meta">${copy.subtitle(options.packId)}</div>
@@ -2037,7 +2104,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             `).join("") || `<div class="meta">${copy.statusLoading}</div>`}
             </div>
           </section>
-          <section class="scene-settings-card">
+          <section class="scene-settings-card" data-editor-section="homeAssistant">
             <div class="scene-settings-head">
               <h2>${copy.inspector}</h2>
               <div class="meta">${copy.pageSettings}</div>
@@ -2132,6 +2199,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       </div>
     `;
     applyPreviewLayout();
+    syncPreviewSelection();
   };
 
   const setStatus = (text: string, tone: EditorState["statusTone"]): void => {
@@ -2597,6 +2665,40 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     markDirty();
     void loadSelectedAvatarPackDetails(packId || null).finally(() => render());
     render();
+  });
+
+  appRoot.addEventListener("click", (event) => {
+    if (!state.config) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    const cardEl = target?.closest<HTMLElement>("[data-scene-card-index][data-scene-page-id]");
+    if (cardEl) {
+      const pageId = String(cardEl.dataset.scenePageId || "").trim();
+      const cardIndex = Number(cardEl.dataset.sceneCardIndex || "-1");
+      if (pageId && Number.isFinite(cardIndex) && cardIndex >= 0) {
+        state.selectedPageId = pageId;
+        state.selectedCardIndex = cardIndex;
+        state.focusedBinding = null;
+        syncSelection();
+        render();
+        scrollEditorSection("cards");
+      }
+      return;
+    }
+    const pageEl = target?.closest<HTMLElement>("[data-scene-page-id]");
+    if (pageEl) {
+      const pageId = String(pageEl.dataset.scenePageId || "").trim();
+      if (pageId) {
+        state.selectedPageId = pageId;
+        state.selectedCardIndex = 0;
+        state.focusedBinding = null;
+        syncSelection();
+        render();
+        scrollEditorSection("pages");
+      }
+      return;
+    }
   });
 
   wrapper.addEventListener("change", (event) => {
