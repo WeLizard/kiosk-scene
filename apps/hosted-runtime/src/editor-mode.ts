@@ -28,6 +28,14 @@ type EditorCopy = {
   avatarPackHint: string;
   avatarPackEmpty: string;
   avatarPackAppliedAfterSave: string;
+  avatarPackDefaultTile: string;
+  avatarPackDefaultHint: string;
+  avatarPackSelect: string;
+  avatarPackSelected: string;
+  avatarPackMotionCount: (count: number) => string;
+  avatarCapabilityMotion: string;
+  avatarCapabilityEmotion: string;
+  avatarCapabilityLipSync: string;
   avatarImport: string;
   avatarImportHint: string;
   avatarImportSelect: string;
@@ -119,6 +127,7 @@ type EditorCopy = {
   cardNumber: string;
   homeAssistant: string;
   entitySearch: string;
+  entityBindingTargets: string;
   entityBinding: string;
   entityBindingEmpty: string;
   entityBindingActive: (card: string, field: string) => string;
@@ -203,6 +212,14 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarPackHint: "Другие модели лежат отдельно в /config/kiosk-scene/avatar-packs/<id>/avatar.manifest.json.",
     avatarPackEmpty: "В каталоге avatar-packs пока нет отдельных моделей.",
     avatarPackAppliedAfterSave: "Выбранный avatar-pack вступит в силу после сохранения и автоматической перезагрузки превью.",
+    avatarPackDefaultTile: "Текущий instance-pack",
+    avatarPackDefaultHint: "Оставить аватар из scene-pack без отдельного avatar-pack.",
+    avatarPackSelect: "Использовать",
+    avatarPackSelected: "Будет применён после сохранения",
+    avatarPackMotionCount: (count) => `${count} motion`,
+    avatarCapabilityMotion: "Motion",
+    avatarCapabilityEmotion: "Emotion",
+    avatarCapabilityLipSync: "LipSync",
     avatarImport: "Импорт аватара",
     avatarImportHint: "Загрузи zip-архив с Live2D-моделью. Kiosk Scene сам распакует его в avatar-packs, найдёт model3.json и создаст draft motion-map.",
     avatarImportSelect: "ZIP архив аватара",
@@ -294,6 +311,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     cardNumber: "Число",
     homeAssistant: "Home Assistant",
     entitySearch: "Поиск сущностей",
+    entityBindingTargets: "Куда привязывать",
     entityBinding: "Связать с полем",
     entityBindingEmpty: "Кликни в поле Сущность / State / Down / Up у карточки, потом выбери сущность здесь.",
     entityBindingActive: (card, field) => `Сейчас связываем: ${card} → ${field}`,
@@ -325,6 +343,14 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarPackHint: "Additional models live in /config/kiosk-scene/avatar-packs/<id>/avatar.manifest.json.",
     avatarPackEmpty: "No separate avatar packs are available yet.",
     avatarPackAppliedAfterSave: "The selected avatar pack will apply after saving and reloading the preview.",
+    avatarPackDefaultTile: "Current instance-pack",
+    avatarPackDefaultHint: "Keep the avatar bundled directly with the scene pack.",
+    avatarPackSelect: "Use avatar",
+    avatarPackSelected: "Will apply after save",
+    avatarPackMotionCount: (count) => `${count} motions`,
+    avatarCapabilityMotion: "Motion",
+    avatarCapabilityEmotion: "Emotion",
+    avatarCapabilityLipSync: "LipSync",
     avatarImport: "Import avatar",
     avatarImportHint: "Upload a Live2D zip archive. Kiosk Scene will unpack it into avatar-packs, detect model3.json and create a draft motion map.",
     avatarImportSelect: "Avatar ZIP archive",
@@ -416,6 +442,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     cardNumber: "number",
     homeAssistant: "Home Assistant",
     entitySearch: "Search entities",
+    entityBindingTargets: "Binding target",
     entityBinding: "Bind into field",
     entityBindingEmpty: "Click an Entity / State / Down / Up field on a card, then choose an entity here.",
     entityBindingActive: (card, field) => `Binding now: ${card} → ${field}`,
@@ -461,6 +488,12 @@ type AvatarPackSummary = {
   name: string;
   manifestUrl: string;
   previewUrl: string;
+  motionCount: number;
+  capabilities?: {
+    supportsMotion?: boolean;
+    supportsEmotion?: boolean;
+    supportsLipSync?: boolean;
+  };
 };
 
 type AvatarImportPayload = {
@@ -979,6 +1012,14 @@ async function loadAvatarCatalog(url: string): Promise<AvatarPackSummary[]> {
         name: String(item.name || item.id || "").trim(),
         manifestUrl: String(item.manifestUrl || "").trim(),
         previewUrl: String(item.previewUrl || "").trim(),
+        motionCount: Number(item.motionCount || 0),
+        capabilities: typeof item.capabilities === "object" && item.capabilities
+          ? {
+              supportsMotion: Boolean(item.capabilities.supportsMotion),
+              supportsEmotion: Boolean(item.capabilities.supportsEmotion),
+              supportsLipSync: Boolean(item.capabilities.supportsLipSync),
+            }
+          : undefined,
       }))
       .filter((item) => item.id && item.manifestUrl)
     : [];
@@ -1004,6 +1045,14 @@ async function importAvatarPack(url: string, archive: File): Promise<AvatarPackS
     name: String(payload.item.name || payload.item.id || "").trim(),
     manifestUrl: String(payload.item.manifestUrl || "").trim(),
     previewUrl: String(payload.item.previewUrl || "").trim(),
+    motionCount: Number(payload.item.motionCount || 0),
+    capabilities: typeof payload.item.capabilities === "object" && payload.item.capabilities
+      ? {
+          supportsMotion: Boolean(payload.item.capabilities.supportsMotion),
+          supportsEmotion: Boolean(payload.item.capabilities.supportsEmotion),
+          supportsLipSync: Boolean(payload.item.capabilities.supportsLipSync),
+        }
+      : undefined,
   };
 }
 
@@ -1130,8 +1179,76 @@ function renderAvatarMapping(
   `;
 }
 
+function renderAvatarPackTile(
+  copy: EditorCopy,
+  item: AvatarPackSummary | null,
+  selectedPackId: string,
+): string {
+  const packId = item?.id || "";
+  const isSelected = selectedPackId === packId;
+  const title = item?.name || copy.avatarPackDefaultTile;
+  const subtitle = item?.id || copy.avatarPackCurrent;
+  const previewUrl = item?.previewUrl || "";
+  const tags = item
+    ? [
+        item.motionCount > 0 ? copy.avatarPackMotionCount(item.motionCount) : "",
+        item.capabilities?.supportsMotion ? copy.avatarCapabilityMotion : "",
+        item.capabilities?.supportsEmotion ? copy.avatarCapabilityEmotion : "",
+        item.capabilities?.supportsLipSync ? copy.avatarCapabilityLipSync : "",
+      ].filter(Boolean)
+    : [copy.avatarPackDefaultHint];
+
+  return `
+    <article class="avatar-pack-card${isSelected ? " is-active" : ""}">
+      <div class="avatar-pack-card-preview">
+        ${previewUrl
+          ? `<img src="${escapeHtml(previewUrl)}" alt="${escapeHtml(title)}">`
+          : `<span>${escapeHtml(title)}</span>`}
+      </div>
+      <div class="avatar-pack-card-body">
+        <strong>${escapeHtml(title)}</strong>
+        <div class="meta">${escapeHtml(subtitle)}</div>
+        <div class="avatar-pack-card-meta">
+          ${tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+        </div>
+        <button class="scene-editor-button${isSelected ? " is-accent" : ""}" type="button" data-action="select-avatar-pack" data-pack-id="${escapeHtml(packId)}">
+          ${escapeHtml(isSelected ? copy.avatarPackSelected : copy.avatarPackSelect)}
+        </button>
+      </div>
+    </article>
+  `;
+}
+
 function isEntityBindingField(field: string): boolean {
   return ["entity", "stateEntity", "downEntity", "upEntity"].includes(field);
+}
+
+function renderBindingTargets(
+  copy: EditorCopy,
+  card: SceneCardV1 | null,
+  cardIndex: number | null,
+  focusedBinding: { cardIndex: number; field: string } | null,
+): string {
+  if (!card || cardIndex === null) {
+    return `<div class="meta">${escapeHtml(copy.entityBindingEmpty)}</div>`;
+  }
+  const fields = cardFieldsForType(fieldValue(card as Record<string, unknown>, "type") || "entity")
+    .filter((field) => isEntityBindingField(field));
+  if (!fields.length) {
+    return `<div class="meta">${escapeHtml(copy.entityBindingEmpty)}</div>`;
+  }
+  return `
+    <div class="binding-targets">
+      ${fields.map((field) => {
+        const active = focusedBinding?.cardIndex === cardIndex && focusedBinding.field === field;
+        return `
+          <button class="tiny-btn${active ? " is-active" : ""}" type="button" data-action="focus-binding" data-card-index="${cardIndex}" data-binding-field="${escapeHtml(field)}">
+            ${escapeHtml(labelForField(copy, field))}
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function firstBindableFieldForType(type: string): string | null {
@@ -1463,6 +1580,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         min-height: 30px;
         padding: 0 10px;
       }
+      #scene-editor-shell .tiny-btn.is-active {
+        background: rgba(45,98,162,0.14);
+        border-color: rgba(45,98,162,0.25);
+        color: #1f4e87;
+      }
       #scene-editor-shell .scene-editor-button.is-accent {
         background: linear-gradient(180deg, rgba(111,191,162,0.24), rgba(111,191,162,0.12));
         border-color: rgba(77,147,121,0.28);
@@ -1520,35 +1642,60 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       #scene-editor-shell .avatar-pack-box {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 124px;
         gap: 14px;
-        align-items: start;
       }
-      #scene-editor-shell .avatar-pack-meta {
+      #scene-editor-shell .avatar-pack-grid {
         display: grid;
-        gap: 8px;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       }
-      #scene-editor-shell .avatar-pack-preview {
-        width: 124px;
-        min-height: 124px;
-        border-radius: 18px;
-        border: 1px solid rgba(32,48,65,0.08);
+      #scene-editor-shell .avatar-pack-card {
+        display: grid;
+        gap: 12px;
+        border-radius: 20px;
+        border: 1px solid rgba(32,48,65,0.1);
+        background: rgba(255,255,255,0.92);
+        padding: 14px;
+      }
+      #scene-editor-shell .avatar-pack-card.is-active {
+        border-color: rgba(45,98,162,0.35);
+        box-shadow: inset 0 0 0 1px rgba(45,98,162,0.18);
+      }
+      #scene-editor-shell .avatar-pack-card-preview {
+        min-height: 144px;
+        border-radius: 16px;
         background: linear-gradient(180deg, rgba(223,232,239,0.82), rgba(236,242,246,0.92));
         display: grid;
         place-items: center;
         overflow: hidden;
       }
-      #scene-editor-shell .avatar-pack-preview img {
+      #scene-editor-shell .avatar-pack-card-preview img {
         display: block;
-        width: 100%;
-        height: 100%;
+        max-width: 100%;
+        max-height: 144px;
         object-fit: contain;
       }
-      #scene-editor-shell .avatar-pack-preview span {
+      #scene-editor-shell .avatar-pack-card-preview span {
         padding: 12px;
         text-align: center;
         font: 12px/1.35 "Aptos","Segoe UI",sans-serif;
         color: rgba(32,48,65,0.62);
+      }
+      #scene-editor-shell .avatar-pack-card-body {
+        display: grid;
+        gap: 8px;
+      }
+      #scene-editor-shell .avatar-pack-card-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      #scene-editor-shell .avatar-pack-card-meta span {
+        border-radius: 999px;
+        padding: 4px 8px;
+        background: rgba(214,225,237,0.72);
+        font-size: 11px;
+        color: #385268;
       }
       #scene-editor-shell .page-chip,
       #scene-editor-shell .card-item,
@@ -1648,6 +1795,12 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 8px;
         align-items: center;
+      }
+      #scene-editor-shell .binding-targets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
       }
       #scene-editor-shell .ha-entity code {
         font: 12px/1.25 Consolas, monospace;
@@ -1805,7 +1958,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         )
       : copy.entityBindingEmpty;
     const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
-    const selectedAvatarPack = state.avatarCatalog.find((item) => item.id === selectedAvatarPackId) || null;
     const avatarArchiveLabel = state.pendingAvatarZipName
       ? copy.avatarImportSelected(state.pendingAvatarZipName)
       : copy.avatarImportHint;
@@ -1835,21 +1987,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
           ${config ? `
             <div class="avatar-pack-box">
-              <div class="avatar-pack-meta">
-                <div class="field is-wide">
-                  <label for="avatar-pack-select">${copy.avatarPack}</label>
-                  <select id="avatar-pack-select" data-avatar-pack>
-                    <option value="">${copy.avatarPackCurrent}</option>
-                    ${state.avatarCatalog.map((item) => `<option value="${escapeHtml(item.id)}"${item.id === selectedAvatarPackId ? " selected" : ""}>${escapeHtml(item.name || item.id)}</option>`).join("")}
-                  </select>
-                </div>
-                <div class="meta">${state.avatarCatalog.length ? copy.avatarPackHint : copy.avatarPackEmpty}</div>
-                <div class="meta">${copy.avatarPackAppliedAfterSave}</div>
-              </div>
-              <div class="avatar-pack-preview">
-                ${selectedAvatarPack?.previewUrl
-                  ? `<img src="${escapeHtml(selectedAvatarPack.previewUrl)}" alt="${escapeHtml(selectedAvatarPack.name || selectedAvatarPack.id)}">`
-                  : `<span>${escapeHtml(selectedAvatarPack?.name || copy.avatarPackCurrent)}</span>`}
+              <div class="meta">${state.avatarCatalog.length ? copy.avatarPackHint : copy.avatarPackEmpty}</div>
+              <div class="meta">${copy.avatarPackAppliedAfterSave}</div>
+              <div class="avatar-pack-grid">
+                ${renderAvatarPackTile(copy, null, selectedAvatarPackId)}
+                ${state.avatarCatalog.map((item) => renderAvatarPackTile(copy, item, selectedAvatarPackId)).join("")}
               </div>
             </div>
             <div class="card-stack" style="margin-top:16px;">
@@ -1962,6 +2104,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               <h2>${copy.homeAssistant}</h2>
               <div class="meta">${escapeHtml(bindingLabel)}</div>
             </div>
+          <div>
+            <div class="meta">${copy.entityBindingTargets}</div>
+            ${renderBindingTargets(copy, selectedCard, state.selectedCardIndex, state.focusedBinding)}
+          </div>
           <div class="field ha-search" style="margin-top:12px;">
             <label for="ha-entity-search">${copy.entitySearch}</label>
             <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
@@ -2403,13 +2549,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       applyPreviewLayout();
       return;
     }
-    if (target.dataset.avatarPack !== undefined) {
-      ensureAvatarConfig(state.config).packId = target.value.trim() || null;
-      markDirty();
-      void loadSelectedAvatarPackDetails(target.value.trim() || null).finally(() => render());
-      render();
-      return;
-    }
     if (target.dataset.avatarSemantic !== undefined) {
       const selectedPackId = readAvatarPackId(state.config);
       if (!state.avatarPackDetails || !selectedPackId || state.avatarPackDetails.packId !== selectedPackId) {
@@ -2446,6 +2585,18 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.entitySearch = target.value;
       render();
     }
+  });
+
+  wrapper.addEventListener("click", (event) => {
+    const actionEl = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action='select-avatar-pack']");
+    if (!actionEl || !state.config) {
+      return;
+    }
+    const packId = String(actionEl.dataset.packId || "").trim();
+    ensureAvatarConfig(state.config).packId = packId || null;
+    markDirty();
+    void loadSelectedAvatarPackDetails(packId || null).finally(() => render());
+    render();
   });
 
   wrapper.addEventListener("change", (event) => {

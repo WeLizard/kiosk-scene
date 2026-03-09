@@ -512,6 +512,24 @@ def load_avatar_catalog() -> dict[str, Any]:
 
         pack_id = pack_dir.name
         asset_root = str(manifest.get("assetRoot") or "").strip()
+        motion_map_rel = str(manifest.get("motionMapUrl") or "").strip()
+        asset_root_dir = pack_dir
+        if asset_root and not asset_root.startswith("/") and "://" not in asset_root:
+            asset_root_dir = pack_dir / asset_root.removeprefix("./")
+        motion_map_path = (
+            asset_root_dir / motion_map_rel.removeprefix("./")
+            if motion_map_rel and not motion_map_rel.startswith("/")
+            else None
+        )
+        motion_count = 0
+        if motion_map_path and motion_map_path.exists():
+            try:
+                motion_map = read_json_file(motion_map_path)
+                motions = motion_map.get("motions")
+                if isinstance(motions, list):
+                    motion_count = len(motions)
+            except Exception as exc:
+                logging.warning("Failed to read avatar pack motion-map %s: %s", motion_map_path, exc)
         fallback_portrait = _resolve_avatar_asset_url(
             pack_id, str(manifest.get("fallbackPortrait", "")), asset_root
         )
@@ -523,6 +541,8 @@ def load_avatar_catalog() -> dict[str, Any]:
                 "manifestUrl": f"/avatar-packs/{quote(pack_id)}/avatar.manifest.json",
                 "previewUrl": fallback_portrait,
                 "fallbackPortrait": fallback_portrait,
+                "motionCount": motion_count,
+                "capabilities": manifest.get("capabilities") if isinstance(manifest.get("capabilities"), dict) else {},
             }
         )
 
