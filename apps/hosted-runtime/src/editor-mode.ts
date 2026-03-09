@@ -36,9 +36,11 @@ type EditorCopy = {
   displaySettings: string;
   displaySubtitle: string;
   cards: string;
+  cardTemplates: string;
   cardType: string;
   noCards: string;
   addCard: string;
+  bindFromHa: string;
   remove: string;
   up: string;
   down: string;
@@ -114,6 +116,32 @@ const CARD_TYPE_OPTIONS = [
 ] as const;
 
 const COMMON_CARD_FIELDS = ["caption", "hint"] as const;
+type CardTypeOption = (typeof CARD_TYPE_OPTIONS)[number];
+
+const CARD_TYPE_DESCRIPTIONS: Record<UiLang, Record<CardTypeOption, string>> = {
+  ru: {
+    entity: "Одна сущность с кратким состоянием.",
+    text: "Ручной текстовый блок без привязки.",
+    todo: "Список дел или одна задача из HA.",
+    onoff: "Переключатель с подписями Вкл/Выкл.",
+    battery: "Заряд и отдельное состояние батареи.",
+    network: "Скорость down/up для сети.",
+    time: "Время или timestamp из HA.",
+    percent: "Процентное значение с округлением.",
+    number: "Число с единицей измерения.",
+  },
+  en: {
+    entity: "Single entity with a compact state.",
+    text: "Manual text block without HA binding.",
+    todo: "Task list or a single HA task.",
+    onoff: "Switch card with on/off labels.",
+    battery: "Battery value with a secondary state.",
+    network: "Network throughput with down/up.",
+    time: "Time or timestamp from HA.",
+    percent: "Percentage value with rounding.",
+    number: "Numeric value with unit.",
+  },
+};
 
 const COPY: Record<UiLang, EditorCopy> = {
   ru: {
@@ -149,9 +177,11 @@ const COPY: Record<UiLang, EditorCopy> = {
     displaySettings: "Дисплей и врезка",
     displaySubtitle: "Подстройка под физический экран, safe area и общий масштаб сцены.",
     cards: "Карточки",
+    cardTemplates: "Шаблоны карточек",
     cardType: "Тип карточки",
     noCards: "На странице пока нет карточек",
     addCard: "+ Карточка",
+    bindFromHa: "из HA",
     remove: "Удалить",
     up: "Выше",
     down: "Ниже",
@@ -237,9 +267,11 @@ const COPY: Record<UiLang, EditorCopy> = {
     displaySettings: "Display fit",
     displaySubtitle: "Tune safe areas, spacing and overall scale for the physical screen.",
     cards: "Cards",
+    cardTemplates: "Card templates",
     cardType: "Card type",
     noCards: "No cards on this page yet",
     addCard: "+ Card",
+    bindFromHa: "from HA",
     remove: "Remove",
     up: "Up",
     down: "Down",
@@ -722,6 +754,12 @@ function cardTypeLabel(copy: EditorCopy, type: string): string {
   return map[type] || type;
 }
 
+function cardTypeDescription(type: string): string {
+  const lang = resolveUiLang();
+  const descriptions = CARD_TYPE_DESCRIPTIONS[lang];
+  return descriptions[type as CardTypeOption] || "";
+}
+
 function labelForField(copy: EditorCopy, field: string): string {
   const map: Record<string, string> = {
     caption: copy.fieldCardCaption,
@@ -803,6 +841,10 @@ function isEntityBindingField(field: string): boolean {
   return ["entity", "stateEntity", "downEntity", "upEntity"].includes(field);
 }
 
+function firstBindableFieldForType(type: string): string | null {
+  return cardFieldsForType(type).find((field) => isEntityBindingField(field)) || null;
+}
+
 function renderPageField(label: string, field: string, value: string, wide = false): string {
   return `
     <div class="field ${wide ? "is-wide" : ""}">
@@ -838,7 +880,13 @@ function renderPageSelect(
   `;
 }
 
-function renderCard(copy: EditorCopy, card: SceneCardV1, index: number, count: number): string {
+function renderCard(
+  copy: EditorCopy,
+  card: SceneCardV1,
+  index: number,
+  count: number,
+  focusedBinding: { cardIndex: number; field: string } | null,
+): string {
   const type = fieldValue(card as Record<string, unknown>, "type") || "entity";
   const fields = cardFieldsForType(type);
   return `
@@ -861,20 +909,62 @@ function renderCard(copy: EditorCopy, card: SceneCardV1, index: number, count: n
             ${CARD_TYPE_OPTIONS.map((item) => `<option value="${item}"${item === type ? " selected" : ""}>${escapeHtml(cardTypeLabel(copy, item))}</option>`).join("")}
           </select>
         </div>
-        ${fields.map((field) => `
-          <div class="field ${field === "hint" ? "is-wide" : ""}">
-            <label>${escapeHtml(labelForField(copy, field))}</label>
-            <input
-              type="${field === "digits" ? "number" : "text"}"
-              data-card-index="${index}"
-              data-card-field="${escapeHtml(field)}"
-              ${isEntityBindingField(field) ? `data-binding-field="${escapeHtml(field)}"` : ""}
-              value="${escapeHtml(fieldValue(card as Record<string, unknown>, field))}"
-            >
-          </div>
-        `).join("")}
+        ${fields.map((field) => {
+          const bindingField = isEntityBindingField(field);
+          const isActiveBinding = bindingField
+            && focusedBinding?.cardIndex === index
+            && focusedBinding.field === field;
+          if (bindingField) {
+            return `
+              <div class="field ${field === "hint" ? "is-wide" : ""} is-binding-field${isActiveBinding ? " is-active" : ""}">
+                <label>${escapeHtml(labelForField(copy, field))}</label>
+                <div class="field-binding-row">
+                  <input
+                    type="text"
+                    data-card-index="${index}"
+                    data-card-field="${escapeHtml(field)}"
+                    data-binding-field="${escapeHtml(field)}"
+                    value="${escapeHtml(fieldValue(card as Record<string, unknown>, field))}"
+                  >
+                  <button
+                    class="tiny-btn"
+                    type="button"
+                    data-action="focus-binding"
+                    data-card-index="${index}"
+                    data-binding-field="${escapeHtml(field)}"
+                  >${copy.bindFromHa}</button>
+                </div>
+              </div>
+            `;
+          }
+          return `
+            <div class="field ${field === "hint" ? "is-wide" : ""}">
+              <label>${escapeHtml(labelForField(copy, field))}</label>
+              <input
+                type="${field === "digits" ? "number" : "text"}"
+                data-card-index="${index}"
+                data-card-field="${escapeHtml(field)}"
+                value="${escapeHtml(fieldValue(card as Record<string, unknown>, field))}"
+              >
+            </div>
+          `;
+        }).join("")}
       </div>
     </article>
+  `;
+}
+
+function renderCardTemplateTile(copy: EditorCopy, type: string): string {
+  return `
+    <button
+      class="card-template-button"
+      type="button"
+      data-action="add-card-template"
+      data-card-type="${escapeHtml(type)}"
+    >
+      <strong>${escapeHtml(cardTypeLabel(copy, type))}</strong>
+      <span>${escapeHtml(cardTypeDescription(type))}</span>
+    </button>
   `;
 }
 
@@ -985,15 +1075,15 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         display: inline-block;
         width: max-content;
         max-width: none;
-        border-radius: 24px;
-        border: 1px solid rgba(32,48,65,0.1);
-        background: #dae5ec;
+        border-radius: 0;
+        border: 0;
+        background: transparent;
         overflow: visible;
       }
       #scene-editor-shell .scene-preview-stage {
         overflow: hidden;
-        border-radius: 24px;
-        background: #dbe8f2;
+        border-radius: 0;
+        background: transparent;
         display: block;
       }
       #scene-editor-shell #app {
@@ -1083,10 +1173,39 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       #scene-editor-shell .page-list,
       #scene-editor-shell .cards-list,
-      #scene-editor-shell .ha-list,
       #scene-editor-shell .scene-settings-stack {
         display: grid;
         gap: 10px;
+      }
+      #scene-editor-shell .ha-list {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+      #scene-editor-shell .card-template-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+      #scene-editor-shell .card-template-button {
+        display: grid;
+        gap: 6px;
+        min-height: 96px;
+        padding: 14px;
+        text-align: left;
+        border-radius: 18px;
+        border: 1px solid rgba(32,48,65,0.1);
+        background: rgba(255,255,255,0.9);
+        color: #203041;
+        cursor: pointer;
+      }
+      #scene-editor-shell .card-template-button strong {
+        display: block;
+        font: 700 14px/1.15 "Aptos","Segoe UI",sans-serif;
+      }
+      #scene-editor-shell .card-template-button span {
+        font: 12px/1.4 "Aptos","Segoe UI",sans-serif;
+        color: rgba(32,48,65,0.66);
       }
       #scene-editor-shell .avatar-pack-box {
         display: grid;
@@ -1163,6 +1282,16 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         display: grid;
         gap: 6px;
       }
+      #scene-editor-shell .field.is-binding-field {
+        padding: 10px;
+        border-radius: 14px;
+        border: 1px solid rgba(32,48,65,0.08);
+        background: rgba(246,249,252,0.82);
+      }
+      #scene-editor-shell .field.is-binding-field.is-active {
+        border-color: rgba(77,147,121,0.34);
+        box-shadow: 0 0 0 2px rgba(111,191,162,0.18);
+      }
       #scene-editor-shell .field.is-wide {
         grid-column: 1 / -1;
       }
@@ -1180,13 +1309,19 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         padding: 0 12px;
         color: #203041;
       }
+      #scene-editor-shell .field-binding-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+      }
       #scene-editor-shell .ha-entity code {
         font: 12px/1.25 Consolas, monospace;
         color: #385268;
       }
       #scene-editor-shell .ha-entity-row {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 8px;
       }
@@ -1207,6 +1342,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         }
         #scene-editor-shell .inspector-grid,
         #scene-editor-shell .card-grid {
+          grid-template-columns: 1fr;
+        }
+        #scene-editor-shell .field-binding-row {
           grid-template-columns: 1fr;
         }
       }
@@ -1293,7 +1431,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const selectedCards = Array.isArray(selectedPage?.cards) ? selectedPage.cards : [];
     const filteredEntities = filterHaEntityCatalog(state.haEntities, state.entitySearch);
     const bindingLabel = state.focusedBinding
-      ? `${copy.entityBinding}: #${state.focusedBinding.cardIndex + 1} → ${state.focusedBinding.field}`
+      ? `${copy.entityBinding}: #${state.focusedBinding.cardIndex + 1} → ${labelForField(copy, state.focusedBinding.field)}`
       : copy.entityBindingEmpty;
     const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
     const selectedAvatarPack = state.avatarCatalog.find((item) => item.id === selectedAvatarPackId) || null;
@@ -1377,14 +1515,12 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               ${renderPageField(copy.fieldStampValue, "stampValue", pageFieldValue(selectedPage, "stampValue"))}
             </div>
             <h2 style="margin-top:18px;">${copy.cards}</h2>
-            <div class="card-add">
-              <select data-add-card-type>
-                ${CARD_TYPE_OPTIONS.map((type) => `<option value="${type}">${escapeHtml(cardTypeLabel(copy, type))}</option>`).join("")}
-              </select>
-              <button class="scene-editor-button" type="button" data-action="add-card">${copy.addCard}</button>
+            <div class="meta">${copy.cardTemplates}</div>
+            <div class="card-template-grid" style="margin-top:12px;">
+              ${CARD_TYPE_OPTIONS.map((type) => renderCardTemplateTile(copy, type)).join("")}
             </div>
             <div class="cards-list" style="margin-top:12px;">
-              ${selectedCards.length ? selectedCards.map((card, index) => renderCard(copy, card, index, selectedCards.length)).join("") : `<div class="meta">${copy.noCards}</div>`}
+              ${selectedCards.length ? selectedCards.map((card, index) => renderCard(copy, card, index, selectedCards.length, state.focusedBinding)).join("") : `<div class="meta">${copy.noCards}</div>`}
             </div>
           ` : `<div class="meta">${copy.statusLoading}</div>`}
           </section>
@@ -1422,7 +1558,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
                     <strong>${escapeHtml(entity.name)}</strong>
                     <div class="meta">${escapeHtml(entity.domain)}</div>
                   </div>
-                  <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}">${copy.useEntity}</button>
+                  <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}"${state.focusedBinding ? "" : " disabled"}>${copy.useEntity}</button>
                 </div>
                 <code>${escapeHtml(entity.entityId)}</code>
                 <div class="ha-state">${escapeHtml(entity.state)}${entity.unit ? ` · ${escapeHtml(entity.unit)}` : ""}</div>
@@ -1549,6 +1685,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     if (field === "type") {
       const nextCard = createCard(value);
       page.cards[cardIndex] = { ...nextCard, caption: fieldValue(card as Record<string, unknown>, "caption") || nextCard.caption };
+      if (state.focusedBinding?.cardIndex === cardIndex) {
+        const nextBindingField = firstBindableFieldForType(value);
+        state.focusedBinding = nextBindingField ? { cardIndex, field: nextBindingField } : null;
+      }
     } else if (field === "digits") {
       (card as Record<string, unknown>)[field] = value === "" ? 0 : Number(value);
     } else {
@@ -1575,6 +1715,17 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     render();
   };
 
+  const focusBindingField = (cardIndex: number, field: string): void => {
+    state.focusedBinding = { cardIndex, field };
+    render();
+    window.requestAnimationFrame(() => {
+      const searchInput = wrapper.querySelector<HTMLInputElement>("#ha-entity-search");
+      searchInput?.scrollIntoView({ behavior: "smooth", block: "center" });
+      searchInput?.focus();
+      searchInput?.select();
+    });
+  };
+
   wrapper.addEventListener("click", async (event) => {
     const target = event.target as HTMLElement | null;
     const actionEl = target?.closest<HTMLElement>("[data-action]");
@@ -1598,6 +1749,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
 
     if (action === "select-page" && pageId) {
       state.selectedPageId = pageId;
+      state.focusedBinding = null;
       syncSelection();
       render();
       return;
@@ -1626,6 +1778,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.config.pages = state.config.pages.filter((page) => page.id !== pageId);
       state.config.rotation.order = orderedPages(state.config).map((page) => page.id);
       state.selectedPageId = orderedPages(state.config)[Math.max(0, pageIndex - 1)]?.id || orderedPages(state.config)[0]?.id || null;
+      state.focusedBinding = null;
       markDirty();
       syncSelection();
       render();
@@ -1636,21 +1789,40 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.config.pages.push(page);
       state.config.rotation.order = orderedPages(state.config).map((item) => item.id);
       state.selectedPageId = page.id;
+      state.focusedBinding = null;
       markDirty();
       syncSelection();
       render();
       return;
     }
-    if (action === "add-card" && state.selectedPageId) {
+    if (action === "add-card-template" && state.selectedPageId) {
       const page = state.config.pages.find((item) => item.id === state.selectedPageId);
-      const addType = wrapper.querySelector<HTMLSelectElement>("[data-add-card-type]")?.value || "entity";
+      const addType = actionEl?.dataset.cardType || "entity";
       if (page) {
         if (!Array.isArray(page.cards)) {
           page.cards = [];
         }
         page.cards.push(createCard(addType));
+        const nextCardIndex = page.cards.length - 1;
+        const bindingField = firstBindableFieldForType(addType);
+        state.focusedBinding = bindingField ? { cardIndex: nextCardIndex, field: bindingField } : null;
         markDirty();
         render();
+        if (bindingField) {
+          window.requestAnimationFrame(() => {
+            const searchInput = wrapper.querySelector<HTMLInputElement>("#ha-entity-search");
+            searchInput?.scrollIntoView({ behavior: "smooth", block: "center" });
+            searchInput?.focus();
+          });
+        }
+      }
+      return;
+    }
+    if (action === "focus-binding") {
+      const cardIndex = Number(actionEl?.dataset.cardIndex || "-1");
+      const bindingField = actionEl?.dataset.bindingField || "";
+      if (cardIndex >= 0 && bindingField) {
+        focusBindingField(cardIndex, bindingField);
       }
       return;
     }
@@ -1662,18 +1834,42 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       if (action === "card-remove") {
         page.cards = page.cards.filter((_, index) => index !== cardIndex);
+        if (state.focusedBinding) {
+          if (state.focusedBinding.cardIndex === cardIndex) {
+            state.focusedBinding = null;
+          } else if (state.focusedBinding.cardIndex > cardIndex) {
+            state.focusedBinding = {
+              cardIndex: state.focusedBinding.cardIndex - 1,
+              field: state.focusedBinding.field,
+            };
+          }
+        }
         markDirty();
         render();
         return;
       }
       if (action === "card-up" && cardIndex > 0) {
         [page.cards[cardIndex - 1], page.cards[cardIndex]] = [page.cards[cardIndex], page.cards[cardIndex - 1]];
+        if (state.focusedBinding) {
+          if (state.focusedBinding.cardIndex === cardIndex) {
+            state.focusedBinding = { cardIndex: cardIndex - 1, field: state.focusedBinding.field };
+          } else if (state.focusedBinding.cardIndex === cardIndex - 1) {
+            state.focusedBinding = { cardIndex, field: state.focusedBinding.field };
+          }
+        }
         markDirty();
         render();
         return;
       }
       if (action === "card-down" && cardIndex < page.cards.length - 1) {
         [page.cards[cardIndex], page.cards[cardIndex + 1]] = [page.cards[cardIndex + 1], page.cards[cardIndex]];
+        if (state.focusedBinding) {
+          if (state.focusedBinding.cardIndex === cardIndex) {
+            state.focusedBinding = { cardIndex: cardIndex + 1, field: state.focusedBinding.field };
+          } else if (state.focusedBinding.cardIndex === cardIndex + 1) {
+            state.focusedBinding = { cardIndex, field: state.focusedBinding.field };
+          }
+        }
         markDirty();
         render();
         return;
