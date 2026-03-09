@@ -36,6 +36,9 @@ type EditorCopy = {
   displaySettings: string;
   displaySubtitle: string;
   cards: string;
+  cardsSubtitle: string;
+  cardInspector: string;
+  cardInspectorEmpty: string;
   cardTemplates: string;
   cardType: string;
   noCards: string;
@@ -90,6 +93,7 @@ type EditorCopy = {
   entitySearch: string;
   entityBinding: string;
   entityBindingEmpty: string;
+  entityBindingActive: (card: string, field: string) => string;
   noEntities: string;
   useEntity: string;
 };
@@ -151,7 +155,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewSubtitle: "Сверху показывается честный 1:1 viewport выбранного экрана. Если не влезает по ширине, страница просто прокручивается.",
     previewDisplay: "Экран для проверки",
     previewResolution: "Разрешение",
-    previewApplyProfile: "Применить пресет экрана",
+    previewApplyProfile: "Подставить в настройки экрана",
     dashboardTitle: "Панель настройки сцены",
     dashboardSubtitle: "Вся настройка расположена ниже превью как длинная редакторская страница.",
     statusLoading: "Загружаю конфигурацию сцены...",
@@ -177,6 +181,9 @@ const COPY: Record<UiLang, EditorCopy> = {
     displaySettings: "Дисплей и врезка",
     displaySubtitle: "Подстройка под физический экран, safe area и общий масштаб сцены.",
     cards: "Карточки",
+    cardsSubtitle: "Сначала выбери или добавь карточку, затем настрой её ниже. Порядок здесь же влияет на правую карусель.",
+    cardInspector: "Настройка карточки",
+    cardInspectorEmpty: "Добавь карточку из шаблона выше или выбери существующую карточку из списка.",
     cardTemplates: "Шаблоны карточек",
     cardType: "Тип карточки",
     noCards: "На странице пока нет карточек",
@@ -231,6 +238,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     entitySearch: "Поиск сущностей",
     entityBinding: "Связать с полем",
     entityBindingEmpty: "Кликни в поле Сущность / State / Down / Up у карточки, потом выбери сущность здесь.",
+    entityBindingActive: (card, field) => `Сейчас связываем: ${card} → ${field}`,
     noEntities: "Сущности Home Assistant пока недоступны",
     useEntity: "Использовать",
   },
@@ -241,7 +249,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewSubtitle: "The top stage renders a true 1:1 viewport of the selected screen. If it does not fit, the editor page simply scrolls.",
     previewDisplay: "Screen profile",
     previewResolution: "Resolution",
-    previewApplyProfile: "Apply screen preset",
+    previewApplyProfile: "Fill display settings below",
     dashboardTitle: "Scene Settings Dashboard",
     dashboardSubtitle: "All configuration lives below the preview as a normal scrollable page.",
     statusLoading: "Loading scene config...",
@@ -267,6 +275,9 @@ const COPY: Record<UiLang, EditorCopy> = {
     displaySettings: "Display fit",
     displaySubtitle: "Tune safe areas, spacing and overall scale for the physical screen.",
     cards: "Cards",
+    cardsSubtitle: "Add or choose a card first, then edit it below. The order here drives the right-hand carousel.",
+    cardInspector: "Card inspector",
+    cardInspectorEmpty: "Add a card from the templates above or choose an existing one from the list.",
     cardTemplates: "Card templates",
     cardType: "Card type",
     noCards: "No cards on this page yet",
@@ -321,6 +332,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     entitySearch: "Search entities",
     entityBinding: "Bind into field",
     entityBindingEmpty: "Click an Entity / State / Down / Up field on a card, then choose an entity here.",
+    entityBindingActive: (card, field) => `Binding now: ${card} → ${field}`,
     noEntities: "Home Assistant entities are not available yet",
     useEntity: "Use",
   },
@@ -329,6 +341,7 @@ const COPY: Record<UiLang, EditorCopy> = {
 type EditorState = {
   config: SceneConfigV1 | null;
   selectedPageId: string | null;
+  selectedCardIndex: number | null;
   dirty: boolean;
   saving: boolean;
   status: string;
@@ -884,7 +897,6 @@ function renderCard(
   copy: EditorCopy,
   card: SceneCardV1,
   index: number,
-  count: number,
   focusedBinding: { cardIndex: number; field: string } | null,
 ): string {
   const type = fieldValue(card as Record<string, unknown>, "type") || "entity";
@@ -896,11 +908,7 @@ function renderCard(
           <strong>${escapeHtml(fieldValue(card as Record<string, unknown>, "caption") || cardTypeLabel(copy, type))}</strong>
           <div class="meta">${escapeHtml(cardTypeLabel(copy, type))}</div>
         </div>
-        <div class="card-actions">
-          <button class="tiny-btn" type="button" data-action="card-up" data-card-index="${index}"${index === 0 ? " disabled" : ""}>${copy.up}</button>
-          <button class="tiny-btn" type="button" data-action="card-down" data-card-index="${index}"${index === count - 1 ? " disabled" : ""}>${copy.down}</button>
-          <button class="tiny-btn" type="button" data-action="card-remove" data-card-index="${index}">${copy.remove}</button>
-        </div>
+        <div class="meta">#${index + 1}</div>
       </div>
       <div class="card-grid">
         <div class="field is-wide">
@@ -954,6 +962,39 @@ function renderCard(
   `;
 }
 
+function renderCardListItem(
+  copy: EditorCopy,
+  card: SceneCardV1,
+  index: number,
+  count: number,
+  selected: boolean,
+): string {
+  const type = fieldValue(card as Record<string, unknown>, "type") || "entity";
+  const title = fieldValue(card as Record<string, unknown>, "caption") || cardTypeLabel(copy, type);
+  const secondary = fieldValue(card as Record<string, unknown>, "entity")
+    || fieldValue(card as Record<string, unknown>, "stateEntity")
+    || fieldValue(card as Record<string, unknown>, "downEntity")
+    || fieldValue(card as Record<string, unknown>, "upEntity")
+    || fieldValue(card as Record<string, unknown>, "value")
+    || fieldValue(card as Record<string, unknown>, "hint")
+    || cardTypeDescription(type);
+
+  return `
+    <article class="card-list-item${selected ? " is-active" : ""}">
+      <button class="card-list-select" type="button" data-action="select-card" data-card-index="${index}">
+        <strong>${escapeHtml(title)}</strong>
+        <span class="meta">${escapeHtml(cardTypeLabel(copy, type))}</span>
+        <div class="meta">${escapeHtml(secondary)}</div>
+      </button>
+      <div class="card-actions">
+        <button class="tiny-btn" type="button" data-action="card-up" data-card-index="${index}"${index === 0 ? " disabled" : ""}>${copy.up}</button>
+        <button class="tiny-btn" type="button" data-action="card-down" data-card-index="${index}"${index === count - 1 ? " disabled" : ""}>${copy.down}</button>
+        <button class="tiny-btn" type="button" data-action="card-remove" data-card-index="${index}">${copy.remove}</button>
+      </div>
+    </article>
+  `;
+}
+
 function renderCardTemplateTile(copy: EditorCopy, type: string): string {
   return `
     <button
@@ -1000,7 +1041,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   wrapper.innerHTML = `
     <style>
       #scene-editor-shell {
-        --preview-stage-width: min(100%, 1280px);
         max-width: 1420px;
         margin: 0 auto;
         padding: 24px 18px 64px;
@@ -1012,11 +1052,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       #scene-editor-shell .scene-preview-shell,
       #scene-editor-shell .scene-settings-card {
-        border-radius: 30px;
+        border-radius: 24px;
         border: 1px solid rgba(32,48,65,0.1);
-        background: rgba(248, 251, 253, 0.86);
-        box-shadow: 0 24px 64px rgba(46,72,94,0.18);
-        backdrop-filter: blur(14px);
+        background: rgba(248, 251, 253, 0.92);
+        box-shadow: 0 16px 36px rgba(46,72,94,0.1);
       }
       #scene-editor-shell .scene-preview-shell {
         padding: 18px;
@@ -1069,21 +1108,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         margin-top: 18px;
         overflow-x: auto;
         overflow-y: hidden;
-        padding-bottom: 6px;
-      }
-      #scene-editor-shell .scene-preview-screen {
-        display: inline-block;
-        width: max-content;
-        max-width: none;
-        border-radius: 0;
-        border: 0;
-        background: transparent;
-        overflow: visible;
+        padding: 4px 0 8px;
       }
       #scene-editor-shell .scene-preview-stage {
         overflow: hidden;
-        border-radius: 0;
-        background: transparent;
+        border-radius: 18px;
+        border: 1px solid rgba(32,48,65,0.1);
+        background: #e6eef4;
         display: block;
       }
       #scene-editor-shell #app {
@@ -1241,7 +1272,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       #scene-editor-shell .page-chip,
       #scene-editor-shell .card-item,
-      #scene-editor-shell .ha-entity {
+      #scene-editor-shell .ha-entity,
+      #scene-editor-shell .card-list-item {
         display: grid;
         gap: 10px;
         padding: 12px;
@@ -1253,14 +1285,29 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         border-color: rgba(77,147,121,0.34);
         box-shadow: 0 0 0 2px rgba(111,191,162,0.18);
       }
+      #scene-editor-shell .card-list-item.is-active {
+        border-color: rgba(77,147,121,0.34);
+        box-shadow: 0 0 0 2px rgba(111,191,162,0.18);
+      }
       #scene-editor-shell .page-chip-header {
         display: grid;
         gap: 4px;
         cursor: pointer;
       }
+      #scene-editor-shell .card-list-select {
+        display: grid;
+        gap: 4px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+        color: inherit;
+      }
       #scene-editor-shell .page-chip-header strong,
       #scene-editor-shell .card-item-head strong,
-      #scene-editor-shell .ha-entity strong {
+      #scene-editor-shell .ha-entity strong,
+      #scene-editor-shell .card-list-select strong {
         display: block;
         font: 700 14px/1.1 "Aptos","Segoe UI",sans-serif;
         color: #203041;
@@ -1277,6 +1324,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
+      }
+      #scene-editor-shell .card-stack {
+        display: grid;
+        gap: 16px;
       }
       #scene-editor-shell .field {
         display: grid;
@@ -1371,9 +1422,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
           </div>
         </div>
         <div class="scene-preview-frame">
-          <div class="scene-preview-screen" data-preview-screen>
-            <div class="scene-preview-stage" data-preview-stage></div>
-          </div>
+          <div class="scene-preview-stage" data-preview-stage></div>
         </div>
       </section>
       <section class="scene-dashboard" data-dashboard></section>
@@ -1384,12 +1433,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   document.body.dataset.editorMode = "true";
   document.body.style.overflow = "auto";
 
-  const previewScreen = wrapper.querySelector<HTMLElement>("[data-preview-screen]");
   const previewStage = wrapper.querySelector<HTMLElement>("[data-preview-stage]");
   const previewResolution = wrapper.querySelector<HTMLElement>("[data-preview-resolution]");
   const previewDisplaySelect = wrapper.querySelector<HTMLSelectElement>("[data-preview-display]");
   const dashboardHost = wrapper.querySelector<HTMLElement>("[data-dashboard]");
-  if (!previewScreen || !previewStage || !previewResolution || !previewDisplaySelect || !dashboardHost) {
+  if (!previewStage || !previewResolution || !previewDisplaySelect || !dashboardHost) {
     throw new Error("Missing native editor shell elements");
   }
   previewStage.appendChild(appRoot);
@@ -1397,6 +1445,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   const state: EditorState = {
     config: null,
     selectedPageId: null,
+    selectedCardIndex: null,
     dirty: false,
     saving: false,
     status: copy.statusLoading,
@@ -1416,7 +1465,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     previewStage.style.height = `${profile.height}px`;
     appRoot.style.width = `${profile.width}px`;
     appRoot.style.height = `${profile.height}px`;
-    previewScreen.style.width = `${profile.width}px`;
   };
 
   const resizeObserver = typeof ResizeObserver !== "undefined"
@@ -1429,9 +1477,14 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const ordered = config ? orderedPages(config) : [];
     const selectedPage = ordered.find((page) => page.id === state.selectedPageId) || ordered[0] || null;
     const selectedCards = Array.isArray(selectedPage?.cards) ? selectedPage.cards : [];
+    const selectedCard = state.selectedCardIndex !== null ? selectedCards[state.selectedCardIndex] || null : null;
     const filteredEntities = filterHaEntityCatalog(state.haEntities, state.entitySearch);
     const bindingLabel = state.focusedBinding
-      ? `${copy.entityBinding}: #${state.focusedBinding.cardIndex + 1} → ${labelForField(copy, state.focusedBinding.field)}`
+      ? copy.entityBindingActive(
+          fieldValue(selectedCards[state.focusedBinding.cardIndex] as Record<string, unknown>, "caption")
+            || `${copy.cards} #${state.focusedBinding.cardIndex + 1}`,
+          labelForField(copy, state.focusedBinding.field),
+        )
       : copy.entityBindingEmpty;
     const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
     const selectedAvatarPack = state.avatarCatalog.find((item) => item.id === selectedAvatarPackId) || null;
@@ -1514,13 +1567,32 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               ${renderPageField(copy.fieldStampCaption, "stampCaption", pageFieldValue(selectedPage, "stampCaption"))}
               ${renderPageField(copy.fieldStampValue, "stampValue", pageFieldValue(selectedPage, "stampValue"))}
             </div>
-            <h2 style="margin-top:18px;">${copy.cards}</h2>
-            <div class="meta">${copy.cardTemplates}</div>
-            <div class="card-template-grid" style="margin-top:12px;">
-              ${CARD_TYPE_OPTIONS.map((type) => renderCardTemplateTile(copy, type)).join("")}
+          ` : `<div class="meta">${copy.statusLoading}</div>`}
+          </section>
+          <section class="scene-settings-card">
+            <div class="scene-settings-head">
+              <h2>${copy.cards}</h2>
+              <div class="meta">${copy.cardsSubtitle}</div>
             </div>
-            <div class="cards-list" style="margin-top:12px;">
-              ${selectedCards.length ? selectedCards.map((card, index) => renderCard(copy, card, index, selectedCards.length, state.focusedBinding)).join("") : `<div class="meta">${copy.noCards}</div>`}
+          ${selectedPage ? `
+            <div class="card-stack">
+              <div>
+                <div class="meta">${copy.cardTemplates}</div>
+                <div class="card-template-grid" style="margin-top:12px;">
+                  ${CARD_TYPE_OPTIONS.map((type) => renderCardTemplateTile(copy, type)).join("")}
+                </div>
+              </div>
+              <div class="cards-list">
+                ${selectedCards.length
+                  ? selectedCards.map((card, index) => renderCardListItem(copy, card, index, selectedCards.length, index === state.selectedCardIndex)).join("")
+                  : `<div class="meta">${copy.noCards}</div>`}
+              </div>
+              <div>
+                <h2>${copy.cardInspector}</h2>
+                ${selectedCard
+                  ? renderCard(copy, selectedCard, state.selectedCardIndex || 0, state.focusedBinding)
+                  : `<div class="meta">${copy.cardInspectorEmpty}</div>`}
+              </div>
             </div>
           ` : `<div class="meta">${copy.statusLoading}</div>`}
           </section>
@@ -1589,6 +1661,14 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     }
     if (!state.selectedPageId || !ordered.some((page) => page.id === state.selectedPageId)) {
       state.selectedPageId = ordered[0].id;
+    }
+    const selectedPage = ordered.find((page) => page.id === state.selectedPageId) || null;
+    const cards = Array.isArray(selectedPage?.cards) ? selectedPage.cards : [];
+    if (!cards.length) {
+      state.selectedCardIndex = null;
+      state.focusedBinding = null;
+    } else if (state.selectedCardIndex === null || state.selectedCardIndex >= cards.length) {
+      state.selectedCardIndex = 0;
     }
     setSelectedPageParam(state.selectedPageId);
     focusScenePageByIndex(pageIndexById(state.config, state.selectedPageId));
@@ -1716,6 +1796,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   };
 
   const focusBindingField = (cardIndex: number, field: string): void => {
+    state.selectedCardIndex = cardIndex;
     state.focusedBinding = { cardIndex, field };
     render();
     window.requestAnimationFrame(() => {
@@ -1749,6 +1830,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
 
     if (action === "select-page" && pageId) {
       state.selectedPageId = pageId;
+      state.selectedCardIndex = 0;
       state.focusedBinding = null;
       syncSelection();
       render();
@@ -1778,6 +1860,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.config.pages = state.config.pages.filter((page) => page.id !== pageId);
       state.config.rotation.order = orderedPages(state.config).map((page) => page.id);
       state.selectedPageId = orderedPages(state.config)[Math.max(0, pageIndex - 1)]?.id || orderedPages(state.config)[0]?.id || null;
+      state.selectedCardIndex = 0;
       state.focusedBinding = null;
       markDirty();
       syncSelection();
@@ -1789,6 +1872,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.config.pages.push(page);
       state.config.rotation.order = orderedPages(state.config).map((item) => item.id);
       state.selectedPageId = page.id;
+      state.selectedCardIndex = null;
       state.focusedBinding = null;
       markDirty();
       syncSelection();
@@ -1804,6 +1888,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         }
         page.cards.push(createCard(addType));
         const nextCardIndex = page.cards.length - 1;
+        state.selectedCardIndex = nextCardIndex;
         const bindingField = firstBindableFieldForType(addType);
         state.focusedBinding = bindingField ? { cardIndex: nextCardIndex, field: bindingField } : null;
         markDirty();
@@ -1832,8 +1917,20 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       if (!page || !Array.isArray(page.cards)) {
         return;
       }
+      if (action === "select-card") {
+        state.selectedCardIndex = cardIndex;
+        render();
+        return;
+      }
       if (action === "card-remove") {
         page.cards = page.cards.filter((_, index) => index !== cardIndex);
+        if (state.selectedCardIndex !== null) {
+          if (state.selectedCardIndex === cardIndex) {
+            state.selectedCardIndex = page.cards.length ? Math.min(cardIndex, page.cards.length - 1) : null;
+          } else if (state.selectedCardIndex > cardIndex) {
+            state.selectedCardIndex -= 1;
+          }
+        }
         if (state.focusedBinding) {
           if (state.focusedBinding.cardIndex === cardIndex) {
             state.focusedBinding = null;
@@ -1850,6 +1947,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       if (action === "card-up" && cardIndex > 0) {
         [page.cards[cardIndex - 1], page.cards[cardIndex]] = [page.cards[cardIndex], page.cards[cardIndex - 1]];
+        if (state.selectedCardIndex === cardIndex) {
+          state.selectedCardIndex = cardIndex - 1;
+        } else if (state.selectedCardIndex === cardIndex - 1) {
+          state.selectedCardIndex = cardIndex;
+        }
         if (state.focusedBinding) {
           if (state.focusedBinding.cardIndex === cardIndex) {
             state.focusedBinding = { cardIndex: cardIndex - 1, field: state.focusedBinding.field };
@@ -1863,6 +1965,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       if (action === "card-down" && cardIndex < page.cards.length - 1) {
         [page.cards[cardIndex], page.cards[cardIndex + 1]] = [page.cards[cardIndex + 1], page.cards[cardIndex]];
+        if (state.selectedCardIndex === cardIndex) {
+          state.selectedCardIndex = cardIndex + 1;
+        } else if (state.selectedCardIndex === cardIndex + 1) {
+          state.selectedCardIndex = cardIndex;
+        }
         if (state.focusedBinding) {
           if (state.focusedBinding.cardIndex === cardIndex) {
             state.focusedBinding = { cardIndex: cardIndex + 1, field: state.focusedBinding.field };
@@ -1928,6 +2035,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       return;
     }
     if (target.dataset.cardField && target.dataset.cardIndex) {
+      state.selectedCardIndex = Number(target.dataset.cardIndex);
       updateCardField(Number(target.dataset.cardIndex), target.dataset.cardField, target.value);
       render();
       return;
@@ -1947,6 +2055,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     if (cardIndex < 0) {
       return;
     }
+    state.selectedCardIndex = cardIndex;
     state.focusedBinding = {
       cardIndex,
       field: target.dataset.bindingField,
@@ -1964,6 +2073,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     }
     state.haEntities = buildHaEntityCatalog(getHomeAssistantHandle()?.states || null);
     state.selectedPageId = initialSelectedPageId(state.config);
+    state.selectedCardIndex = 0;
     state.status = copy.statusSaved;
     state.statusTone = "ok";
     syncSelection();
