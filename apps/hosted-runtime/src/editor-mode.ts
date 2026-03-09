@@ -113,8 +113,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     title: "Редактор сцены",
     subtitle: (packId) => `Пакет: ${packId || "default"} · Живое превью сцены и полный дашборд настроек`,
     previewTitle: "Превью дисплея",
-    previewSubtitle: "Сверху показывается та сцена, которую увидит выбранный экран.",
-    previewDisplay: "Профиль дисплея",
+    previewSubtitle: "Сверху показывается честный 1:1 viewport выбранного экрана. Если не влезает по ширине, страница просто прокручивается.",
+    previewDisplay: "Экран для проверки",
     previewResolution: "Разрешение",
     dashboardTitle: "Панель настройки сцены",
     dashboardSubtitle: "Вся настройка расположена ниже превью как длинная редакторская страница.",
@@ -195,8 +195,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     title: "Scene Editor",
     subtitle: (packId) => `Pack: ${packId || "default"} · Live scene preview with a full settings dashboard`,
     previewTitle: "Display Preview",
-    previewSubtitle: "The top stage mirrors how the selected screen should look.",
-    previewDisplay: "Display profile",
+    previewSubtitle: "The top stage renders a true 1:1 viewport of the selected screen. If it does not fit, the editor page simply scrolls.",
+    previewDisplay: "Screen profile",
     previewResolution: "Resolution",
     dashboardTitle: "Scene Settings Dashboard",
     dashboardSubtitle: "All configuration lives below the preview as a normal scrollable page.",
@@ -840,37 +840,33 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       #scene-editor-shell .scene-preview-frame {
         margin-top: 18px;
-        display: grid;
-        justify-items: center;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 6px;
       }
       #scene-editor-shell .scene-preview-screen {
-        width: var(--preview-stage-width);
-        max-width: 100%;
-        aspect-ratio: 16 / 9;
-        border-radius: 30px;
-        padding: 16px;
-        border: 1px solid rgba(32,48,65,0.08);
-        background:
-          radial-gradient(circle at top left, rgba(255,255,255,0.92), transparent 28%),
-          linear-gradient(165deg, #edf5fb 0%, #dbeaf3 52%, #f8fbfd 100%);
-        overflow: hidden;
+        display: inline-block;
+        width: max-content;
+        max-width: none;
+        border-radius: 24px;
+        padding: 8px;
+        border: 1px solid rgba(20,30,40,0.18);
+        background: #121a22;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+        overflow: visible;
       }
       #scene-editor-shell .scene-preview-stage {
-        width: 100%;
-        height: 100%;
         overflow: hidden;
-        border-radius: 22px;
-        background: rgba(231, 240, 247, 0.68);
-        border: 1px solid rgba(32,48,65,0.08);
-        display: flex;
-        align-items: flex-start;
-        justify-content: flex-start;
+        border-radius: 18px;
+        background: #dbe8f2;
+        border: 1px solid rgba(255,255,255,0.08);
+        display: block;
       }
       #scene-editor-shell #app {
-        flex: none;
+        overflow: hidden;
         margin: 0;
         min-height: 0;
-        transform-origin: top left;
+        transform: none !important;
       }
       #scene-editor-shell #app,
       #scene-editor-shell #app .scene-viewport,
@@ -1040,9 +1036,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         #scene-editor-shell .scene-settings-card {
           border-radius: 24px;
         }
-        #scene-editor-shell .scene-preview-screen {
-          padding: 10px;
-        }
         #scene-editor-shell .inspector-grid,
         #scene-editor-shell .card-grid {
           grid-template-columns: 1fr;
@@ -1110,19 +1103,17 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const profile = resolvePreviewDisplayProfile(state.previewDisplayId);
     previewDisplaySelect.value = profile.id;
     previewResolution.textContent = formatPreviewResolution(profile);
-    previewScreen.style.aspectRatio = `${profile.width} / ${profile.height}`;
+    previewStage.style.width = `${profile.width}px`;
+    previewStage.style.height = `${profile.height}px`;
     appRoot.style.width = `${profile.width}px`;
     appRoot.style.height = `${profile.height}px`;
-    const availableWidth = previewScreen.clientWidth || profile.width;
-    const scale = Math.min(1, availableWidth / profile.width);
-    appRoot.style.transform = `scale(${scale})`;
+    previewScreen.style.width = `${profile.width + 16}px`;
   };
 
   const resizeObserver = typeof ResizeObserver !== "undefined"
     ? new ResizeObserver(() => applyPreviewLayout())
     : null;
-  resizeObserver?.observe(previewScreen);
-  window.addEventListener("resize", applyPreviewLayout);
+  resizeObserver?.observe(previewStage);
 
   const render = (): void => {
     const config = state.config;
