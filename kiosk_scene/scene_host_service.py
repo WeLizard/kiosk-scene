@@ -19,6 +19,9 @@ RUNTIME_DIR = Path(
     os.environ.get("SCENE_RUNTIME_DIR", str(SCENE_ROOT / "scene-runtime"))
 )
 PACKS_DIR = Path(os.environ.get("SCENE_PACKS_DIR", str(SCENE_ROOT / "scene-packs")))
+AVATAR_PACKS_DIR = Path(
+    os.environ.get("SCENE_AVATAR_PACKS_DIR", str(SCENE_ROOT / "avatar-packs"))
+)
 ACTIVE_PACK_FILE = Path(
     os.environ.get("SCENE_ACTIVE_PACK_FILE", str(SCENE_ROOT / "active-pack.json"))
 )
@@ -56,6 +59,7 @@ def build_bootstrap() -> dict[str, Any]:
             "sceneConfigUrl": pack_base_url + "scene.default.json",
             "entityMapUrl": pack_base_url + "entity-map.json",
             "avatarManifestUrl": pack_base_url + "avatar.manifest.json",
+            "avatarCatalogUrl": f"{PATH_PREFIX}/avatar-catalog",
         },
         "availability": {
             "runtimeIndex": (RUNTIME_DIR / "index.html").exists(),
@@ -64,13 +68,75 @@ def build_bootstrap() -> dict[str, Any]:
             "sceneConfig": (pack_dir / "scene.default.json").exists(),
             "entityMap": (pack_dir / "entity-map.json").exists(),
             "avatarManifest": (pack_dir / "avatar.manifest.json").exists(),
+            "avatarPacksDir": AVATAR_PACKS_DIR.exists(),
         },
         "paths": {
             "runtimeDir": str(RUNTIME_DIR),
             "packsDir": str(PACKS_DIR),
+            "avatarPacksDir": str(AVATAR_PACKS_DIR),
             "activePackFile": str(ACTIVE_PACK_FILE),
             "packDir": str(pack_dir),
         },
+    }
+
+
+def _resolve_avatar_asset_url(pack_id: str, value: str, asset_root: str = "") -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    if normalized.startswith("/") or "://" in normalized:
+        return normalized
+    root = str(asset_root or "").strip()
+    if root and not (root.startswith("/") or "://" in root):
+        root = f"/avatar-packs/{quote(pack_id)}/{quote(root, safe='/')}"
+    elif not root:
+        root = f"/avatar-packs/{quote(pack_id)}"
+    root = root.rstrip("/")
+    return f"{root}/{quote(normalized, safe='/')}"
+
+
+def load_avatar_catalog() -> dict[str, Any]:
+    packs: list[dict[str, Any]] = []
+    if not AVATAR_PACKS_DIR.exists():
+        return {
+            "success": True,
+            "items": packs,
+            "root": str(AVATAR_PACKS_DIR),
+        }
+
+    for pack_dir in sorted(
+        [item for item in AVATAR_PACKS_DIR.iterdir() if item.is_dir()],
+        key=lambda item: item.name.lower(),
+    ):
+        manifest_path = pack_dir / "avatar.manifest.json"
+        if not manifest_path.exists():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logging.warning("Failed to read avatar pack manifest %s: %s", manifest_path, exc)
+            continue
+
+        pack_id = pack_dir.name
+        asset_root = str(manifest.get("assetRoot") or "").strip()
+        fallback_portrait = _resolve_avatar_asset_url(
+            pack_id, str(manifest.get("fallbackPortrait", "")), asset_root
+        )
+        packs.append(
+            {
+                "id": pack_id,
+                "name": str(manifest.get("name") or pack_id),
+                "adapter": str(manifest.get("adapter") or ""),
+                "manifestUrl": f"/avatar-packs/{quote(pack_id)}/avatar.manifest.json",
+                "previewUrl": fallback_portrait,
+                "fallbackPortrait": fallback_portrait,
+            }
+        )
+
+    return {
+        "success": True,
+        "items": packs,
+        "root": str(AVATAR_PACKS_DIR),
     }
 
 
@@ -106,6 +172,9 @@ class SceneHostHandler(BaseHTTPRequestHandler):
             return
         if path == f"{PATH_PREFIX}/bootstrap":
             self.send_json(build_bootstrap())
+            return
+        if path == f"{PATH_PREFIX}/avatar-catalog":
+            self.send_json(load_avatar_catalog())
             return
         self.send_json(
             {"success": False, "error": f"Endpoint not found: {path}"},

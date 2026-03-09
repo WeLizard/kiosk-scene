@@ -23,8 +23,53 @@ interface SceneHostBootstrap {
     sceneConfigUrl?: string;
     entityMapUrl?: string;
     avatarManifestUrl?: string;
+    avatarCatalogUrl?: string;
   };
   availability?: Record<string, boolean>;
+}
+
+interface AvatarCatalogItem {
+  id: string;
+  name?: string;
+  manifestUrl?: string;
+  previewUrl?: string;
+}
+
+interface AvatarCatalogPayload {
+  success?: boolean;
+  items?: AvatarCatalogItem[];
+}
+
+interface HostedSceneConfig {
+  avatar?: {
+    packId?: string | null;
+  };
+}
+
+interface HostedRendererConfig {
+  version?: number;
+  assistant?: {
+    name?: string;
+    locale?: string;
+  };
+  links?: Record<string, string>;
+  avatar?: {
+    manifestUrl?: string;
+  };
+  scene?: {
+    configUrl?: string;
+  };
+  state?: {
+    provider?: "json" | "ha";
+    stateUrl?: string;
+    haApiFallback?: boolean;
+    idleLinesUrl?: string;
+    entityMapUrl?: string;
+  };
+  control?: {
+    provider?: "json";
+    controlUrl?: string;
+  };
 }
 
 const DEFAULT_BOOTSTRAP_URL = "../scene-api/bootstrap";
@@ -409,6 +454,107 @@ async function loadBootstrap(url: string): Promise<SceneHostBootstrap> {
   return payload;
 }
 
+async function readJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+function absolutizeRendererConfig(config: HostedRendererConfig, rendererConfigUrl: string): HostedRendererConfig {
+  return {
+    ...config,
+    links: Object.fromEntries(
+      Object.entries(config.links || {})
+        .map(([key, value]) => [key, resolveHostedUrl(value, rendererConfigUrl)])
+        .filter(([, value]) => Boolean(value)),
+    ),
+    avatar: {
+      manifestUrl: resolveHostedUrl(String(config.avatar?.manifestUrl || "").trim(), rendererConfigUrl),
+    },
+    scene: {
+      configUrl: resolveHostedUrl(String(config.scene?.configUrl || "").trim(), rendererConfigUrl),
+    },
+    state: {
+      provider: config.state?.provider || "json",
+      stateUrl: resolveHostedUrl(String(config.state?.stateUrl || "").trim(), rendererConfigUrl),
+      haApiFallback: config.state?.haApiFallback === true,
+      idleLinesUrl: resolveHostedUrl(String(config.state?.idleLinesUrl || "").trim(), rendererConfigUrl),
+      entityMapUrl: resolveHostedUrl(String(config.state?.entityMapUrl || "").trim(), rendererConfigUrl),
+    },
+    control: {
+      provider: "json",
+      controlUrl: resolveHostedUrl(String(config.control?.controlUrl || "").trim(), rendererConfigUrl),
+    },
+  };
+}
+
+async function resolveRuntimeRendererConfigUrl(
+  bootstrap: SceneHostBootstrap,
+  bootstrapUrl: string,
+): Promise<string> {
+  const rendererConfigUrl = resolveHostedUrl(
+    String(bootstrap.files?.rendererConfigUrl || "").trim(),
+    bootstrapUrl,
+  );
+  if (!rendererConfigUrl) {
+    return "";
+  }
+
+  const sceneConfigUrl = resolveHostedUrl(
+    String(bootstrap.files?.sceneConfigUrl || "").trim(),
+    bootstrapUrl,
+  );
+  const avatarCatalogUrl = resolveHostedUrl(
+    String(bootstrap.files?.avatarCatalogUrl || "").trim(),
+    bootstrapUrl,
+  );
+  if (!sceneConfigUrl || !avatarCatalogUrl) {
+    return rendererConfigUrl;
+  }
+
+  let selectedAvatarPackId = "";
+  try {
+    const sceneConfig = await readJson<HostedSceneConfig>(sceneConfigUrl);
+    selectedAvatarPackId = String(sceneConfig.avatar?.packId || "").trim();
+  } catch {
+    selectedAvatarPackId = "";
+  }
+  if (!selectedAvatarPackId) {
+    return rendererConfigUrl;
+  }
+
+  let selectedAvatarManifestUrl = "";
+  try {
+    const avatarCatalog = await readJson<AvatarCatalogPayload>(avatarCatalogUrl);
+    const selectedAvatar = Array.isArray(avatarCatalog.items)
+      ? avatarCatalog.items.find((item) => String(item.id || "").trim() === selectedAvatarPackId)
+      : null;
+    selectedAvatarManifestUrl = resolveHostedUrl(String(selectedAvatar?.manifestUrl || "").trim(), bootstrapUrl);
+  } catch {
+    selectedAvatarManifestUrl = "";
+  }
+  if (!selectedAvatarManifestUrl) {
+    return rendererConfigUrl;
+  }
+
+  const rendererConfig = absolutizeRendererConfig(
+    await readJson<HostedRendererConfig>(rendererConfigUrl),
+    rendererConfigUrl,
+  );
+  const overriddenConfig: HostedRendererConfig = {
+    ...rendererConfig,
+    avatar: {
+      manifestUrl: selectedAvatarManifestUrl,
+    },
+  };
+
+  return URL.createObjectURL(
+    new Blob([JSON.stringify(overriddenConfig)], { type: "application/json" }),
+  );
+}
+
 const root = document.getElementById("app");
 if (!root) {
   throw new Error("Missing #app root element");
@@ -424,10 +570,7 @@ void (async () => {
     const bootstrap = await loadBootstrap(bootstrapUrl);
     const packId = String(bootstrap.packId || "").trim();
     const isNeiriPack = packId.toLowerCase() === "neiri";
-    const rendererConfigUrl = resolveHostedUrl(
-      String(bootstrap.files?.rendererConfigUrl || "").trim(),
-      bootstrapUrl,
-    );
+    const rendererConfigUrl = await resolveRuntimeRendererConfigUrl(bootstrap, bootstrapUrl);
     if (!rendererConfigUrl) {
       renderStatus(
         root,
@@ -467,6 +610,10 @@ void (async () => {
         packId,
         sceneApiUrl: resolveHostedUrl(
           String(bootstrap.sceneEditorApiUrl || "").trim(),
+          bootstrapUrl,
+        ),
+        avatarCatalogUrl: resolveHostedUrl(
+          String(bootstrap.files?.avatarCatalogUrl || "").trim(),
           bootstrapUrl,
         ),
         sceneUrl: resolveHostedUrl(

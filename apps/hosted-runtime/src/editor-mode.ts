@@ -10,6 +10,7 @@ type EditorCopy = {
   previewSubtitle: string;
   previewDisplay: string;
   previewResolution: string;
+  previewApplyProfile: string;
   dashboardTitle: string;
   dashboardSubtitle: string;
   statusLoading: string;
@@ -20,8 +21,13 @@ type EditorCopy = {
   save: string;
   saving: string;
   addPage: string;
-  hidePanel: string;
-  showPanel: string;
+  avatar: string;
+  avatarSubtitle: string;
+  avatarPack: string;
+  avatarPackCurrent: string;
+  avatarPackHint: string;
+  avatarPackEmpty: string;
+  avatarPackAppliedAfterSave: string;
   pages: string;
   pageKind: string;
   pageCards: (count: number) => string;
@@ -89,6 +95,7 @@ type EditorCopy = {
 export interface NativeEditorShellOptions {
   packId: string;
   sceneApiUrl: string;
+  avatarCatalogUrl?: string;
   sceneUrl: string;
 }
 
@@ -116,6 +123,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewSubtitle: "Сверху показывается честный 1:1 viewport выбранного экрана. Если не влезает по ширине, страница просто прокручивается.",
     previewDisplay: "Экран для проверки",
     previewResolution: "Разрешение",
+    previewApplyProfile: "Применить пресет экрана",
     dashboardTitle: "Панель настройки сцены",
     dashboardSubtitle: "Вся настройка расположена ниже превью как длинная редакторская страница.",
     statusLoading: "Загружаю конфигурацию сцены...",
@@ -126,8 +134,13 @@ const COPY: Record<UiLang, EditorCopy> = {
     save: "Сохранить",
     saving: "Сохраняю...",
     addPage: "+ Страница",
-    hidePanel: "Скрыть панель",
-    showPanel: "Показать панель",
+    avatar: "Аватар",
+    avatarSubtitle: "Выбор Live2D-модели для текущего instance-pack. Применяется после сохранения и перезагрузки превью.",
+    avatarPack: "Набор аватара",
+    avatarPackCurrent: "Текущий avatar.manifest.json instance-pack",
+    avatarPackHint: "Другие модели лежат отдельно в /config/kiosk-scene/avatar-packs/<id>/avatar.manifest.json.",
+    avatarPackEmpty: "В каталоге avatar-packs пока нет отдельных моделей.",
+    avatarPackAppliedAfterSave: "Выбранный avatar-pack вступит в силу после сохранения и автоматической перезагрузки превью.",
     pages: "Страницы",
     pageKind: "Тип",
     pageCards: (count) => `${count} карточ${count === 1 ? "ка" : count < 5 ? "ки" : "ек"}`,
@@ -198,6 +211,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewSubtitle: "The top stage renders a true 1:1 viewport of the selected screen. If it does not fit, the editor page simply scrolls.",
     previewDisplay: "Screen profile",
     previewResolution: "Resolution",
+    previewApplyProfile: "Apply screen preset",
     dashboardTitle: "Scene Settings Dashboard",
     dashboardSubtitle: "All configuration lives below the preview as a normal scrollable page.",
     statusLoading: "Loading scene config...",
@@ -208,8 +222,13 @@ const COPY: Record<UiLang, EditorCopy> = {
     save: "Save",
     saving: "Saving...",
     addPage: "+ Page",
-    hidePanel: "Hide Panel",
-    showPanel: "Show Panel",
+    avatar: "Avatar",
+    avatarSubtitle: "Choose the Live2D model for this instance-pack. It applies after save and preview reload.",
+    avatarPack: "Avatar pack",
+    avatarPackCurrent: "Use the instance-pack avatar.manifest.json",
+    avatarPackHint: "Additional models live in /config/kiosk-scene/avatar-packs/<id>/avatar.manifest.json.",
+    avatarPackEmpty: "No separate avatar packs are available yet.",
+    avatarPackAppliedAfterSave: "The selected avatar pack will apply after saving and reloading the preview.",
     pages: "Pages",
     pageKind: "Kind",
     pageCards: (count) => `${count} cards`,
@@ -283,6 +302,7 @@ type EditorState = {
   status: string;
   statusTone: "muted" | "ok" | "bad";
   haEntities: HaEntitySummary[];
+  avatarCatalog: AvatarPackSummary[];
   entitySearch: string;
   focusedBinding: { cardIndex: number; field: string } | null;
   previewDisplayId: string;
@@ -296,11 +316,27 @@ type HaEntitySummary = {
   unit: string;
 };
 
+type AvatarPackSummary = {
+  id: string;
+  name: string;
+  manifestUrl: string;
+  previewUrl: string;
+};
+
 type PreviewDisplayProfile = {
   id: string;
   width: number;
   height: number;
   label: Record<UiLang, string>;
+  displayDefaults: {
+    safeTop: number;
+    safeRight: number;
+    safeBottom: number;
+    safeLeft: number;
+    layoutPaddingPx: number;
+    layoutGapPx: number;
+    globalScale: number;
+  };
 };
 
 const PREVIEW_DISPLAY_PROFILES: readonly PreviewDisplayProfile[] = [
@@ -312,6 +348,15 @@ const PREVIEW_DISPLAY_PROFILES: readonly PreviewDisplayProfile[] = [
       ru: "Mellow Fly 7\" · 1024×600",
       en: "Mellow Fly 7\" · 1024x600",
     },
+    displayDefaults: {
+      safeTop: 0,
+      safeRight: 0,
+      safeBottom: 0,
+      safeLeft: 0,
+      layoutPaddingPx: 16,
+      layoutGapPx: 16,
+      globalScale: 1,
+    },
   },
   {
     id: "hdmi-1080p",
@@ -320,6 +365,15 @@ const PREVIEW_DISPLAY_PROFILES: readonly PreviewDisplayProfile[] = [
     label: {
       ru: "HDMI дисплей 1920×1080",
       en: "HDMI display 1920x1080",
+    },
+    displayDefaults: {
+      safeTop: 0,
+      safeRight: 0,
+      safeBottom: 0,
+      safeLeft: 0,
+      layoutPaddingPx: 24,
+      layoutGapPx: 24,
+      globalScale: 1,
     },
   },
   {
@@ -330,6 +384,15 @@ const PREVIEW_DISPLAY_PROFILES: readonly PreviewDisplayProfile[] = [
       ru: "ТВ панель 1366×768",
       en: "TV panel 1366x768",
     },
+    displayDefaults: {
+      safeTop: 8,
+      safeRight: 12,
+      safeBottom: 12,
+      safeLeft: 12,
+      layoutPaddingPx: 18,
+      layoutGapPx: 18,
+      globalScale: 0.98,
+    },
   },
   {
     id: "hdmi-1440p",
@@ -338,6 +401,15 @@ const PREVIEW_DISPLAY_PROFILES: readonly PreviewDisplayProfile[] = [
     label: {
       ru: "Монитор 2560×1440",
       en: "Monitor 2560x1440",
+    },
+    displayDefaults: {
+      safeTop: 0,
+      safeRight: 0,
+      safeBottom: 0,
+      safeLeft: 0,
+      layoutPaddingPx: 24,
+      layoutGapPx: 24,
+      globalScale: 1,
     },
   },
   {
@@ -348,6 +420,15 @@ const PREVIEW_DISPLAY_PROFILES: readonly PreviewDisplayProfile[] = [
       ru: "4K дисплей 3840×2160",
       en: "4K display 3840x2160",
     },
+    displayDefaults: {
+      safeTop: 0,
+      safeRight: 0,
+      safeBottom: 0,
+      safeLeft: 0,
+      layoutPaddingPx: 32,
+      layoutGapPx: 32,
+      globalScale: 1,
+    },
   },
   {
     id: "portrait-1080",
@@ -356,6 +437,15 @@ const PREVIEW_DISPLAY_PROFILES: readonly PreviewDisplayProfile[] = [
     label: {
       ru: "Portrait 1080×1920",
       en: "Portrait 1080x1920",
+    },
+    displayDefaults: {
+      safeTop: 8,
+      safeRight: 8,
+      safeBottom: 8,
+      safeLeft: 8,
+      layoutPaddingPx: 16,
+      layoutGapPx: 16,
+      globalScale: 0.96,
     },
   },
 ] as const;
@@ -513,6 +603,31 @@ function ensureDisplayConfig(config: SceneConfigV1): NonNullable<SceneConfigV1["
   return config.display;
 }
 
+function readAvatarPackId(config: SceneConfigV1): string {
+  const packId = String(config.avatar?.packId || "").trim();
+  return packId;
+}
+
+function ensureAvatarConfig(config: SceneConfigV1): NonNullable<SceneConfigV1["avatar"]> {
+  if (!config.avatar) {
+    config.avatar = {};
+  }
+  return config.avatar;
+}
+
+function applyDisplayProfile(config: SceneConfigV1, profile: PreviewDisplayProfile): void {
+  const display = ensureDisplayConfig(config);
+  const safeArea = display.safeArea || {};
+  safeArea.top = profile.displayDefaults.safeTop;
+  safeArea.right = profile.displayDefaults.safeRight;
+  safeArea.bottom = profile.displayDefaults.safeBottom;
+  safeArea.left = profile.displayDefaults.safeLeft;
+  display.safeArea = safeArea;
+  display.layoutPaddingPx = profile.displayDefaults.layoutPaddingPx;
+  display.layoutGapPx = profile.displayDefaults.layoutGapPx;
+  display.globalScale = profile.displayDefaults.globalScale;
+}
+
 function focusScenePageByIndex(index: number): void {
   const dot = document.querySelector<HTMLButtonElement>(`.carousel-dot[data-slide-index="${index}"]`);
   dot?.click();
@@ -660,6 +775,28 @@ function filterHaEntityCatalog(catalog: HaEntitySummary[], query: string): HaEnt
       || item.domain.toLowerCase().includes(normalized)
       || item.state.toLowerCase().includes(normalized))
     .slice(0, 48);
+}
+
+async function loadAvatarCatalog(url: string): Promise<AvatarPackSummary[]> {
+  const target = String(url || "").trim();
+  if (!target) {
+    return [];
+  }
+  const response = await fetch(target, { cache: "no-store" });
+  const payload = await response.json() as { success?: boolean; items?: Array<Partial<AvatarPackSummary>> };
+  if (!response.ok || payload.success === false) {
+    throw new Error(`GET ${target} failed: HTTP ${response.status}`);
+  }
+  return Array.isArray(payload.items)
+    ? payload.items
+      .map((item) => ({
+        id: String(item.id || "").trim(),
+        name: String(item.name || item.id || "").trim(),
+        manifestUrl: String(item.manifestUrl || "").trim(),
+        previewUrl: String(item.previewUrl || "").trim(),
+      }))
+      .filter((item) => item.id && item.manifestUrl)
+    : [];
 }
 
 function isEntityBindingField(field: string): boolean {
@@ -849,17 +986,14 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         width: max-content;
         max-width: none;
         border-radius: 24px;
-        padding: 8px;
-        border: 1px solid rgba(20,30,40,0.18);
-        background: #121a22;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+        border: 1px solid rgba(32,48,65,0.1);
+        background: #dae5ec;
         overflow: visible;
       }
       #scene-editor-shell .scene-preview-stage {
         overflow: hidden;
-        border-radius: 18px;
+        border-radius: 24px;
         background: #dbe8f2;
-        border: 1px solid rgba(255,255,255,0.08);
         display: block;
       }
       #scene-editor-shell #app {
@@ -954,6 +1088,38 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         display: grid;
         gap: 10px;
       }
+      #scene-editor-shell .avatar-pack-box {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 124px;
+        gap: 14px;
+        align-items: start;
+      }
+      #scene-editor-shell .avatar-pack-meta {
+        display: grid;
+        gap: 8px;
+      }
+      #scene-editor-shell .avatar-pack-preview {
+        width: 124px;
+        min-height: 124px;
+        border-radius: 18px;
+        border: 1px solid rgba(32,48,65,0.08);
+        background: linear-gradient(180deg, rgba(223,232,239,0.82), rgba(236,242,246,0.92));
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      #scene-editor-shell .avatar-pack-preview img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      #scene-editor-shell .avatar-pack-preview span {
+        padding: 12px;
+        text-align: center;
+        font: 12px/1.35 "Aptos","Segoe UI",sans-serif;
+        color: rgba(32,48,65,0.62);
+      }
       #scene-editor-shell .page-chip,
       #scene-editor-shell .card-item,
       #scene-editor-shell .ha-entity {
@@ -1036,6 +1202,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         #scene-editor-shell .scene-settings-card {
           border-radius: 24px;
         }
+        #scene-editor-shell .avatar-pack-box {
+          grid-template-columns: 1fr;
+        }
         #scene-editor-shell .inspector-grid,
         #scene-editor-shell .card-grid {
           grid-template-columns: 1fr;
@@ -1060,6 +1229,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               <span>${copy.previewResolution}</span>
               <strong data-preview-resolution>1920 × 1080</strong>
             </div>
+            <button class="scene-editor-button" type="button" data-action="apply-display-profile">${copy.previewApplyProfile}</button>
           </div>
         </div>
         <div class="scene-preview-frame">
@@ -1094,6 +1264,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     status: copy.statusLoading,
     statusTone: "muted",
     haEntities: [],
+    avatarCatalog: [],
     entitySearch: "",
     focusedBinding: null,
     previewDisplayId: DEFAULT_PREVIEW_DISPLAY_ID,
@@ -1107,7 +1278,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     previewStage.style.height = `${profile.height}px`;
     appRoot.style.width = `${profile.width}px`;
     appRoot.style.height = `${profile.height}px`;
-    previewScreen.style.width = `${profile.width + 16}px`;
+    previewScreen.style.width = `${profile.width}px`;
   };
 
   const resizeObserver = typeof ResizeObserver !== "undefined"
@@ -1124,6 +1295,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const bindingLabel = state.focusedBinding
       ? `${copy.entityBinding}: #${state.focusedBinding.cardIndex + 1} → ${state.focusedBinding.field}`
       : copy.entityBindingEmpty;
+    const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
+    const selectedAvatarPack = state.avatarCatalog.find((item) => item.id === selectedAvatarPackId) || null;
 
     dashboardHost.innerHTML = `
       <div class="scene-dashboard-topbar">
@@ -1136,11 +1309,36 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
           <a class="scene-editor-button" href="${escapeHtml(options.sceneUrl)}">${copy.viewOnly}</a>
           <button class="scene-editor-button is-accent" type="button" data-action="save"${state.saving || !config ? " disabled" : ""}>${state.saving ? copy.saving : copy.save}</button>
           <button class="scene-editor-button" type="button" data-action="add-page"${!config ? " disabled" : ""}>${copy.addPage}</button>
-          <button class="scene-editor-button" type="button" data-action="toggle-panel">${wrapper.dataset.collapsed === "true" ? copy.showPanel : copy.hidePanel}</button>
         </div>
       </div>
       <div class="scene-dashboard-body">
         <div class="scene-settings-stack">
+          <section class="scene-settings-card">
+            <div class="scene-settings-head">
+              <h2>${copy.avatar}</h2>
+              <div class="meta">${copy.avatarSubtitle}</div>
+            </div>
+          ${config ? `
+            <div class="avatar-pack-box">
+              <div class="avatar-pack-meta">
+                <div class="field is-wide">
+                  <label for="avatar-pack-select">${copy.avatarPack}</label>
+                  <select id="avatar-pack-select" data-avatar-pack>
+                    <option value="">${copy.avatarPackCurrent}</option>
+                    ${state.avatarCatalog.map((item) => `<option value="${escapeHtml(item.id)}"${item.id === selectedAvatarPackId ? " selected" : ""}>${escapeHtml(item.name || item.id)}</option>`).join("")}
+                  </select>
+                </div>
+                <div class="meta">${state.avatarCatalog.length ? copy.avatarPackHint : copy.avatarPackEmpty}</div>
+                <div class="meta">${copy.avatarPackAppliedAfterSave}</div>
+              </div>
+              <div class="avatar-pack-preview">
+                ${selectedAvatarPack?.previewUrl
+                  ? `<img src="${escapeHtml(selectedAvatarPack.previewUrl)}" alt="${escapeHtml(selectedAvatarPack.name || selectedAvatarPack.id)}">`
+                  : `<span>${escapeHtml(selectedAvatarPack?.name || copy.avatarPackCurrent)}</span>`}
+              </div>
+            </div>
+          ` : `<div class="meta">${copy.statusLoading}</div>`}
+          </section>
           <section class="scene-settings-card">
             <div class="scene-settings-head">
               <h2>${copy.pages}</h2>
@@ -1384,9 +1582,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     if (!action) {
       return;
     }
-    if (action === "toggle-panel") {
-      const collapsed = wrapper.dataset.collapsed === "true";
-      wrapper.dataset.collapsed = collapsed ? "false" : "true";
+    if (action === "apply-display-profile" && state.config) {
+      applyDisplayProfile(state.config, resolvePreviewDisplayProfile(state.previewDisplayId));
+      markDirty();
       render();
       return;
     }
@@ -1517,6 +1715,12 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       applyPreviewLayout();
       return;
     }
+    if (target.dataset.avatarPack !== undefined) {
+      ensureAvatarConfig(state.config).packId = target.value.trim() || null;
+      markDirty();
+      render();
+      return;
+    }
     if (target.dataset.pageField) {
       updatePageField(target.dataset.pageField as keyof ScenePageV1, target.value);
       render();
@@ -1555,6 +1759,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
 
   try {
     state.config = await loadConfig(options.sceneApiUrl);
+    if (options.avatarCatalogUrl) {
+      try {
+        state.avatarCatalog = await loadAvatarCatalog(options.avatarCatalogUrl);
+      } catch {
+        state.avatarCatalog = [];
+      }
+    }
     state.haEntities = buildHaEntityCatalog(getHomeAssistantHandle()?.states || null);
     state.selectedPageId = initialSelectedPageId(state.config);
     state.status = copy.statusSaved;

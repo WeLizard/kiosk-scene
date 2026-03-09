@@ -20,6 +20,7 @@ export PYTHONUNBUFFERED=1
 export SCENE_ROOT="/config/kiosk-scene"
 export SCENE_RUNTIME_DIR="${SCENE_ROOT}/scene-runtime"
 export SCENE_PACKS_DIR="${SCENE_ROOT}/scene-packs"
+export SCENE_AVATAR_PACKS_DIR="${SCENE_ROOT}/avatar-packs"
 export SCENE_ACTIVE_PACK_FILE="${SCENE_ROOT}/active-pack.json"
 export SCENE_DEFAULT_PACK_ID="$DEFAULT_PACK_ID"
 export SCENE_HOST_BIND="127.0.0.1"
@@ -35,6 +36,7 @@ LEGACY_LIVE2D_DIR="/config/www/live2d"
 DEFAULT_PACK_DIR="${SCENE_PACKS_DIR}/${SCENE_DEFAULT_PACK_ID}"
 
 mkdir -p "$SCENE_RUNTIME_DIR" "$SCENE_PACKS_DIR" "$DEFAULT_PACK_DIR"
+mkdir -p "$SCENE_AVATAR_PACKS_DIR"
 
 if [ -d "${LEGACY_SCENE_ROOT}/scene-runtime" ] && [ ! -f "${SCENE_RUNTIME_DIR}/index.html" ]; then
   rsync -a --ignore-existing "${LEGACY_SCENE_ROOT}/scene-runtime/" "${SCENE_RUNTIME_DIR}/" 2>/dev/null || true

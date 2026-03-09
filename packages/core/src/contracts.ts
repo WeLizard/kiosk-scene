@@ -68,6 +68,10 @@ export interface SceneDisplayV1 {
   globalScale?: number;
 }
 
+export interface SceneAvatarV1 {
+  packId?: string | null;
+}
+
 export interface SceneCardV1 {
   type?: string;
   entity?: string;
@@ -90,6 +94,7 @@ export interface SceneConfigV1 {
   version: 1;
   rotation: SceneRotationV1;
   display?: SceneDisplayV1;
+  avatar?: SceneAvatarV1;
   pages: ScenePageV1[];
 }
 

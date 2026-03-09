@@ -45,6 +45,9 @@ DEFAULT_SCENE_CONFIG: dict[str, Any] = {
         "layoutGapPx": 16,
         "globalScale": 1,
     },
+    "avatar": {
+        "packId": None,
+    },
     "pages": [
         {
             "id": "page-1",

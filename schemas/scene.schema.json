@@ -76,6 +76,18 @@
         }
       }
     },
+    "avatar": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "packId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
     "pages": {
       "type": "array",
       "items": {
