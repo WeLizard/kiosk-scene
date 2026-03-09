@@ -130,6 +130,7 @@ type EditorCopy = {
   entityBindingTargets: string;
   entityBinding: string;
   entityBindingEmpty: string;
+  entityBindingNoTargets: string;
   entityBindingActive: (card: string, field: string) => string;
   previewSelectPage: string;
   previewSelectCard: string;
@@ -193,7 +194,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     title: "Редактор сцены",
     subtitle: (packId) => `Пакет: ${packId || "default"} · Живое превью сцены и полный дашборд настроек`,
     previewTitle: "Превью дисплея",
-    previewSubtitle: "Сверху показывается честный 1:1 viewport выбранного экрана. Если не влезает по ширине, страница просто прокручивается.",
+    previewSubtitle: "Сверху показывается превью выбранного экрана с правильными пропорциями. Оно автоматически вмещается по ширине редактора.",
     previewDisplay: "Экран для проверки",
     previewResolution: "Разрешение",
     previewApplyProfile: "Подставить в настройки экрана",
@@ -316,6 +317,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     entityBindingTargets: "Куда привязывать",
     entityBinding: "Связать с полем",
     entityBindingEmpty: "Кликни в поле Сущность / State / Down / Up у карточки, потом выбери сущность здесь.",
+    entityBindingNoTargets: "У этой карточки нет полей для привязки к Home Assistant.",
     entityBindingActive: (card, field) => `Сейчас связываем: ${card} → ${field}`,
     previewSelectPage: "Клик по превью выбирает страницу",
     previewSelectCard: "Клик по карточке в превью выбирает её в инспекторе",
@@ -326,7 +328,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     title: "Scene Editor",
     subtitle: (packId) => `Pack: ${packId || "default"} · Live scene preview with a full settings dashboard`,
     previewTitle: "Display Preview",
-    previewSubtitle: "The top stage renders a true 1:1 viewport of the selected screen. If it does not fit, the editor page simply scrolls.",
+    previewSubtitle: "The top stage previews the selected screen with the correct aspect ratio. It automatically fits the available editor width.",
     previewDisplay: "Screen profile",
     previewResolution: "Resolution",
     previewApplyProfile: "Fill display settings below",
@@ -449,6 +451,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     entityBindingTargets: "Binding target",
     entityBinding: "Bind into field",
     entityBindingEmpty: "Click an Entity / State / Down / Up field on a card, then choose an entity here.",
+    entityBindingNoTargets: "This card has no Home Assistant binding fields.",
     entityBindingActive: (card, field) => `Binding now: ${card} → ${field}`,
     previewSelectPage: "Click the preview to select a page",
     previewSelectCard: "Click a card in the preview to inspect it",
@@ -1241,7 +1244,7 @@ function renderBindingTargets(
   const fields = cardFieldsForType(fieldValue(card as Record<string, unknown>, "type") || "entity")
     .filter((field) => isEntityBindingField(field));
   if (!fields.length) {
-    return `<div class="meta">${escapeHtml(copy.entityBindingEmpty)}</div>`;
+    return `<div class="meta">${escapeHtml(copy.entityBindingNoTargets)}</div>`;
   }
   return `
     <div class="binding-targets">
@@ -1455,9 +1458,12 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   wrapper.innerHTML = `
     <style>
       #scene-editor-shell {
+        width: min(100%, 1420px);
         max-width: 1420px;
         margin: 0 auto;
         padding: 24px 18px 64px;
+        box-sizing: border-box;
+        overflow-x: clip;
         color: #203041;
       }
       #scene-editor-shell .scene-editor-page {
@@ -1520,9 +1526,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       #scene-editor-shell .scene-preview-frame {
         margin-top: 18px;
-        overflow-x: auto;
-        overflow-y: hidden;
+        overflow: hidden;
         padding: 4px 0 8px;
+        display: flex;
+        justify-content: center;
       }
       #scene-editor-shell .scene-preview-hint {
         display: flex;
@@ -1543,6 +1550,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         border: 1px solid rgba(32,48,65,0.1);
         background: #e6eef4;
         display: block;
+        max-width: 100%;
+        margin: 0 auto;
+        position: relative;
+      }
+      #scene-editor-shell .scene-preview-canvas {
+        transform-origin: top left;
+        will-change: transform;
       }
       #scene-editor-shell #app {
         overflow: hidden;
@@ -1911,7 +1925,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
           <span>${copy.previewSelectCard}</span>
         </div>
         <div class="scene-preview-frame">
-          <div class="scene-preview-stage" data-preview-stage></div>
+          <div class="scene-preview-stage" data-preview-stage>
+            <div class="scene-preview-canvas" data-preview-canvas></div>
+          </div>
         </div>
       </section>
       <section class="scene-dashboard" data-dashboard></section>
@@ -1923,13 +1939,14 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   document.body.style.overflow = "auto";
 
   const previewStage = wrapper.querySelector<HTMLElement>("[data-preview-stage]");
+  const previewCanvas = wrapper.querySelector<HTMLElement>("[data-preview-canvas]");
   const previewResolution = wrapper.querySelector<HTMLElement>("[data-preview-resolution]");
   const previewDisplaySelect = wrapper.querySelector<HTMLSelectElement>("[data-preview-display]");
   const dashboardHost = wrapper.querySelector<HTMLElement>("[data-dashboard]");
-  if (!previewStage || !previewResolution || !previewDisplaySelect || !dashboardHost) {
+  if (!previewStage || !previewCanvas || !previewResolution || !previewDisplaySelect || !dashboardHost) {
     throw new Error("Missing native editor shell elements");
   }
-  previewStage.appendChild(appRoot);
+  previewCanvas.appendChild(appRoot);
 
   const state: EditorState = {
     config: null,
@@ -1979,10 +1996,17 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
 
   const applyPreviewLayout = (): void => {
     const profile = resolvePreviewDisplayProfile(state.previewDisplayId);
+    const availableWidth = Math.max(320, previewStage.parentElement?.clientWidth || previewStage.clientWidth || profile.width);
+    const scale = Math.min(1, availableWidth / profile.width);
+    const scaledWidth = Math.round(profile.width * scale);
+    const scaledHeight = Math.round(profile.height * scale);
     previewDisplaySelect.value = profile.id;
     previewResolution.textContent = formatPreviewResolution(profile);
-    previewStage.style.width = `${profile.width}px`;
-    previewStage.style.height = `${profile.height}px`;
+    previewStage.style.width = `${scaledWidth}px`;
+    previewStage.style.height = `${scaledHeight}px`;
+    previewCanvas.style.width = `${profile.width}px`;
+    previewCanvas.style.height = `${profile.height}px`;
+    previewCanvas.style.transform = `scale(${scale})`;
     appRoot.style.width = `${profile.width}px`;
     appRoot.style.height = `${profile.height}px`;
   };
@@ -2033,7 +2057,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   const resizeObserver = typeof ResizeObserver !== "undefined"
     ? new ResizeObserver(() => applyPreviewLayout())
     : null;
-  resizeObserver?.observe(previewStage);
+  resizeObserver?.observe(previewStage.parentElement || previewStage);
   let dragPayload: { kind: "page"; pageId: string } | { kind: "card"; cardIndex: number } | null = null;
 
   const syncPreviewSelection = (): void => {
