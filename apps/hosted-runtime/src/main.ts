@@ -324,10 +324,10 @@ function normalizeHostedAvatarManifest(
     ...normalized,
     assetRoot: resolveHostedUrl(String(normalized.assetRoot || "").trim(), manifestUrl),
     runtimeUrl: resolveHostedUrl(String(normalized.runtimeUrl || "").trim(), manifestUrl),
-    entry: remapLegacyHostedUrl(String(normalized.entry || "").trim(), bootstrapUrl),
-    modelUrl: remapLegacyHostedUrl(String(normalized.modelUrl || "").trim(), bootstrapUrl),
-    fallbackPortrait: remapLegacyHostedUrl(String(normalized.fallbackPortrait || "").trim(), bootstrapUrl),
-    motionMapUrl: remapLegacyHostedUrl(String(normalized.motionMapUrl || "").trim(), bootstrapUrl),
+    entry: resolveHostedUrl(String(normalized.entry || "").trim(), manifestUrl),
+    modelUrl: resolveHostedUrl(String(normalized.modelUrl || "").trim(), manifestUrl),
+    fallbackPortrait: resolveHostedUrl(String(normalized.fallbackPortrait || "").trim(), manifestUrl),
+    motionMapUrl: resolveHostedUrl(String(normalized.motionMapUrl || "").trim(), manifestUrl),
     presetThumbs,
   };
 }
