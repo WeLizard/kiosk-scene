@@ -266,17 +266,17 @@ const COPY: Record<UiLang, EditorCopy> = {
     displaySubtitle: "Только safe area, внутренние отступы и общий масштаб. Профиль сверху меняет само превью автоматически.",
     cards: "Карточки",
     cardOrderHint: "Карточки тоже можно перетаскивать. Их порядок сразу отражается в выбранной странице справа.",
-    cardsSubtitle: "Сначала добавь шаблон или выбери карточку из списка, затем настрой её ниже.",
+    cardsSubtitle: "Сначала добавь шаблон, затем выбери карточку прямо в превью или на ленте ниже и настрой её.",
     cardInspector: "Настройка карточки",
-    cardInspectorEmpty: "Добавь карточку из шаблона выше или выбери существующую карточку из списка.",
+    cardInspectorEmpty: "Добавь карточку или выбери её прямо в превью либо на ленте карточек.",
     cardTemplates: "Шаблоны карточек",
     cardType: "Тип карточки",
     noCards: "На странице пока нет карточек",
     addCard: "+ Карточка",
-    bindFromHa: "из HA",
+    bindFromHa: "HA",
     remove: "Удалить",
-    up: "Выше",
-    down: "Ниже",
+    up: "Левее",
+    down: "Правее",
     loadError: "Не удалось загрузить конфиг сцены",
     saveError: "Не удалось сохранить конфиг сцены",
     kindOverview: "Обзор",
@@ -403,17 +403,17 @@ const COPY: Record<UiLang, EditorCopy> = {
     displaySubtitle: "Only safe area, inner spacing and global scale live here. The screen profile above already drives the preview.",
     cards: "Cards",
     cardOrderHint: "Cards can also be dragged. Their order is reflected on the selected page immediately.",
-    cardsSubtitle: "Add a template or choose an existing card first, then edit it below.",
+    cardsSubtitle: "Add a template, then choose the card directly in the preview or in the rail below and edit it.",
     cardInspector: "Card inspector",
-    cardInspectorEmpty: "Add a card from the templates above or choose an existing one from the list.",
+    cardInspectorEmpty: "Add a card or choose it directly from the preview or the card rail.",
     cardTemplates: "Card templates",
     cardType: "Card type",
     noCards: "No cards on this page yet",
     addCard: "+ Card",
-    bindFromHa: "from HA",
+    bindFromHa: "HA",
     remove: "Remove",
-    up: "Up",
-    down: "Down",
+    up: "Left",
+    down: "Right",
     loadError: "Failed to load scene config",
     saveError: "Failed to save scene config",
     kindOverview: "overview",
@@ -1470,6 +1470,7 @@ function renderCardListItem(
   return `
     <article class="card-list-item${selected ? " is-active" : ""}" draggable="true" data-drag-kind="card" data-card-index="${index}">
       <button class="card-list-select" type="button" data-action="select-card" data-card-index="${index}">
+        <span class="card-list-index">#${index + 1}</span>
         <strong>${escapeHtml(title)}</strong>
         <span class="meta">${escapeHtml(cardTypeLabel(copy, type))}</span>
         <div class="meta">${escapeHtml(secondary)}</div>
@@ -1730,7 +1731,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         font: 12px/1.4 "Aptos","Segoe UI",sans-serif;
         color: rgba(32,48,65,0.66);
       }
-      #scene-editor-shell .cards-list,
       #scene-editor-shell .scene-settings-stack {
         display: grid;
         gap: 10px;
@@ -1745,10 +1745,20 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         align-items: stretch;
         scrollbar-width: thin;
       }
+      #scene-editor-shell .cards-list {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(220px, 260px);
+        gap: 12px;
+        overflow-x: auto;
+        padding: 2px 2px 8px;
+        align-items: stretch;
+        scrollbar-width: thin;
+      }
       #scene-editor-shell .ha-list {
         display: grid;
-        gap: 10px;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       }
       #scene-editor-shell .card-template-grid {
         display: grid;
@@ -1843,6 +1853,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         border: 1px solid rgba(32,48,65,0.08);
         background: rgba(255,255,255,0.86);
       }
+      #scene-editor-shell .card-list-item {
+        min-width: 0;
+        align-content: space-between;
+        gap: 8px;
+      }
       #scene-editor-shell .page-chip {
         min-width: 0;
         align-content: space-between;
@@ -1875,6 +1890,16 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         cursor: pointer;
         color: inherit;
       }
+      #scene-editor-shell .card-list-index {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(214,225,237,0.72);
+        font: 11px/1 "Aptos","Segoe UI",sans-serif;
+        color: #385268;
+      }
       #scene-editor-shell .page-chip-header strong,
       #scene-editor-shell .card-item-head strong,
       #scene-editor-shell .ha-entity strong,
@@ -1889,6 +1914,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
+      }
+      #scene-editor-shell .card-actions {
+        justify-content: space-between;
       }
       #scene-editor-shell .inspector-grid,
       #scene-editor-shell .card-grid {
@@ -1947,12 +1975,21 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         margin-top: 12px;
       }
       #scene-editor-shell .ha-entity code {
-        font: 12px/1.25 Consolas, monospace;
+        display: block;
+        font: 11px/1.2 Consolas, monospace;
         color: #385268;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       #scene-editor-shell code {
         font: 12px/1.25 Consolas, monospace;
         color: #385268;
+      }
+      #scene-editor-shell .ha-entity {
+        gap: 6px;
+        padding: 10px;
+        border-radius: 16px;
       }
       #scene-editor-shell .ha-entity-row {
         display: flex;
@@ -1960,9 +1997,28 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         justify-content: space-between;
         gap: 8px;
       }
+      #scene-editor-shell .ha-entity .tiny-btn {
+        min-height: 26px;
+        padding: 0 8px;
+      }
       #scene-editor-shell .ha-state {
-        font: 12px/1.3 "Aptos","Segoe UI",sans-serif;
+        font: 11px/1.25 "Aptos","Segoe UI",sans-serif;
         color: #4f6a7c;
+      }
+      #scene-editor-shell .avatar-import-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      #scene-editor-shell .avatar-import-trigger.is-disabled {
+        pointer-events: none;
+        opacity: 0.55;
       }
       @media (max-width: 980px) {
         #scene-editor-shell {
@@ -1983,6 +2039,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
           grid-template-columns: 1fr;
         }
         #scene-editor-shell .page-list {
+          grid-auto-columns: minmax(220px, 84vw);
+        }
+        #scene-editor-shell .cards-list {
           grid-auto-columns: minmax(220px, 84vw);
         }
       }
@@ -2237,10 +2296,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
             <div class="card-stack" style="margin-top:16px;">
               <div class="field is-wide">
-                <input id="avatar-pack-archive" type="file" accept=".zip,application/zip" data-avatar-archive hidden>
-                <button class="scene-editor-button" type="button" data-action="open-avatar-archive"${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}>
+                <input id="avatar-pack-archive" class="avatar-import-input" type="file" accept=".zip,application/zip" data-avatar-archive>
+                <label class="scene-editor-button avatar-import-trigger${state.avatarImporting || !options.avatarImportUrl ? " is-disabled" : ""}" for="avatar-pack-archive">
                   ${state.avatarImporting ? copy.avatarImporting : copy.avatarImportButton}
-                </button>
+                </label>
                 <div class="meta">${copy.avatarImportSelect}</div>
               </div>
               <div class="meta">${escapeHtml(avatarArchiveLabel)}</div>
@@ -2673,14 +2732,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const actionEl = target?.closest<HTMLElement>("[data-action]");
     const action = actionEl?.dataset.action;
     if (!action) {
-      return;
-    }
-    if (action === "open-avatar-archive") {
-      const archiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
-      if (archiveInput) {
-        archiveInput.value = "";
-      }
-      archiveInput?.click();
       return;
     }
     if (!state.config) {
