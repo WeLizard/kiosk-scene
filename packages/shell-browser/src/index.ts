@@ -219,7 +219,11 @@ function resolveUrlAgainst(baseUrl: string, candidate: string): string {
 }
 
 function resolveBaseUrl(candidate: string): string {
-  return new URL(".", candidate).toString();
+  try {
+    return new URL(".", candidate).toString();
+  } catch {
+    return new URL(".", window.location.href).toString();
+  }
 }
 
 function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: string): AvatarManifestV1 {
