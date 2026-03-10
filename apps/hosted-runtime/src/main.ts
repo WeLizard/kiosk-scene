@@ -7,6 +7,7 @@ import {
   type SceneShellLabels,
   type WeatherOverviewPayload,
 } from "@kiosk-scene/shell-browser";
+import { sanitizeAvatarManifestV1, type AvatarManifestV1 } from "@kiosk-scene/core";
 import "@kiosk-scene/shell-browser/styles";
 import { mountNativeEditorShell } from "./editor-mode";
 
@@ -77,6 +78,8 @@ interface HostedRendererConfig {
 const DEFAULT_BOOTSTRAP_URL = "../scene-api/bootstrap";
 const WEATHER_ENTITY = "weather.forecast_home_assistant";
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast?latitude=60.0712&longitude=30.3923&current=temperature_2m,relative_humidity_2m,apparent_temperature,surface_pressure,wind_speed_10m,cloud_cover,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Europe%2FMoscow&forecast_days=6";
+const LEGACY_LIVE2D_PREFIX = "/local/live2d/";
+const SCENE_LEGACY_LIVE2D_PREFIX = "/scene-legacy/live2d/";
 
 const NEIRI_COPY_RU = {
   ...DEFAULT_SCENE_SHELL_COPY_EN,
@@ -261,7 +264,7 @@ function resolveIngressRoot(bootstrapUrl: string): string | null {
 }
 
 function resolveHostedUrl(value: string, bootstrapUrl: string): string {
-  const normalized = String(value || "").trim();
+  const normalized = remapLegacyHostedUrl(String(value || "").trim(), bootstrapUrl);
   if (!normalized) {
     return "";
   }
@@ -277,6 +280,56 @@ function resolveHostedUrl(value: string, bootstrapUrl: string): string {
     }
   }
   return new URL(normalized, bootstrapBase).toString();
+}
+
+function remapLegacyHostedUrl(value: string, bootstrapUrl: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.startsWith(LEGACY_LIVE2D_PREFIX)) {
+    return `${SCENE_LEGACY_LIVE2D_PREFIX}${normalized.slice(LEGACY_LIVE2D_PREFIX.length)}`;
+  }
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
+    try {
+      const parsed = new URL(normalized, new URL(bootstrapUrl, window.location.href));
+      if (parsed.pathname.startsWith(LEGACY_LIVE2D_PREFIX)) {
+        const relativePath = parsed.pathname.slice(LEGACY_LIVE2D_PREFIX.length);
+        const remapped = resolveHostedUrl(
+          `${SCENE_LEGACY_LIVE2D_PREFIX}${relativePath}${parsed.search}${parsed.hash}`,
+          bootstrapUrl,
+        );
+        return remapped || normalized;
+      }
+    } catch {
+      return normalized;
+    }
+  }
+  return normalized;
+}
+
+function normalizeHostedAvatarManifest(
+  manifest: AvatarManifestV1,
+  manifestUrl: string,
+  bootstrapUrl: string,
+): AvatarManifestV1 {
+  const normalized = sanitizeAvatarManifestV1(manifest);
+  const presetThumbs = Object.fromEntries(
+    Object.entries(normalized.presetThumbs || {})
+      .map(([key, value]) => [key, resolveHostedUrl(String(value || ""), manifestUrl)])
+      .filter(([, value]) => Boolean(value)),
+  );
+
+  return {
+    ...normalized,
+    assetRoot: resolveHostedUrl(String(normalized.assetRoot || "").trim(), manifestUrl),
+    runtimeUrl: resolveHostedUrl(String(normalized.runtimeUrl || "").trim(), manifestUrl),
+    entry: remapLegacyHostedUrl(String(normalized.entry || "").trim(), bootstrapUrl),
+    modelUrl: remapLegacyHostedUrl(String(normalized.modelUrl || "").trim(), bootstrapUrl),
+    fallbackPortrait: remapLegacyHostedUrl(String(normalized.fallbackPortrait || "").trim(), bootstrapUrl),
+    motionMapUrl: remapLegacyHostedUrl(String(normalized.motionMapUrl || "").trim(), bootstrapUrl),
+    presetThumbs,
+  };
 }
 
 function renderStatus(root: HTMLElement, title: string, body: string, details?: string): void {
@@ -516,43 +569,54 @@ async function resolveRuntimeRendererConfigUrl(
     String(bootstrap.files?.avatarCatalogUrl || "").trim(),
     bootstrapUrl,
   );
-  if (!sceneConfigUrl || !avatarCatalogUrl) {
-    return rendererConfigUrl;
-  }
-
   let selectedAvatarPackId = "";
-  try {
-    const sceneConfig = await readJson<HostedSceneConfig>(sceneConfigUrl);
-    selectedAvatarPackId = String(sceneConfig.avatar?.packId || "").trim();
-  } catch {
-    selectedAvatarPackId = "";
-  }
-  if (!selectedAvatarPackId) {
-    return rendererConfigUrl;
+  if (sceneConfigUrl && avatarCatalogUrl) {
+    try {
+      const sceneConfig = await readJson<HostedSceneConfig>(sceneConfigUrl);
+      selectedAvatarPackId = String(sceneConfig.avatar?.packId || "").trim();
+    } catch {
+      selectedAvatarPackId = "";
+    }
   }
 
   let selectedAvatarManifestUrl = "";
-  try {
-    const avatarCatalog = await readJson<AvatarCatalogPayload>(avatarCatalogUrl);
-    const selectedAvatar = Array.isArray(avatarCatalog.items)
-      ? avatarCatalog.items.find((item) => String(item.id || "").trim() === selectedAvatarPackId)
-      : null;
-    selectedAvatarManifestUrl = resolveHostedUrl(String(selectedAvatar?.manifestUrl || "").trim(), bootstrapUrl);
-  } catch {
-    selectedAvatarManifestUrl = "";
-  }
-  if (!selectedAvatarManifestUrl) {
-    return rendererConfigUrl;
+  if (selectedAvatarPackId && avatarCatalogUrl) {
+    try {
+      const avatarCatalog = await readJson<AvatarCatalogPayload>(avatarCatalogUrl);
+      const selectedAvatar = Array.isArray(avatarCatalog.items)
+        ? avatarCatalog.items.find((item) => String(item.id || "").trim() === selectedAvatarPackId)
+        : null;
+      selectedAvatarManifestUrl = resolveHostedUrl(String(selectedAvatar?.manifestUrl || "").trim(), bootstrapUrl);
+    } catch {
+      selectedAvatarManifestUrl = "";
+    }
   }
 
   const rendererConfig = absolutizeRendererConfig(
     await readJson<HostedRendererConfig>(rendererConfigUrl),
     rendererConfigUrl,
   );
+  const activeAvatarManifestUrl = selectedAvatarManifestUrl || String(rendererConfig.avatar?.manifestUrl || "").trim();
+  if (!activeAvatarManifestUrl) {
+    return URL.createObjectURL(
+      new Blob([JSON.stringify(rendererConfig)], { type: "application/json" }),
+    );
+  }
+
+  const resolvedAvatarManifestUrl = resolveHostedUrl(activeAvatarManifestUrl, bootstrapUrl);
+  const normalizedAvatarManifest = normalizeHostedAvatarManifest(
+    await readJson<AvatarManifestV1>(resolvedAvatarManifestUrl),
+    resolvedAvatarManifestUrl,
+    bootstrapUrl,
+  );
+  const avatarManifestBlobUrl = URL.createObjectURL(
+    new Blob([JSON.stringify(normalizedAvatarManifest)], { type: "application/json" }),
+  );
+
   const overriddenConfig: HostedRendererConfig = {
     ...rendererConfig,
     avatar: {
-      manifestUrl: selectedAvatarManifestUrl,
+      manifestUrl: avatarManifestBlobUrl,
     },
   };
 
