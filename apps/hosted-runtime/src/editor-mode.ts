@@ -10,7 +10,6 @@ type EditorCopy = {
   previewSubtitle: string;
   previewDisplay: string;
   previewResolution: string;
-  previewApplyProfile: string;
   dashboardTitle: string;
   dashboardSubtitle: string;
   statusLoading: string;
@@ -36,6 +35,8 @@ type EditorCopy = {
   avatarCapabilityMotion: string;
   avatarCapabilityEmotion: string;
   avatarCapabilityLipSync: string;
+  avatarCapabilityViewPresets: string;
+  avatarCapabilityPointerFocus: string;
   avatarImport: string;
   avatarImportHint: string;
   avatarImportSelect: string;
@@ -65,6 +66,7 @@ type EditorCopy = {
   avatarSemanticGreet: string;
   avatarSemanticSpeaking: string;
   pages: string;
+  pageOrderHint: string;
   pageKind: string;
   pageCards: (count: number) => string;
   inspector: string;
@@ -72,6 +74,7 @@ type EditorCopy = {
   displaySettings: string;
   displaySubtitle: string;
   cards: string;
+  cardOrderHint: string;
   cardsSubtitle: string;
   cardInspector: string;
   cardInspectorEmpty: string;
@@ -141,6 +144,7 @@ type EditorCopy = {
 export interface NativeEditorShellOptions {
   packId: string;
   sceneApiUrl: string;
+  sceneAvatarManifestUrl?: string;
   avatarCatalogUrl?: string;
   avatarImportUrl?: string;
   avatarPackApiUrl?: string;
@@ -197,7 +201,6 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewSubtitle: "Сверху показывается превью выбранного экрана с правильными пропорциями. Оно автоматически вмещается по ширине редактора.",
     previewDisplay: "Экран для проверки",
     previewResolution: "Разрешение",
-    previewApplyProfile: "Подставить в настройки экрана",
     dashboardTitle: "Панель настройки сцены",
     dashboardSubtitle: "Вся настройка расположена ниже превью как длинная редакторская страница.",
     statusLoading: "Загружаю конфигурацию сцены...",
@@ -223,6 +226,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarCapabilityMotion: "Анимации",
     avatarCapabilityEmotion: "Эмоции",
     avatarCapabilityLipSync: "Липсинк",
+    avatarCapabilityViewPresets: "Ракурсы",
+    avatarCapabilityPointerFocus: "Фокус",
     avatarImport: "Импорт аватара",
     avatarImportHint: "Импорт сразу создаёт отдельный avatar-pack, находит model3.json и подготавливает черновик motion-map.",
     avatarImportSelect: "ZIP-архив Live2D-модели",
@@ -232,7 +237,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarImportSuccess: (name) => `Импортирован avatar-pack: ${name}`,
     avatarImportError: "Не удалось импортировать avatar-pack",
     avatarMapping: "Маппинг анимаций",
-    avatarMappingSubtitle: "Здесь задаётся, какие движения модель использует для semantic cue/activity в runtime.",
+    avatarMappingSubtitle: "Здесь задаётся, какие движения модель использует для внешних команд runtime/OpenClaw.",
     avatarMappingEmpty: "У встроенной модели нет отдельного motion-map редактора.",
     avatarMappingLoading: "Загружаю motion-map avatar-pack...",
     avatarMappingLoadError: "Не удалось загрузить motion-map avatar-pack",
@@ -252,14 +257,16 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarSemanticGreet: "Приветствие",
     avatarSemanticSpeaking: "Речь",
     pages: "Страницы",
+    pageOrderHint: "Страницы можно перетаскивать; этот порядок используется каруселью справа.",
     pageKind: "Тип",
     pageCards: (count) => `${count} карточ${count === 1 ? "ка" : count < 5 ? "ки" : "ек"}`,
     inspector: "Инспектор",
-    pageSettings: "Параметры страницы",
-    displaySettings: "Дисплей и врезка",
-    displaySubtitle: "Подстройка под физический экран, safe area и общий масштаб сцены.",
+    pageSettings: "Выбранная страница",
+    displaySettings: "Экран и масштаб",
+    displaySubtitle: "Только safe area, внутренние отступы и общий масштаб. Профиль сверху меняет само превью автоматически.",
     cards: "Карточки",
-    cardsSubtitle: "Сначала выбери или добавь карточку, затем настрой её ниже. Порядок здесь же влияет на правую карусель.",
+    cardOrderHint: "Карточки тоже можно перетаскивать. Их порядок сразу отражается в выбранной странице справа.",
+    cardsSubtitle: "Сначала добавь шаблон или выбери карточку из списка, затем настрой её ниже.",
     cardInspector: "Настройка карточки",
     cardInspectorEmpty: "Добавь карточку из шаблона выше или выбери существующую карточку из списка.",
     cardTemplates: "Шаблоны карточек",
@@ -312,7 +319,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     cardTime: "Время",
     cardPercent: "Процент",
     cardNumber: "Число",
-    homeAssistant: "Home Assistant",
+    homeAssistant: "Привязка Home Assistant",
     entitySearch: "Поиск сущностей",
     entityBindingTargets: "Куда привязывать",
     entityBinding: "Связать с полем",
@@ -331,7 +338,6 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewSubtitle: "The top stage previews the selected screen with the correct aspect ratio. It automatically fits the available editor width.",
     previewDisplay: "Screen profile",
     previewResolution: "Resolution",
-    previewApplyProfile: "Fill display settings below",
     dashboardTitle: "Scene Settings Dashboard",
     dashboardSubtitle: "All configuration lives below the preview as a normal scrollable page.",
     statusLoading: "Loading scene config...",
@@ -357,6 +363,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarCapabilityMotion: "Motion",
     avatarCapabilityEmotion: "Emotion",
     avatarCapabilityLipSync: "LipSync",
+    avatarCapabilityViewPresets: "View presets",
+    avatarCapabilityPointerFocus: "Pointer focus",
     avatarImport: "Import avatar",
     avatarImportHint: "Import creates a separate avatar pack, detects model3.json and prepares a draft motion map.",
     avatarImportSelect: "Choose avatar ZIP",
@@ -366,7 +374,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarImportSuccess: (name) => `Imported avatar pack: ${name}`,
     avatarImportError: "Failed to import avatar pack",
     avatarMapping: "Animation mapping",
-    avatarMappingSubtitle: "Map semantic cue/activity slots to actual model motions used by the runtime.",
+    avatarMappingSubtitle: "Map external runtime/OpenClaw commands to actual model motions.",
     avatarMappingEmpty: "The bundled scene model does not have a separate motion-map editor.",
     avatarMappingLoading: "Loading avatar pack motion map...",
     avatarMappingLoadError: "Failed to load avatar pack motion map",
@@ -386,14 +394,16 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarSemanticGreet: "Greet",
     avatarSemanticSpeaking: "Speaking",
     pages: "Pages",
+    pageOrderHint: "Pages can be dragged around; this order is used by the carousel on the right.",
     pageKind: "Kind",
     pageCards: (count) => `${count} cards`,
     inspector: "Inspector",
-    pageSettings: "Page settings",
-    displaySettings: "Display fit",
-    displaySubtitle: "Tune safe areas, spacing and overall scale for the physical screen.",
+    pageSettings: "Selected page",
+    displaySettings: "Screen and scale",
+    displaySubtitle: "Only safe area, inner spacing and global scale live here. The screen profile above already drives the preview.",
     cards: "Cards",
-    cardsSubtitle: "Add or choose a card first, then edit it below. The order here drives the right-hand carousel.",
+    cardOrderHint: "Cards can also be dragged. Their order is reflected on the selected page immediately.",
+    cardsSubtitle: "Add a template or choose an existing card first, then edit it below.",
     cardInspector: "Card inspector",
     cardInspectorEmpty: "Add a card from the templates above or choose an existing one from the list.",
     cardTemplates: "Card templates",
@@ -446,7 +456,7 @@ const COPY: Record<UiLang, EditorCopy> = {
     cardTime: "time",
     cardPercent: "percent",
     cardNumber: "number",
-    homeAssistant: "Home Assistant",
+    homeAssistant: "Home Assistant binding",
     entitySearch: "Search entities",
     entityBindingTargets: "Binding target",
     entityBinding: "Bind into field",
@@ -469,6 +479,7 @@ type EditorState = {
   status: string;
   statusTone: "muted" | "ok" | "bad";
   haEntities: HaEntitySummary[];
+  bundledAvatar: AvatarPackSummary | null;
   avatarCatalog: AvatarPackSummary[];
   entitySearch: string;
   focusedBinding: { cardIndex: number; field: string } | null;
@@ -502,6 +513,8 @@ type AvatarPackSummary = {
     supportsMotion?: boolean;
     supportsEmotion?: boolean;
     supportsLipSync?: boolean;
+    supportsViewPresets?: boolean;
+    supportsPointerFocus?: boolean;
   };
 };
 
@@ -838,19 +851,6 @@ function ensureAvatarConfig(config: SceneConfigV1): NonNullable<SceneConfigV1["a
   return config.avatar;
 }
 
-function applyDisplayProfile(config: SceneConfigV1, profile: PreviewDisplayProfile): void {
-  const display = ensureDisplayConfig(config);
-  const safeArea = display.safeArea || {};
-  safeArea.top = profile.displayDefaults.safeTop;
-  safeArea.right = profile.displayDefaults.safeRight;
-  safeArea.bottom = profile.displayDefaults.safeBottom;
-  safeArea.left = profile.displayDefaults.safeLeft;
-  display.safeArea = safeArea;
-  display.layoutPaddingPx = profile.displayDefaults.layoutPaddingPx;
-  display.layoutGapPx = profile.displayDefaults.layoutGapPx;
-  display.globalScale = profile.displayDefaults.globalScale;
-}
-
 function focusScenePageByIndex(index: number): void {
   const dot = document.querySelector<HTMLButtonElement>(`.carousel-dot[data-slide-index="${index}"]`);
   dot?.click();
@@ -1006,6 +1006,98 @@ function filterHaEntityCatalog(catalog: HaEntitySummary[], query: string): HaEnt
     .slice(0, 48);
 }
 
+function resolveEditorUrl(value: string, baseUrl: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  return new URL(normalized, baseUrl).toString();
+}
+
+function ensureDirectoryUrl(value: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  return normalized.endsWith("/") ? normalized : `${normalized}/`;
+}
+
+function resolveAvatarAssetBaseUrl(manifestUrl: string, assetRoot: string): string {
+  const manifestDirUrl = new URL("./", manifestUrl).toString();
+  const resolvedRoot = resolveEditorUrl(assetRoot, manifestDirUrl);
+  return ensureDirectoryUrl(resolvedRoot || manifestDirUrl);
+}
+
+function resolveAvatarAssetUrl(manifestUrl: string, assetRoot: string, value: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  return resolveEditorUrl(normalized, resolveAvatarAssetBaseUrl(manifestUrl, assetRoot));
+}
+
+function normalizeAvatarSummary(item: Partial<AvatarPackSummary>): AvatarPackSummary {
+  return {
+    id: String(item.id || "").trim(),
+    name: String(item.name || item.id || "").trim(),
+    manifestUrl: String(item.manifestUrl || "").trim(),
+    previewUrl: String(item.previewUrl || "").trim(),
+    motionCount: Number(item.motionCount || 0),
+    capabilities: typeof item.capabilities === "object" && item.capabilities
+      ? {
+          supportsMotion: Boolean(item.capabilities.supportsMotion),
+          supportsEmotion: Boolean(item.capabilities.supportsEmotion),
+          supportsLipSync: Boolean(item.capabilities.supportsLipSync),
+          supportsViewPresets: Boolean(item.capabilities.supportsViewPresets),
+          supportsPointerFocus: Boolean(item.capabilities.supportsPointerFocus),
+        }
+      : undefined,
+  };
+}
+
+async function loadBundledAvatarSummary(manifestUrl: string, packId: string): Promise<AvatarPackSummary | null> {
+  const target = String(manifestUrl || "").trim();
+  if (!target) {
+    return null;
+  }
+
+  const response = await fetch(target, { cache: "no-store" });
+  const manifest = await response.json() as {
+    name?: string;
+    assetRoot?: string;
+    fallbackPortrait?: string;
+    motionMapUrl?: string;
+    capabilities?: Partial<AvatarPackSummary["capabilities"]>;
+  };
+  if (!response.ok) {
+    throw new Error(`GET ${target} failed: HTTP ${response.status}`);
+  }
+
+  const assetRoot = String(manifest.assetRoot || "").trim();
+  let motionCount = 0;
+  const motionMapUrl = resolveAvatarAssetUrl(target, assetRoot, String(manifest.motionMapUrl || "").trim());
+  if (motionMapUrl) {
+    try {
+      const motionMapResponse = await fetch(motionMapUrl, { cache: "no-store" });
+      const motionMap = await motionMapResponse.json() as { motions?: unknown[] };
+      if (motionMapResponse.ok && Array.isArray(motionMap.motions)) {
+        motionCount = motionMap.motions.length;
+      }
+    } catch {
+      motionCount = 0;
+    }
+  }
+
+  return normalizeAvatarSummary({
+    id: "",
+    name: String(manifest.name || "").trim() || packId || "",
+    manifestUrl: target,
+    previewUrl: resolveAvatarAssetUrl(target, assetRoot, String(manifest.fallbackPortrait || "").trim()),
+    motionCount,
+    capabilities: manifest.capabilities,
+  });
+}
+
 async function loadAvatarCatalog(url: string): Promise<AvatarPackSummary[]> {
   const target = String(url || "").trim();
   if (!target) {
@@ -1018,20 +1110,7 @@ async function loadAvatarCatalog(url: string): Promise<AvatarPackSummary[]> {
   }
   return Array.isArray(payload.items)
     ? payload.items
-      .map((item) => ({
-        id: String(item.id || "").trim(),
-        name: String(item.name || item.id || "").trim(),
-        manifestUrl: String(item.manifestUrl || "").trim(),
-        previewUrl: String(item.previewUrl || "").trim(),
-        motionCount: Number(item.motionCount || 0),
-        capabilities: typeof item.capabilities === "object" && item.capabilities
-          ? {
-              supportsMotion: Boolean(item.capabilities.supportsMotion),
-              supportsEmotion: Boolean(item.capabilities.supportsEmotion),
-              supportsLipSync: Boolean(item.capabilities.supportsLipSync),
-            }
-          : undefined,
-      }))
+      .map((item) => normalizeAvatarSummary(item))
       .filter((item) => item.id && item.manifestUrl)
     : [];
 }
@@ -1051,20 +1130,7 @@ async function importAvatarPack(url: string, archive: File): Promise<AvatarPackS
   if (!response.ok || payload.success === false || !payload.item) {
     throw new Error(String(payload.error || `HTTP ${response.status}`));
   }
-  return {
-    id: String(payload.item.id || "").trim(),
-    name: String(payload.item.name || payload.item.id || "").trim(),
-    manifestUrl: String(payload.item.manifestUrl || "").trim(),
-    previewUrl: String(payload.item.previewUrl || "").trim(),
-    motionCount: Number(payload.item.motionCount || 0),
-    capabilities: typeof payload.item.capabilities === "object" && payload.item.capabilities
-      ? {
-          supportsMotion: Boolean(payload.item.capabilities.supportsMotion),
-          supportsEmotion: Boolean(payload.item.capabilities.supportsEmotion),
-          supportsLipSync: Boolean(payload.item.capabilities.supportsLipSync),
-        }
-      : undefined,
-  };
+  return normalizeAvatarSummary(payload.item);
 }
 
 async function loadAvatarPackDetails(url: string, packId: string): Promise<AvatarPackDetails> {
@@ -1206,8 +1272,11 @@ function renderAvatarPackTile(
         item.capabilities?.supportsMotion ? copy.avatarCapabilityMotion : "",
         item.capabilities?.supportsEmotion ? copy.avatarCapabilityEmotion : "",
         item.capabilities?.supportsLipSync ? copy.avatarCapabilityLipSync : "",
+        item.capabilities?.supportsViewPresets ? copy.avatarCapabilityViewPresets : "",
+        item.capabilities?.supportsPointerFocus ? copy.avatarCapabilityPointerFocus : "",
       ].filter(Boolean)
     : [copy.avatarPackDefaultHint];
+  const metaTags = tags.length ? tags : [copy.avatarPackDefaultHint];
 
   return `
     <article class="avatar-pack-card${isSelected ? " is-active" : ""}">
@@ -1220,7 +1289,7 @@ function renderAvatarPackTile(
         <strong>${escapeHtml(title)}</strong>
         <div class="meta">${escapeHtml(subtitle)}</div>
         <div class="avatar-pack-card-meta">
-          ${tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
+          ${metaTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
         </div>
         <button class="scene-editor-button${isSelected ? " is-accent" : ""}" type="button" data-action="select-avatar-pack" data-pack-id="${escapeHtml(packId)}">
           ${escapeHtml(isSelected ? copy.avatarPackSelected : copy.avatarPackSelect)}
@@ -1532,6 +1601,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         padding: 4px 0 8px;
         display: flex;
         justify-content: center;
+        align-items: flex-start;
       }
       #scene-editor-shell .scene-preview-hint {
         display: flex;
@@ -1660,11 +1730,20 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         font: 12px/1.4 "Aptos","Segoe UI",sans-serif;
         color: rgba(32,48,65,0.66);
       }
-      #scene-editor-shell .page-list,
       #scene-editor-shell .cards-list,
       #scene-editor-shell .scene-settings-stack {
         display: grid;
         gap: 10px;
+      }
+      #scene-editor-shell .page-list {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(240px, 280px);
+        gap: 12px;
+        overflow-x: auto;
+        padding: 2px 2px 8px;
+        align-items: stretch;
+        scrollbar-width: thin;
       }
       #scene-editor-shell .ha-list {
         display: grid;
@@ -1763,6 +1842,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         border-radius: 18px;
         border: 1px solid rgba(32,48,65,0.08);
         background: rgba(255,255,255,0.86);
+      }
+      #scene-editor-shell .page-chip {
+        min-width: 0;
+        align-content: space-between;
       }
       #scene-editor-shell .page-chip.is-active {
         border-color: rgba(77,147,121,0.34);
@@ -1899,6 +1982,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         #scene-editor-shell .field-binding-row {
           grid-template-columns: 1fr;
         }
+        #scene-editor-shell .page-list {
+          grid-auto-columns: minmax(220px, 84vw);
+        }
       }
     </style>
     <div class="scene-editor-page">
@@ -1919,7 +2005,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               <span>${copy.previewResolution}</span>
               <strong data-preview-resolution>1920 × 1080</strong>
             </div>
-            <button class="scene-editor-button" type="button" data-action="apply-display-profile">${copy.previewApplyProfile}</button>
           </div>
         </div>
         <div class="scene-preview-hint">
@@ -1959,6 +2044,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     status: copy.statusLoading,
     statusTone: "muted",
     haEntities: [],
+    bundledAvatar: null,
     avatarCatalog: [],
     entitySearch: "",
     focusedBinding: null,
@@ -1999,11 +2085,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   const applyPreviewLayout = (): void => {
     const profile = resolvePreviewDisplayProfile(state.previewDisplayId);
     const availableWidth = Math.max(320, previewStage.parentElement?.clientWidth || previewStage.clientWidth || profile.width);
-    const scale = Math.min(1, availableWidth / profile.width);
+    const maxPreviewHeight = Math.max(260, Math.min(window.innerHeight * 0.62, 760));
+    const scale = Math.min(1, availableWidth / profile.width, maxPreviewHeight / profile.height);
     const scaledWidth = Math.round(profile.width * scale);
     const scaledHeight = Math.round(profile.height * scale);
     previewDisplaySelect.value = profile.id;
     previewResolution.textContent = formatPreviewResolution(profile);
+    previewStage.style.aspectRatio = `${profile.width} / ${profile.height}`;
     previewStage.style.width = `${scaledWidth}px`;
     previewStage.style.height = `${scaledHeight}px`;
     previewCanvas.style.width = `${profile.width}px`;
@@ -2114,6 +2202,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       : "";
     const hasSeparateAvatarPacks = state.avatarCatalog.length > 0;
     const avatarPackMeta = hasSeparateAvatarPacks ? copy.avatarPackHint : copy.avatarPackEmpty;
+    const selectedPageMeta = selectedPage
+      ? `${selectedPage.title || selectedPage.id || copy.pageSettings} · ${pageKindLabel(copy, selectedPage.kind)}`
+      : copy.statusLoading;
 
     dashboardHost.innerHTML = `
       <div class="scene-dashboard-topbar">
@@ -2130,7 +2221,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       </div>
       <div class="scene-dashboard-body">
         <div class="scene-settings-stack">
-          <section class="scene-settings-card" data-editor-section="pages">
+          <section class="scene-settings-card">
             <div class="scene-settings-head">
               <h2>${copy.avatar}</h2>
               <div class="meta">${copy.avatarSubtitle}</div>
@@ -2140,7 +2231,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               <div class="meta">${avatarPackMeta}</div>
               <div class="meta">${copy.avatarPackAppliedAfterSave}</div>
               <div class="avatar-pack-grid">
-                ${renderAvatarPackTile(copy, null, selectedAvatarPackId)}
+                ${renderAvatarPackTile(copy, state.bundledAvatar, selectedAvatarPackId)}
                 ${state.avatarCatalog.map((item) => renderAvatarPackTile(copy, item, selectedAvatarPackId)).join("")}
               </div>
             </div>
@@ -2164,10 +2255,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               : ""}
           ` : `<div class="meta">${copy.statusLoading}</div>`}
           </section>
-          <section class="scene-settings-card" data-editor-section="cards">
+          <section class="scene-settings-card" data-editor-section="pages">
             <div class="scene-settings-head">
               <h2>${copy.pages}</h2>
               <div class="meta">${copy.subtitle(options.packId)}</div>
+              <div class="meta">${copy.pageOrderHint}</div>
             </div>
             <div class="page-list">
             ${ordered.map((page, index) => `
@@ -2185,10 +2277,10 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             `).join("") || `<div class="meta">${copy.statusLoading}</div>`}
             </div>
           </section>
-          <section class="scene-settings-card" data-editor-section="homeAssistant">
+          <section class="scene-settings-card">
             <div class="scene-settings-head">
-              <h2>${copy.inspector}</h2>
-              <div class="meta">${copy.pageSettings}</div>
+              <h2>${copy.pageSettings}</h2>
+              <div class="meta">${escapeHtml(selectedPageMeta)}</div>
             </div>
           ${selectedPage ? `
             <div class="inspector-grid">
@@ -2203,10 +2295,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
           ` : `<div class="meta">${copy.statusLoading}</div>`}
           </section>
-          <section class="scene-settings-card">
+          <section class="scene-settings-card" data-editor-section="cards">
             <div class="scene-settings-head">
               <h2>${copy.cards}</h2>
               <div class="meta">${copy.cardsSubtitle}</div>
+              <div class="meta">${copy.cardOrderHint}</div>
             </div>
           ${selectedPage ? `
             <div class="card-stack">
@@ -2256,42 +2349,36 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             <div class="meta">${copy.entityBindingTargets}</div>
             ${renderBindingTargets(copy, selectedCard, state.selectedCardIndex, state.focusedBinding)}
           </div>
-          <div class="field ha-search" style="margin-top:12px;">
-            <label for="ha-entity-search">${copy.entitySearch}</label>
-            <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
-          </div>
-          <div class="ha-list">
-            ${filteredEntities.length ? filteredEntities.map((entity) => `
-              <article class="ha-entity">
-                <div class="ha-entity-row">
-                  <div>
-                    <strong>${escapeHtml(entity.name)}</strong>
-                    <div class="meta">${escapeHtml(entity.domain)}</div>
+          ${state.focusedBinding ? `
+            <div class="field ha-search" style="margin-top:12px;">
+              <label for="ha-entity-search">${copy.entitySearch}</label>
+              <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
+            </div>
+            <div class="ha-list">
+              ${filteredEntities.length ? filteredEntities.map((entity) => `
+                <article class="ha-entity">
+                  <div class="ha-entity-row">
+                    <div>
+                      <strong>${escapeHtml(entity.name)}</strong>
+                      <div class="meta">${escapeHtml(entity.domain)}</div>
+                    </div>
+                    <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}">${copy.useEntity}</button>
                   </div>
-                  <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}"${state.focusedBinding ? "" : " disabled"}>${copy.useEntity}</button>
-                </div>
-                <code>${escapeHtml(entity.entityId)}</code>
-                <div class="ha-state">${escapeHtml(entity.state)}${entity.unit ? ` · ${escapeHtml(entity.unit)}` : ""}</div>
-              </article>
-            `).join("") : `<div class="meta">${copy.noEntities}</div>`}
-          </div>
+                  <code>${escapeHtml(entity.entityId)}</code>
+                  <div class="ha-state">${escapeHtml(entity.state)}${entity.unit ? ` · ${escapeHtml(entity.unit)}` : ""}</div>
+                </article>
+              `).join("") : `<div class="meta">${copy.noEntities}</div>`}
+            </div>
+          ` : ""}
           </section>
         </div>
       </div>
     `;
-
-    const livePreviewDisplaySelect = dashboardHost.querySelector<HTMLSelectElement>("[data-preview-display]");
-    livePreviewDisplaySelect?.addEventListener("change", () => {
-      handlePreviewDisplaySelection(livePreviewDisplaySelect.value);
-    });
-    livePreviewDisplaySelect?.addEventListener("input", () => {
-      handlePreviewDisplaySelection(livePreviewDisplaySelect.value);
-    });
-
     const liveAvatarArchiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
     liveAvatarArchiveInput?.addEventListener("change", () => {
       const archive = liveAvatarArchiveInput.files?.[0] || null;
       handleAvatarArchiveSelection(archive);
+      liveAvatarArchiveInput.value = "";
       if (archive) {
         void importAvatarArchive(archive);
       }
@@ -2588,15 +2675,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     if (!action) {
       return;
     }
-    if (action === "apply-display-profile" && state.config) {
-      const activePreviewDisplayId = previewDisplaySelect.value || state.previewDisplayId;
-      applyDisplayProfile(state.config, resolvePreviewDisplayProfile(activePreviewDisplayId));
-      markDirty();
-      render();
-      return;
-    }
     if (action === "open-avatar-archive") {
       const archiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
+      if (archiveInput) {
+        archiveInput.value = "";
+      }
       archiveInput?.click();
       return;
     }
@@ -2917,6 +3000,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
 
   try {
     state.config = await loadConfig(options.sceneApiUrl);
+    if (options.sceneAvatarManifestUrl) {
+      try {
+        state.bundledAvatar = await loadBundledAvatarSummary(options.sceneAvatarManifestUrl, options.packId);
+      } catch {
+        state.bundledAvatar = null;
+      }
+    }
     if (options.avatarCatalogUrl) {
       try {
         state.avatarCatalog = await loadAvatarCatalog(options.avatarCatalogUrl);

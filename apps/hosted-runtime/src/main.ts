@@ -618,6 +618,10 @@ void (async () => {
           String(bootstrap.sceneEditorApiUrl || "").trim(),
           bootstrapUrl,
         ),
+        sceneAvatarManifestUrl: resolveHostedUrl(
+          String(bootstrap.files?.avatarManifestUrl || "").trim(),
+          bootstrapUrl,
+        ),
         avatarCatalogUrl: resolveHostedUrl(
           String(bootstrap.files?.avatarCatalogUrl || "").trim(),
           bootstrapUrl,
