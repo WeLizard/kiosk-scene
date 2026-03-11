@@ -526,6 +526,8 @@ type AvatarPackSummary = {
 type AvatarImportPayload = {
   success?: boolean;
   item?: AvatarPackSummary;
+  uploadId?: string;
+  complete?: boolean;
   error?: string;
 };
 
@@ -559,6 +561,8 @@ const AVATAR_SEMANTIC_FIELDS = [
   { key: "greet", labelKey: "avatarSemanticGreet" },
   { key: "speaking", labelKey: "avatarSemanticSpeaking" },
 ] as const;
+
+const AVATAR_IMPORT_CHUNK_BYTES = 4 * 1024 * 1024;
 
 type AvatarSemanticField = (typeof AVATAR_SEMANTIC_FIELDS)[number];
 
@@ -1201,6 +1205,42 @@ async function importAvatarPack(url: string, archive: File): Promise<AvatarPackS
   const target = String(url || "").trim();
   if (!target) {
     throw new Error("Avatar import API is not configured.");
+  }
+  if (archive.size > AVATAR_IMPORT_CHUNK_BYTES) {
+    const uploadId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const chunkCount = Math.max(1, Math.ceil(archive.size / AVATAR_IMPORT_CHUNK_BYTES));
+    let importedSummary: AvatarPackSummary | null = null;
+    for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+      const start = chunkIndex * AVATAR_IMPORT_CHUNK_BYTES;
+      const end = Math.min(archive.size, start + AVATAR_IMPORT_CHUNK_BYTES);
+      const formData = new FormData();
+      formData.set("uploadId", uploadId);
+      formData.set("filename", archive.name);
+      formData.set("chunkIndex", String(chunkIndex));
+      formData.set("chunkCount", String(chunkCount));
+      formData.set(
+        "archive",
+        archive.slice(start, end, "application/zip"),
+        `${archive.name}.part-${chunkIndex + 1}-of-${chunkCount}`,
+      );
+      const response = await fetch(target, {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json() as AvatarImportPayload;
+      if (!response.ok || payload.success === false) {
+        throw new Error(String(payload.error || `HTTP ${response.status}`));
+      }
+      if (payload.item) {
+        importedSummary = normalizeAvatarSummaryWithBase(payload.item, target);
+      }
+    }
+    if (!importedSummary) {
+      throw new Error("Avatar import did not return the imported pack.");
+    }
+    return importedSummary;
   }
   const formData = new FormData();
   formData.set("archive", archive, archive.name);

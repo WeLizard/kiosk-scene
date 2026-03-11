@@ -9,6 +9,7 @@ import shutil
 import stat
 import tempfile
 import zipfile
+import uuid
 from email.parser import BytesParser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -44,6 +45,7 @@ SHARED_PRESET_BASE_URL = (
     os.environ.get("SCENE_SHARED_PRESET_BASE_URL", "../../scene-runtime/assets").strip()
     or "../../scene-runtime/assets"
 )
+AVATAR_UPLOADS_DIR = SCENE_ROOT / ".avatar-upload-sessions"
 
 
 def load_active_pack_id() -> str:
@@ -456,16 +458,15 @@ def write_avatar_pack(
     }
 
 
-def import_avatar_archive(filename: str, payload: bytes, requested_pack_id: str = "") -> dict[str, Any]:
+def import_avatar_archive_from_path(
+    filename: str, archive_path: Path, requested_pack_id: str = ""
+) -> dict[str, Any]:
     preferred_name = Path(filename or "").stem or requested_pack_id or "avatar-pack"
     pack_id = unique_pack_id(requested_pack_id or preferred_name)
     display_name = humanize_name(preferred_name)
 
     with tempfile.TemporaryDirectory(prefix="kiosk-scene-avatar-import-") as temp_dir_name:
         temp_dir = Path(temp_dir_name)
-        archive_path = temp_dir / "upload.zip"
-        archive_path.write_bytes(payload)
-
         extracted_dir = temp_dir / "extracted"
         extracted_dir.mkdir(parents=True, exist_ok=True)
         safe_extract_zip(archive_path, extracted_dir)
@@ -474,6 +475,13 @@ def import_avatar_archive(filename: str, payload: bytes, requested_pack_id: str 
             raise ValueError("Archive is empty.")
         model_info = inspect_model_bundle(content_root)
         return write_avatar_pack(pack_id, display_name, content_root, model_info)
+
+
+def import_avatar_archive(filename: str, payload: bytes, requested_pack_id: str = "") -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="kiosk-scene-avatar-import-upload-") as temp_dir_name:
+        archive_path = Path(temp_dir_name) / "upload.zip"
+        archive_path.write_bytes(payload)
+        return import_avatar_archive_from_path(filename, archive_path, requested_pack_id)
 
 
 def parse_multipart_form(body: bytes, content_type: str) -> tuple[dict[str, str], str, bytes]:
@@ -504,6 +512,77 @@ def parse_multipart_form(body: bytes, content_type: str) -> tuple[dict[str, str]
     if not filename or not file_payload:
         raise ValueError("Avatar ZIP file is missing.")
     return fields, filename, file_payload
+
+
+def resolve_avatar_upload_session_dir(upload_id: str) -> Path:
+    safe_id = slugify(upload_id or "")
+    if not safe_id:
+        raise ValueError("Avatar upload session id is missing.")
+    return AVATAR_UPLOADS_DIR / safe_id
+
+
+def handle_avatar_import_chunk(
+    fields: dict[str, str], fallback_filename: str, file_payload: bytes
+) -> dict[str, Any]:
+    upload_dir = resolve_avatar_upload_session_dir(str(fields.get("uploadId") or uuid.uuid4().hex))
+    chunk_index = int(str(fields.get("chunkIndex") or "0"))
+    chunk_count = int(str(fields.get("chunkCount") or "0"))
+    original_filename = str(fields.get("filename") or fallback_filename or "").strip()
+    requested_pack_id = str(fields.get("packId") or fields.get("slug") or "").strip()
+    if not original_filename:
+        raise ValueError("Avatar ZIP file is missing.")
+    if chunk_count <= 0:
+        raise ValueError("Chunk count must be greater than zero.")
+    if chunk_index < 0 or chunk_index >= chunk_count:
+        raise ValueError("Chunk index is out of range.")
+
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    meta_path = upload_dir / "meta.json"
+    parts_dir = upload_dir / "parts"
+    parts_dir.mkdir(parents=True, exist_ok=True)
+    next_meta = {
+        "filename": original_filename,
+        "packId": requested_pack_id,
+        "chunkCount": chunk_count,
+    }
+    if meta_path.exists():
+        current_meta = read_json_file(meta_path)
+        if (
+            str(current_meta.get("filename") or "") != original_filename
+            or int(current_meta.get("chunkCount") or 0) != chunk_count
+            or str(current_meta.get("packId") or "") != requested_pack_id
+        ):
+            shutil.rmtree(upload_dir, ignore_errors=True)
+            raise ValueError("Upload session parameters changed. Start the ZIP upload again.")
+    meta_path.write_text(json.dumps(next_meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (parts_dir / f"{chunk_index:06d}.part").write_bytes(file_payload)
+
+    if chunk_index < chunk_count - 1:
+        return {
+            "success": True,
+            "uploadId": upload_dir.name,
+            "complete": False,
+            "receivedChunk": chunk_index,
+            "chunkCount": chunk_count,
+        }
+
+    missing = [index for index in range(chunk_count) if not (parts_dir / f"{index:06d}.part").exists()]
+    if missing:
+        raise ValueError("ZIP upload is incomplete. Start the upload again.")
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="kiosk-scene-avatar-import-assemble-") as temp_dir_name:
+            archive_path = Path(temp_dir_name) / "upload.zip"
+            with archive_path.open("wb") as assembled:
+                for index in range(chunk_count):
+                    assembled.write((parts_dir / f"{index:06d}.part").read_bytes())
+            return import_avatar_archive_from_path(
+                filename=original_filename,
+                archive_path=archive_path,
+                requested_pack_id=requested_pack_id,
+            )
+    finally:
+        shutil.rmtree(upload_dir, ignore_errors=True)
 
 
 def load_avatar_catalog() -> dict[str, Any]:
@@ -757,11 +836,21 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(content_length)
         try:
             fields, filename, file_payload = parse_multipart_form(body, content_type)
-            result = import_avatar_archive(
-                filename=filename,
-                payload=file_payload,
-                requested_pack_id=str(fields.get("packId") or fields.get("slug") or "").strip(),
+            is_chunked_upload = any(
+                str(fields.get(key) or "").strip()
+                for key in ("uploadId", "chunkIndex", "chunkCount")
             )
+            if is_chunked_upload:
+                result = handle_avatar_import_chunk(fields, filename, file_payload)
+                if not result.get("complete", True):
+                    self.send_json(result)
+                    return
+            else:
+                result = import_avatar_archive(
+                    filename=filename,
+                    payload=file_payload,
+                    requested_pack_id=str(fields.get("packId") or fields.get("slug") or "").strip(),
+                )
             catalog = load_avatar_catalog()
             item = next(
                 (
