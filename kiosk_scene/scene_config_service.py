@@ -1697,6 +1697,53 @@ def order_pages(pages: list[dict[str, Any]], order: list[str]) -> list[dict[str,
     return ordered
 
 
+def is_placeholder_page_label(value: Any) -> bool:
+    normalized = trim_text(value, "", 64).lower()
+    if not normalized:
+        return False
+    return normalized == "page" or (
+        normalized.startswith("page ")
+        and normalized.removeprefix("page ").strip().isdigit()
+    )
+
+
+def card_has_meaningful_content(card: dict[str, Any]) -> bool:
+    for key, value in card.items():
+        if key == "type":
+            continue
+        if isinstance(value, str) and trim_text(value, "", 255):
+            return True
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return True
+        if isinstance(value, bool):
+            return True
+    return False
+
+
+def should_keep_display_page(page: dict[str, Any], index: int) -> bool:
+    kind = trim_text(page.get("kind"), "cards", 32)
+    if kind in ("overview", "forecast+cards"):
+        return True
+    cards = page.get("cards") if isinstance(page.get("cards"), list) else []
+    if cards:
+        return True
+    title = trim_text(page.get("title"), "", 64)
+    subtitle = trim_text(page.get("subtitle"), "", 140)
+    stamp_caption = trim_text(page.get("stampCaption"), "", 32)
+    stamp_value = trim_text(page.get("stampValue"), "", 32)
+    if subtitle or stamp_value:
+        return True
+    if not title:
+        return False
+    if (
+        is_placeholder_page_label(title)
+        or is_placeholder_page_label(page.get("id"))
+        or (index >= 1 and title == f"Page {index + 1}")
+    ):
+        return False
+    return not is_placeholder_page_label(stamp_caption)
+
+
 def compile_scene_display_config(config: dict[str, Any]) -> dict[str, Any]:
     payload = normalize_scene_config(config)
     rotation = payload.get("rotation") if isinstance(payload.get("rotation"), dict) else {}
@@ -1709,7 +1756,13 @@ def compile_scene_display_config(config: dict[str, Any]) -> dict[str, Any]:
         raw_pages = DEFAULT_SCENE_CONFIG["pages"]
 
     used_ids: set[str] = set()
-    pages = [sanitize_page(page, index, used_ids) for index, page in enumerate(raw_pages)]
+    pages: list[dict[str, Any]] = []
+    for index, page in enumerate(raw_pages):
+        sanitized = sanitize_page(page, index, used_ids)
+        cards = sanitized.get("cards") if isinstance(sanitized.get("cards"), list) else []
+        sanitized["cards"] = [card for card in cards if isinstance(card, dict) and card_has_meaningful_content(card)]
+        if should_keep_display_page(sanitized, index):
+            pages.append(sanitized)
 
     raw_order = [
         trim_text(item, "", 40)

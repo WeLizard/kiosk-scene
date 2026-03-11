@@ -23,6 +23,56 @@ export interface NormalizedSceneConfigV1 {
 
 export type SceneRuntimeConfigV1 = SceneDisplayConfigV1;
 
+function isPlaceholderPageLabel(value: string): boolean {
+  const normalized = trimText(value, 64).toLowerCase();
+  return normalized === "page" || /^page\s+\d+$/.test(normalized);
+}
+
+function hasMeaningfulCardContent(card: unknown): boolean {
+  if (!isObjectRecord(card)) {
+    return false;
+  }
+  for (const [key, rawValue] of Object.entries(card)) {
+    if (key === "type") {
+      continue;
+    }
+    if (typeof rawValue === "string" && trimText(rawValue, 255)) {
+      return true;
+    }
+    if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+      return true;
+    }
+    if (typeof rawValue === "boolean") {
+      return true;
+    }
+  }
+  return false;
+}
+
+function shouldKeepScenePage(page: ScenePageV1, index: number): boolean {
+  if (page.kind === "overview" || page.kind === "forecast+cards") {
+    return true;
+  }
+  const cards = Array.isArray(page.cards) ? page.cards.filter((card) => hasMeaningfulCardContent(card)) : [];
+  if (cards.length > 0) {
+    return true;
+  }
+  const title = trimText(page.title, 64);
+  const subtitle = trimText(page.subtitle || "", 140);
+  const stampCaption = trimText(page.stampCaption || "", 32);
+  const stampValue = trimText(page.stampValue || "", 32);
+  if (subtitle || stampValue) {
+    return true;
+  }
+  if (!title) {
+    return false;
+  }
+  if (isPlaceholderPageLabel(title) || isPlaceholderPageLabel(page.id) || (index >= 1 && title === `Page ${index + 1}`)) {
+    return false;
+  }
+  return !isPlaceholderPageLabel(stampCaption);
+}
+
 function normalizeNonNegativeNumber(value: unknown, fallback: number): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
@@ -102,8 +152,12 @@ export function normalizeSceneConfig(config: unknown, defaults: SceneConfigV1): 
 
   const pages = defaultPages.map((basePage) => {
     const incoming = incomingPages.find((page) => trimText(isObjectRecord(page) ? page.id : "", 40) === basePage.id);
-    return mergeScenePage(basePage, incoming);
-  });
+    const merged = mergeScenePage(basePage, incoming);
+    if (Array.isArray(merged.cards)) {
+      merged.cards = merged.cards.filter((card) => hasMeaningfulCardContent(card));
+    }
+    return merged;
+  }).filter((page, index) => shouldKeepScenePage(page, index));
 
   const incomingRotation = isObjectRecord(payload) && isObjectRecord(payload.rotation) ? payload.rotation : {};
   const defaultDisplay = isObjectRecord(defaults.display) ? defaults.display : {};

@@ -23,6 +23,17 @@ from typing import Any
 from urllib.parse import parse_qs, quote, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
+try:
+    from scene_config_service import (
+        compile_scene_display_config as compile_editor_scene_display_config,
+        normalize_scene_config as normalize_editor_scene_config,
+        write_json_atomic as write_editor_scene_json_atomic,
+    )
+except Exception:
+    compile_editor_scene_display_config = None
+    normalize_editor_scene_config = None
+    write_editor_scene_json_atomic = None
+
 
 HOST = os.environ.get("SCENE_HOST_BIND", "127.0.0.1")
 PORT = int(os.environ.get("SCENE_HOST_PORT", "48097"))
@@ -107,6 +118,41 @@ def load_active_pack_id() -> str:
     return DEFAULT_PACK_ID
 
 
+def ensure_display_scene_config(pack_id: str | None = None) -> None:
+    if (
+        compile_editor_scene_display_config is None
+        or normalize_editor_scene_config is None
+        or write_editor_scene_json_atomic is None
+    ):
+        return
+    resolved_pack_id = str(pack_id or load_active_pack_id()).strip() or DEFAULT_PACK_ID
+    pack_dir = PACKS_DIR / resolved_pack_id
+    primary_path = pack_dir / "scene.default.json"
+    display_path = pack_dir / DISPLAY_SCENE_CONFIG_FILENAME
+    if not primary_path.exists():
+        return
+    try:
+        payload = json.loads(primary_path.read_text(encoding="utf-8"))
+        normalized = normalize_editor_scene_config(payload)
+        compiled = compile_editor_scene_display_config(normalized)
+        serialized = json.dumps(compiled, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        current = ""
+        if display_path.exists():
+            try:
+                current = json.dumps(
+                    json.loads(display_path.read_text(encoding="utf-8")),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+            except Exception:
+                current = ""
+        if serialized != current:
+            write_editor_scene_json_atomic(display_path, compiled)
+    except Exception as exc:
+        logging.warning("Failed to refresh display scene config for %s: %s", resolved_pack_id, exc)
+
+
 def resolve_runtime_scene_config_name(pack_dir: Path) -> str:
     display_config_path = pack_dir / DISPLAY_SCENE_CONFIG_FILENAME
     if display_config_path.exists():
@@ -116,6 +162,7 @@ def resolve_runtime_scene_config_name(pack_dir: Path) -> str:
 
 def build_bootstrap() -> dict[str, Any]:
     pack_id = load_active_pack_id()
+    ensure_display_scene_config(pack_id)
     pack_dir = PACKS_DIR / pack_id
     pack_base_url = f"/scene-packs/{quote(pack_id)}/"
     runtime_scene_config_name = resolve_runtime_scene_config_name(pack_dir)

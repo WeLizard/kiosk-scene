@@ -1506,8 +1506,11 @@ export class BrowserSceneShellApp {
   }
 
   private async readWeatherData(): Promise<WeatherOverviewPayload> {
-    let payload: WeatherOverviewPatch = {
+    const defaultPayload: WeatherOverviewPatch = {
       ...(this.options.defaultWeather || {}),
+    };
+    let payload: WeatherOverviewPatch = {
+      ...defaultPayload,
     };
 
     try {
@@ -1516,6 +1519,9 @@ export class BrowserSceneShellApp {
     } catch {
       // Fallback file is optional.
     }
+
+    // Canonical runtime copy comes from the hosted/default pack, not from stale seeded weather.json labels.
+    payload = mergeWeatherSource(payload, defaultPayload);
 
     if (this.options.weatherReader) {
       try {
