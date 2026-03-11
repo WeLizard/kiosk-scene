@@ -78,13 +78,34 @@ function withTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
+function resolveIngressRoot(baseUrl: string): string {
+  try {
+    const parsed = new URL(baseUrl, window.location.href);
+    const match = parsed.pathname.match(/^\/api\/hassio_ingress\/[^/]+\//);
+    if (!match) {
+      return "";
+    }
+    return new URL(match[0], parsed.origin).toString();
+  } catch {
+    return "";
+  }
+}
+
 function resolveUrl(assetRoot: string, candidate: string): string {
   const normalized = trimText(candidate, 1024);
   if (!normalized) {
     return "";
   }
-  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized) || normalized.startsWith("/")) {
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
     return normalized;
+  }
+  if (normalized.startsWith("/")) {
+    const ingressRoot = resolveIngressRoot(assetRoot || window.location.href);
+    if (ingressRoot) {
+      return new URL(normalized.slice(1), ingressRoot).toString();
+    }
+    const baseOrigin = new URL(window.location.href).origin;
+    return new URL(normalized, baseOrigin).toString();
   }
   const base = new URL(withTrailingSlash(trimText(assetRoot, 1024) || "."), window.location.href);
   return new URL(normalized, base).toString();
@@ -95,8 +116,15 @@ function resolvePageUrl(candidate: string): string {
   if (!normalized) {
     return "";
   }
-  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized) || normalized.startsWith("/")) {
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
     return normalized;
+  }
+  if (normalized.startsWith("/")) {
+    const ingressRoot = resolveIngressRoot(window.location.href);
+    if (ingressRoot) {
+      return new URL(normalized.slice(1), ingressRoot).toString();
+    }
+    return new URL(normalized, new URL(window.location.href).origin).toString();
   }
   return new URL(normalized, window.location.href).toString();
 }

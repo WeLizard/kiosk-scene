@@ -208,15 +208,36 @@ function withTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
+function resolveIngressRoot(baseUrl: string): string {
+  try {
+    const parsed = new URL(baseUrl, window.location.href);
+    const match = parsed.pathname.match(/^\/api\/hassio_ingress\/[^/]+\//);
+    if (!match) {
+      return "";
+    }
+    return new URL(match[0], parsed.origin).toString();
+  } catch {
+    return "";
+  }
+}
+
 function resolveUrlAgainst(baseUrl: string, candidate: string): string {
   const normalized = trimText(candidate, 1024);
   if (!normalized) {
     return "";
   }
-  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized) || normalized.startsWith("/")) {
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
     return normalized;
   }
-  return new URL(normalized, baseUrl).toString();
+  const resolvedBase = new URL(baseUrl, window.location.href);
+  if (normalized.startsWith("/")) {
+    const ingressRoot = resolveIngressRoot(resolvedBase.toString());
+    if (ingressRoot) {
+      return new URL(normalized.slice(1), ingressRoot).toString();
+    }
+    return new URL(normalized, resolvedBase.origin).toString();
+  }
+  return new URL(normalized, resolvedBase).toString();
 }
 
 function resolveBaseUrl(candidate: string): string {
