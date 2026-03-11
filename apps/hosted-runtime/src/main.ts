@@ -335,6 +335,13 @@ function normalizeHostedAvatarManifest(
     }
     return normalizedValue;
   };
+  const remapManifestValue = (value: string): string => {
+    const normalizedValue = String(value || "").trim();
+    if (!normalizedValue) {
+      return "";
+    }
+    return resolveHostedUrl(normalizedValue, manifestUrl);
+  };
   const presetThumbs = Object.fromEntries(
     Object.entries(normalized.presetThumbs || {})
       .map(([key, value]) => [key, resolveHostedUrl(String(value || ""), manifestUrl)])
@@ -348,7 +355,7 @@ function normalizeHostedAvatarManifest(
     entry: remapHostedAssetValue(String(normalized.entry || "").trim()),
     modelUrl: remapHostedAssetValue(String(normalized.modelUrl || "").trim()),
     fallbackPortrait: remapHostedAssetValue(String(normalized.fallbackPortrait || "").trim()),
-    motionMapUrl: remapHostedAssetValue(String(normalized.motionMapUrl || "").trim()),
+    motionMapUrl: remapManifestValue(String(normalized.motionMapUrl || "").trim()),
     presetThumbs,
   };
 }
