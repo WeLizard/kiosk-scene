@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
 import email.policy
+import hashlib
 import json
 import logging
 import os
 import shutil
+import socket
 import stat
 import tempfile
 import threading
@@ -17,7 +20,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
@@ -54,6 +57,9 @@ HOME_ASSISTANT_API_URL = (
     os.environ.get("SCENE_HOME_ASSISTANT_API_URL", "http://supervisor/core/api").strip().rstrip("/")
     or "http://supervisor/core/api"
 )
+HOME_ASSISTANT_WS_URL = (
+    os.environ.get("SCENE_HOME_ASSISTANT_WS_URL", "").strip()
+)
 HOME_ASSISTANT_STATES_CACHE_TTL_MS = max(
     250,
     int(os.environ.get("SCENE_HA_STATES_CACHE_TTL_MS", "2000") or "2000"),
@@ -70,10 +76,19 @@ HOME_ASSISTANT_STREAM_KEEPALIVE_SEC = max(
     5.0,
     float(os.environ.get("SCENE_HA_STATES_STREAM_KEEPALIVE_SEC", "15.0") or "15.0"),
 )
+HOME_ASSISTANT_WS_RETRY_SEC = max(
+    2.0,
+    float(os.environ.get("SCENE_HA_WS_RETRY_SEC", "5.0") or "5.0"),
+)
 
 _ha_states_cache_lock = threading.Lock()
 _ha_states_cache_at = 0.0
 _ha_states_cache: list[dict[str, Any]] | None = None
+_ha_states_generation = 0
+_ha_states_condition = threading.Condition(_ha_states_cache_lock)
+_ha_ws_listener_started = False
+_ha_ws_snapshot_ready = False
+_ha_all_states_by_entity: dict[str, dict[str, Any]] = {}
 HOME_ASSISTANT_TOKEN_PATHS = (
     Path("/run/s6/container_environment/SUPERVISOR_TOKEN"),
     Path("/run/s6/container_environment/HASSIO_TOKEN"),
@@ -266,6 +281,102 @@ def is_home_assistant_entity_id(value: Any) -> bool:
     return bool(normalized and "." in normalized and " " not in normalized)
 
 
+def resolve_home_assistant_websocket_url() -> str:
+    explicit = HOME_ASSISTANT_WS_URL.strip()
+    if explicit:
+        return explicit
+    parsed = urlsplit(HOME_ASSISTANT_API_URL)
+    scheme = "wss" if parsed.scheme == "https" else "ws"
+    path = parsed.path.rstrip("/")
+    if path.endswith("/api"):
+        path = path[: -len("/api")]
+    return urlunsplit((scheme, parsed.netloc, f"{path}/websocket", "", ""))
+
+
+def load_home_assistant_token() -> str:
+    token = (
+        os.environ.get("SUPERVISOR_TOKEN", "").strip()
+        or os.environ.get("HASSIO_TOKEN", "").strip()
+    )
+    if token:
+        return token
+    for path in HOME_ASSISTANT_TOKEN_PATHS:
+        try:
+            token = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            token = ""
+        if token:
+            return token
+    return ""
+
+
+def update_home_assistant_states_snapshot(states: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    global _ha_states_cache
+    global _ha_states_cache_at
+    global _ha_states_generation
+    global _ha_ws_snapshot_ready
+
+    normalized: list[dict[str, Any]] = []
+    state_map: dict[str, dict[str, Any]] = {}
+    for item in states:
+        if not isinstance(item, dict):
+            continue
+        entity_id = str(item.get("entity_id") or "").strip()
+        if not entity_id:
+            continue
+        snapshot = dict(item)
+        normalized.append(snapshot)
+        state_map[entity_id] = snapshot
+
+    now_ms = time.monotonic() * 1000
+    with _ha_states_condition:
+        _ha_all_states_by_entity.clear()
+        _ha_all_states_by_entity.update(state_map)
+        _ha_states_cache = normalized
+        _ha_states_cache_at = now_ms
+        _ha_states_generation += 1
+        _ha_ws_snapshot_ready = True
+        _ha_states_condition.notify_all()
+        return list(_ha_states_cache)
+
+
+def apply_home_assistant_state_event(state: dict[str, Any] | None) -> None:
+    global _ha_states_cache
+    global _ha_states_cache_at
+    global _ha_states_generation
+
+    entity_id = str((state or {}).get("entity_id") or "").strip()
+    if not entity_id:
+        return
+
+    now_ms = time.monotonic() * 1000
+    with _ha_states_condition:
+        _ha_all_states_by_entity[entity_id] = dict(state)
+        _ha_states_cache = list(_ha_all_states_by_entity.values())
+        _ha_states_cache_at = now_ms
+        _ha_states_generation += 1
+        _ha_states_condition.notify_all()
+
+
+def remove_home_assistant_state(entity_id: str) -> None:
+    global _ha_states_cache
+    global _ha_states_cache_at
+    global _ha_states_generation
+
+    normalized = str(entity_id or "").strip()
+    if not normalized:
+        return
+    now_ms = time.monotonic() * 1000
+    with _ha_states_condition:
+        if normalized not in _ha_all_states_by_entity:
+            return
+        _ha_all_states_by_entity.pop(normalized, None)
+        _ha_states_cache = list(_ha_all_states_by_entity.values())
+        _ha_states_cache_at = now_ms
+        _ha_states_generation += 1
+        _ha_states_condition.notify_all()
+
+
 def collect_pack_home_assistant_entity_ids(pack_id: str | None = None) -> list[str]:
     resolved_pack_id = str(pack_id or load_active_pack_id()).strip() or DEFAULT_PACK_ID
     pack_dir = PACKS_DIR / resolved_pack_id
@@ -298,19 +409,7 @@ def collect_pack_home_assistant_entity_ids(pack_id: str | None = None) -> list[s
 
 
 def fetch_home_assistant_states() -> list[dict[str, Any]]:
-    token = (
-        os.environ.get("SUPERVISOR_TOKEN", "").strip()
-        or os.environ.get("HASSIO_TOKEN", "").strip()
-    )
-    if not token:
-        for path in HOME_ASSISTANT_TOKEN_PATHS:
-            try:
-                token = path.read_text(encoding="utf-8").strip()
-            except OSError:
-                token = ""
-            if token:
-                break
-
+    token = load_home_assistant_token()
     if not token:
         raise PermissionError("SUPERVISOR_TOKEN is not available; Home Assistant API access is disabled.")
 
@@ -328,23 +427,271 @@ def fetch_home_assistant_states() -> list[dict[str, Any]]:
     return [item for item in payload if isinstance(item, dict)]
 
 
-def load_filtered_home_assistant_states(pack_id: str | None = None) -> list[dict[str, Any]]:
-    global _ha_states_cache
-    global _ha_states_cache_at
+class _HomeAssistantWebSocket:
+    def __init__(self, sock: socket.socket):
+        self.sock = sock
+        self.remainder = b""
 
+    def close(self) -> None:
+        self.sock.close()
+
+    def sendall(self, payload: bytes) -> None:
+        self.sock.sendall(payload)
+
+    def recv_http_headers(self) -> tuple[str, dict[str, str]]:
+        buffer = bytearray()
+        while b"\r\n\r\n" not in buffer:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise ConnectionError("Unexpected EOF during WebSocket handshake.")
+            buffer.extend(chunk)
+        header_bytes, self.remainder = bytes(buffer).split(b"\r\n\r\n", 1)
+        header_text = header_bytes.decode("utf-8", errors="replace")
+        lines = header_text.split("\r\n")
+        status_line = lines[0] if lines else ""
+        headers: dict[str, str] = {}
+        for line in lines[1:]:
+            if ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            headers[key.strip().lower()] = value.strip()
+        return status_line, headers
+
+    def recv_exact(self, size: int) -> bytes:
+        if self.remainder:
+            if len(self.remainder) >= size:
+                chunk = self.remainder[:size]
+                self.remainder = self.remainder[size:]
+                return chunk
+            chunks = [self.remainder]
+            remaining = size - len(self.remainder)
+            self.remainder = b""
+        else:
+            chunks = []
+            remaining = size
+        while remaining > 0:
+            chunk = self.sock.recv(remaining)
+            if not chunk:
+                raise ConnectionError("Unexpected EOF while reading WebSocket frame.")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        return b"".join(chunks)
+
+
+def _encode_ws_frame(opcode: int, payload: bytes) -> bytes:
+    masked_payload = bytearray(payload)
+    mask_key = os.urandom(4)
+    for index in range(len(masked_payload)):
+        masked_payload[index] ^= mask_key[index % 4]
+
+    frame = bytearray()
+    frame.append(0x80 | (opcode & 0x0F))
+    payload_length = len(masked_payload)
+    if payload_length < 126:
+        frame.append(0x80 | payload_length)
+    elif payload_length < 65536:
+        frame.append(0x80 | 126)
+        frame.extend(payload_length.to_bytes(2, "big"))
+    else:
+        frame.append(0x80 | 127)
+        frame.extend(payload_length.to_bytes(8, "big"))
+    frame.extend(mask_key)
+    frame.extend(masked_payload)
+    return bytes(frame)
+
+
+def _send_ws_json(sock: _HomeAssistantWebSocket, payload: dict[str, Any]) -> None:
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    sock.sendall(_encode_ws_frame(0x1, body))
+
+
+def _recv_ws_frame(sock: _HomeAssistantWebSocket) -> tuple[int, bytes]:
+    header = sock.recv_exact(2)
+    first = header[0]
+    second = header[1]
+    opcode = first & 0x0F
+    masked = bool(second & 0x80)
+    payload_length = second & 0x7F
+    if payload_length == 126:
+        payload_length = int.from_bytes(sock.recv_exact(2), "big")
+    elif payload_length == 127:
+        payload_length = int.from_bytes(sock.recv_exact(8), "big")
+    mask_key = sock.recv_exact(4) if masked else b""
+    payload = bytearray(sock.recv_exact(payload_length))
+    if masked:
+        for index in range(payload_length):
+            payload[index] ^= mask_key[index % 4]
+    return opcode, bytes(payload)
+
+
+def _recv_ws_json(sock: _HomeAssistantWebSocket) -> dict[str, Any]:
+    while True:
+        opcode, payload = _recv_ws_frame(sock)
+        if opcode == 0x8:
+            raise ConnectionError("Home Assistant websocket closed the connection.")
+        if opcode == 0x9:
+            sock.sendall(_encode_ws_frame(0xA, payload))
+            continue
+        if opcode != 0x1:
+            continue
+        message = json.loads(payload.decode("utf-8"))
+        if isinstance(message, dict):
+            return message
+
+
+def _connect_home_assistant_websocket() -> _HomeAssistantWebSocket:
+    ws_url = resolve_home_assistant_websocket_url()
+    parsed = urlsplit(ws_url)
+    if parsed.scheme not in ("ws", "wss"):
+        raise ValueError(f"Unsupported Home Assistant websocket scheme: {ws_url}")
+    host = parsed.hostname or ""
+    if not host:
+        raise ValueError(f"Invalid Home Assistant websocket URL: {ws_url}")
+    port = parsed.port or (443 if parsed.scheme == "wss" else 80)
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    raw_sock = socket.create_connection((host, port), timeout=10)
+    raw_sock.settimeout(30)
+    if parsed.scheme == "wss":
+        import ssl
+        raw_sock = ssl.create_default_context().wrap_socket(raw_sock, server_hostname=host)
+    sock = _HomeAssistantWebSocket(raw_sock)
+    websocket_key = base64.b64encode(os.urandom(16)).decode("ascii")
+    request_lines = [
+        f"GET {path} HTTP/1.1",
+        f"Host: {parsed.netloc}",
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        f"Sec-WebSocket-Key: {websocket_key}",
+        "Sec-WebSocket-Version: 13",
+        "\r\n",
+    ]
+    sock.sendall("\r\n".join(request_lines).encode("utf-8"))
+    status_line, headers = sock.recv_http_headers()
+    if "101" not in status_line:
+        raise ConnectionError(f"WebSocket handshake failed: {status_line or 'missing status line'}")
+    expected_accept = base64.b64encode(
+        hashlib.sha1(f"{websocket_key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11".encode("utf-8")).digest()
+    ).decode("ascii")
+    if headers.get("sec-websocket-accept") != expected_accept:
+        raise ConnectionError("Home Assistant websocket handshake returned an invalid accept header.")
+    return sock
+
+
+def _authenticate_home_assistant_websocket(sock: _HomeAssistantWebSocket) -> None:
+    token = load_home_assistant_token()
+    if not token:
+        raise PermissionError("SUPERVISOR_TOKEN is not available; Home Assistant websocket access is disabled.")
+    message = _recv_ws_json(sock)
+    if message.get("type") != "auth_required":
+        raise ConnectionError(f"Unexpected websocket pre-auth message: {message}")
+    _send_ws_json(sock, {"type": "auth", "access_token": token})
+    result = _recv_ws_json(sock)
+    if result.get("type") != "auth_ok":
+        raise PermissionError(f"Home Assistant websocket authentication failed: {result}")
+
+
+def _bootstrap_home_assistant_states_via_websocket(sock: _HomeAssistantWebSocket) -> None:
+    _send_ws_json(sock, {"id": 1, "type": "get_states"})
+    _send_ws_json(sock, {"id": 2, "type": "subscribe_events", "event_type": "state_changed"})
+
+    states_loaded = False
+    subscription_ready = False
+    while not (states_loaded and subscription_ready):
+        message = _recv_ws_json(sock)
+        if message.get("type") != "result":
+            continue
+        if message.get("id") == 1:
+            result = message.get("result")
+            if not isinstance(result, list):
+                raise ValueError("Home Assistant websocket get_states did not return a list.")
+            update_home_assistant_states_snapshot([item for item in result if isinstance(item, dict)])
+            states_loaded = True
+        elif message.get("id") == 2:
+            if message.get("success") is not True:
+                raise ValueError(f"Home Assistant websocket subscribe_events failed: {message}")
+            subscription_ready = True
+
+
+def _home_assistant_ws_listener() -> None:
+    while True:
+        sock: _HomeAssistantWebSocket | None = None
+        try:
+            sock = _connect_home_assistant_websocket()
+            _authenticate_home_assistant_websocket(sock)
+            _bootstrap_home_assistant_states_via_websocket(sock)
+            logging.info("Home Assistant websocket state listener connected")
+            while True:
+                message = _recv_ws_json(sock)
+                if message.get("type") != "event" or message.get("id") != 2:
+                    continue
+                event = message.get("event")
+                if not isinstance(event, dict):
+                    continue
+                if str(event.get("event_type") or "") != "state_changed":
+                    continue
+                event_data = event.get("data")
+                if not isinstance(event_data, dict):
+                    continue
+                entity_id = str(event_data.get("entity_id") or "").strip()
+                new_state = event_data.get("new_state")
+                if isinstance(new_state, dict):
+                    apply_home_assistant_state_event(new_state)
+                elif entity_id:
+                    remove_home_assistant_state(entity_id)
+        except Exception as exc:
+            logging.warning("Home Assistant websocket state listener disconnected: %s", exc)
+            try:
+                fallback_states = fetch_home_assistant_states()
+            except Exception as fallback_exc:
+                logging.warning("Failed to refresh Home Assistant state fallback snapshot: %s", fallback_exc)
+            else:
+                update_home_assistant_states_snapshot(fallback_states)
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
+        time.sleep(HOME_ASSISTANT_WS_RETRY_SEC)
+
+
+def ensure_home_assistant_state_listener() -> None:
+    global _ha_ws_listener_started
+
+    with _ha_states_condition:
+        if _ha_ws_listener_started:
+            return
+        _ha_ws_listener_started = True
+    thread = threading.Thread(
+        target=_home_assistant_ws_listener,
+        name="scene-ha-state-listener",
+        daemon=True,
+    )
+    thread.start()
+
+
+def load_filtered_home_assistant_states(pack_id: str | None = None) -> list[dict[str, Any]]:
     entity_ids = set(collect_pack_home_assistant_entity_ids(pack_id))
     if not entity_ids:
         return []
 
-    now_ms = time.monotonic() * 1000
-    with _ha_states_cache_lock:
-        if (
-            _ha_states_cache is None
-            or now_ms - _ha_states_cache_at >= HOME_ASSISTANT_STATES_CACHE_TTL_MS
-        ):
-            _ha_states_cache = fetch_home_assistant_states()
-            _ha_states_cache_at = now_ms
-        snapshot = list(_ha_states_cache)
+    ensure_home_assistant_state_listener()
+    with _ha_states_condition:
+        snapshot = list(_ha_states_cache) if _ha_states_cache is not None else []
+        snapshot_ready = _ha_ws_snapshot_ready
+
+    if not snapshot:
+        fallback_snapshot = update_home_assistant_states_snapshot(fetch_home_assistant_states())
+        snapshot = fallback_snapshot
+        snapshot_ready = True
+
+    if not snapshot_ready:
+        with _ha_states_condition:
+            _ha_states_condition.wait(timeout=1.5)
+            if _ha_states_cache is not None:
+                snapshot = list(_ha_states_cache)
 
     return [
         state
@@ -1103,6 +1450,7 @@ class SceneHostHandler(BaseHTTPRequestHandler):
             )
 
     def handle_home_assistant_states_stream(self) -> None:
+        ensure_home_assistant_state_listener()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
@@ -1111,6 +1459,7 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
         last_payload = ""
+        last_generation = -1
         last_keepalive_at = 0.0
         try:
             while True:
@@ -1124,7 +1473,12 @@ class SceneHostHandler(BaseHTTPRequestHandler):
                 elif now - last_keepalive_at >= HOME_ASSISTANT_STREAM_KEEPALIVE_SEC:
                     self.send_event_stream_keepalive()
                     last_keepalive_at = now
-                time.sleep(HOME_ASSISTANT_STREAM_POLL_SEC)
+                with _ha_states_condition:
+                    if last_generation != _ha_states_generation:
+                        last_generation = _ha_states_generation
+                        continue
+                    timeout = max(0.25, HOME_ASSISTANT_STREAM_KEEPALIVE_SEC - (time.monotonic() - last_keepalive_at))
+                    _ha_states_condition.wait(timeout=timeout)
         except (BrokenPipeError, ConnectionResetError, OSError):
             logging.info("Home Assistant state stream client disconnected")
         except Exception:

@@ -1119,7 +1119,6 @@
     let statePollingStarted = false;
     let statePollingTimer = null;
     let displaySleepPaused = false;
-    let lastExternalStateAt = 0;
     let currentMotionIndex = 0;
     let viewState = { scale: 1, x: 0, y: 0 };
     let baseModelSize = null;
@@ -1526,7 +1525,6 @@
       }
       if (payload.type === 'neiri-display-state') {
         if (payload.state && typeof payload.state === 'object') {
-          lastExternalStateAt = Date.now();
           applyState(payload.state);
         }
         return;
@@ -1786,6 +1784,10 @@
       }
     }
 
+    function canUseInternalStatePolling() {
+      return !IS_DISPLAY_MODE && !EXTERNAL_STATE_MODE;
+    }
+
     function syncRuntimeActivity({ refreshState = false, reason = 'sync' } = {}) {
       const suspended = isRuntimeSuspended();
       if (suspended) {
@@ -1799,16 +1801,16 @@
       if (app && app.ticker && typeof app.ticker.start === 'function') {
         app.ticker.start();
       }
-      if (!EXTERNAL_STATE_MODE && statePollingStarted && statePollingTimer === null) {
+      if (canUseInternalStatePolling() && statePollingStarted && statePollingTimer === null) {
         statePollingTimer = window.setInterval(refreshAvatarState, POLL_MS);
       }
-      if (refreshState && !EXTERNAL_STATE_MODE) {
+      if (refreshState && canUseInternalStatePolling()) {
         void refreshAvatarState();
       }
     }
 
     function startStatePolling() {
-      if (EXTERNAL_STATE_MODE) {
+      if (!canUseInternalStatePolling()) {
         statePollingStarted = false;
         stopStatePolling();
         return;
@@ -2074,10 +2076,10 @@
     }
 
     async function refreshAvatarState() {
-      if (isRuntimeSuspended()) {
+      if (!canUseInternalStatePolling()) {
         return;
       }
-      if (IS_DISPLAY_MODE && Date.now() - lastExternalStateAt < POLL_MS * 4) {
+      if (isRuntimeSuspended()) {
         return;
       }
       try {
@@ -2421,8 +2423,6 @@
   </script>
 </body>
 </html>
-
-
 
 
 
