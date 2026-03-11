@@ -8,6 +8,8 @@ import os
 import shutil
 import stat
 import tempfile
+import threading
+import time
 import zipfile
 import uuid
 from email.parser import BytesParser
@@ -16,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import parse_qs, quote, urlsplit
+from urllib.request import Request, urlopen
 
 
 HOST = os.environ.get("SCENE_HOST_BIND", "127.0.0.1")
@@ -46,6 +49,23 @@ SHARED_PRESET_BASE_URL = (
     or "../../scene-runtime/assets"
 )
 AVATAR_UPLOADS_DIR = SCENE_ROOT / ".avatar-upload-sessions"
+HOME_ASSISTANT_API_URL = (
+    os.environ.get("SCENE_HOME_ASSISTANT_API_URL", "http://supervisor/core/api").strip().rstrip("/")
+    or "http://supervisor/core/api"
+)
+HOME_ASSISTANT_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "").strip()
+HOME_ASSISTANT_STATES_CACHE_TTL_MS = max(
+    250,
+    int(os.environ.get("SCENE_HA_STATES_CACHE_TTL_MS", "2000") or "2000"),
+)
+WEATHER_ENTITY_ID = (
+    os.environ.get("SCENE_WEATHER_ENTITY_ID", "weather.forecast_home_assistant").strip()
+    or "weather.forecast_home_assistant"
+)
+
+_ha_states_cache_lock = threading.Lock()
+_ha_states_cache_at = 0.0
+_ha_states_cache: list[dict[str, Any]] | None = None
 
 
 def load_active_pack_id() -> str:
@@ -79,6 +99,7 @@ def build_bootstrap() -> dict[str, Any]:
             "sceneConfigUrl": pack_base_url + "scene.default.json",
             "entityMapUrl": pack_base_url + "entity-map.json",
             "avatarManifestUrl": pack_base_url + "avatar.manifest.json",
+            "haStatesUrl": f"{PATH_PREFIX}/ha-states",
             "avatarCatalogUrl": f"{PATH_PREFIX}/avatar-catalog",
             "avatarImportUrl": f"{PATH_PREFIX}/avatar-import",
             "avatarPackApiUrl": f"{PATH_PREFIX}/avatar-pack",
@@ -206,6 +227,95 @@ def safe_extract_zip(archive_path: Path, target_dir: Path) -> None:
 
 def read_json_file(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_json_file_if_exists(path: Path) -> Any | None:
+    if not path.exists():
+        return None
+    try:
+        return read_json_file(path)
+    except Exception as exc:
+        logging.warning("Failed to read %s: %s", path, exc)
+        return None
+
+
+def is_home_assistant_entity_id(value: Any) -> bool:
+    normalized = str(value or "").strip()
+    return bool(normalized and "." in normalized and " " not in normalized)
+
+
+def collect_pack_home_assistant_entity_ids(pack_id: str | None = None) -> list[str]:
+    resolved_pack_id = str(pack_id or load_active_pack_id()).strip() or DEFAULT_PACK_ID
+    pack_dir = PACKS_DIR / resolved_pack_id
+    entity_ids: set[str] = set()
+
+    def add_entity(candidate: Any) -> None:
+        if is_home_assistant_entity_id(candidate):
+            entity_ids.add(str(candidate).strip())
+
+    for filename in ("entity-map.json", "control-entity-map.json"):
+        payload = read_json_file_if_exists(pack_dir / filename)
+        if not isinstance(payload, dict):
+            continue
+        for value in payload.values():
+            add_entity(value)
+
+    scene_config = read_json_file_if_exists(pack_dir / "scene.default.json")
+    if isinstance(scene_config, dict):
+        for page in scene_config.get("pages", []):
+            if not isinstance(page, dict):
+                continue
+            for card in page.get("cards", []):
+                if not isinstance(card, dict):
+                    continue
+                for field in ("entity", "stateEntity", "downEntity", "upEntity"):
+                    add_entity(card.get(field))
+
+    add_entity(WEATHER_ENTITY_ID)
+    return sorted(entity_ids)
+
+
+def fetch_home_assistant_states() -> list[dict[str, Any]]:
+    if not HOME_ASSISTANT_TOKEN:
+        raise PermissionError("SUPERVISOR_TOKEN is not available; Home Assistant API access is disabled.")
+
+    request = Request(
+        f"{HOME_ASSISTANT_API_URL}/states",
+        headers={
+            "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
+            "Accept": "application/json",
+        },
+    )
+    with urlopen(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError("Home Assistant /states did not return a JSON array.")
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def load_filtered_home_assistant_states(pack_id: str | None = None) -> list[dict[str, Any]]:
+    global _ha_states_cache
+    global _ha_states_cache_at
+
+    entity_ids = set(collect_pack_home_assistant_entity_ids(pack_id))
+    if not entity_ids:
+        return []
+
+    now_ms = time.monotonic() * 1000
+    with _ha_states_cache_lock:
+        if (
+            _ha_states_cache is None
+            or now_ms - _ha_states_cache_at >= HOME_ASSISTANT_STATES_CACHE_TTL_MS
+        ):
+            _ha_states_cache = fetch_home_assistant_states()
+            _ha_states_cache_at = now_ms
+        snapshot = list(_ha_states_cache)
+
+    return [
+        state
+        for state in snapshot
+        if str(state.get("entity_id") or "").strip() in entity_ids
+    ]
 
 
 def resolve_motion_id(path: Path, fallback_index: int) -> str:
@@ -743,9 +853,7 @@ class SceneHostHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: Any) -> None:
         logging.info("%s - %s", self.address_string(), fmt % args)
 
-    def send_json(
-        self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK
-    ) -> None:
+    def send_json(self, payload: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -770,6 +878,26 @@ class SceneHostHandler(BaseHTTPRequestHandler):
             return
         if path == f"{PATH_PREFIX}/bootstrap":
             self.send_json(build_bootstrap())
+            return
+        if path == f"{PATH_PREFIX}/ha-states":
+            try:
+                self.send_json(load_filtered_home_assistant_states())
+            except PermissionError as exc:
+                self.send_json(
+                    {"success": False, "error": str(exc)},
+                    status=HTTPStatus.SERVICE_UNAVAILABLE,
+                )
+            except ValueError as exc:
+                self.send_json(
+                    {"success": False, "error": str(exc)},
+                    status=HTTPStatus.BAD_GATEWAY,
+                )
+            except Exception as exc:
+                logging.exception("Failed to proxy Home Assistant states")
+                self.send_json(
+                    {"success": False, "error": f"Failed to proxy Home Assistant states: {exc}"},
+                    status=HTTPStatus.BAD_GATEWAY,
+                )
             return
         if path == f"{PATH_PREFIX}/avatar-catalog":
             self.send_json(load_avatar_catalog())

@@ -30,8 +30,10 @@ import {
   type ViewPreset,
 } from "@kiosk-scene/core";
 import {
-  createHomeAssistantStateProvider,
   createHomeAssistantStatesReader,
+  mapAssistantControlFromHomeAssistant,
+  mapAssistantStateFromHomeAssistant,
+  type HomeAssistantControlEntityMap,
   type HomeAssistantEntityMap,
   type HomeAssistantStates,
 } from "@kiosk-scene/provider-ha";
@@ -448,6 +450,7 @@ export interface HomeAssistantWeatherReaderOptions {
   locale?: string;
   iconBaseUrl?: string;
   allowApiFallback?: boolean;
+  apiUrl?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -456,6 +459,7 @@ export function createHomeAssistantWeatherReader(options: HomeAssistantWeatherRe
   const iconBaseUrl = trimText(options.iconBaseUrl, 1024) || "./assets/icons";
   const statesReader = createHomeAssistantStatesReader({
     allowApiFallback: options.allowApiFallback,
+    apiUrl: options.apiUrl,
     fetchImpl: options.fetchImpl,
   });
 
@@ -549,6 +553,8 @@ export class BrowserSceneShellApp {
   private avatarManifest!: AvatarManifestV1;
   private sceneConfig!: SceneConfigV1;
   private entityMap: HomeAssistantEntityMap | null = null;
+  private controlEntityMap: HomeAssistantControlEntityMap | null = null;
+  private haStatesReader: ReturnType<typeof createHomeAssistantStatesReader> | null = null;
   private weatherData: WeatherOverviewPayload;
   private hassStates: HomeAssistantStates | null = null;
   private currentState!: StateV1;
@@ -640,6 +646,9 @@ export class BrowserSceneShellApp {
       state: {
         ...rawRendererConfig.state,
         stateUrl: resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.state.stateUrl),
+        apiUrl: rawRendererConfig.state.apiUrl
+          ? resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.state.apiUrl)
+          : undefined,
         idleLinesUrl: resolveUrlAgainst(
           rendererConfigBaseUrl,
           rawRendererConfig.state.idleLinesUrl || "./idle-lines.json",
@@ -651,6 +660,12 @@ export class BrowserSceneShellApp {
       control: {
         ...rawRendererConfig.control,
         controlUrl: resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.control.controlUrl),
+        apiUrl: rawRendererConfig.control.apiUrl
+          ? resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.control.apiUrl)
+          : undefined,
+        entityMapUrl: rawRendererConfig.control.entityMapUrl
+          ? resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.control.entityMapUrl)
+          : undefined,
       },
     });
 
@@ -662,6 +677,8 @@ export class BrowserSceneShellApp {
     );
     this.sceneConfig = await this.readJson(this.rendererConfig.scene.configUrl);
     this.entityMap = await this.readEntityMap();
+    this.controlEntityMap = await this.readControlEntityMap();
+    this.haStatesReader = this.createHaStatesReader();
     this.idleLines = await createJsonLinesProvider({
       url: this.rendererConfig.state.idleLinesUrl || resolveUrlAgainst(rendererConfigBaseUrl, "./idle-lines.json"),
       defaultValue: [],
@@ -669,10 +686,7 @@ export class BrowserSceneShellApp {
     this.weatherData = await this.readWeatherData();
     this.currentState = await this.readAssistantState();
     this.hassStates = await this.readSceneStates();
-    this.remoteControl = await createJsonControlProvider({
-      url: this.rendererConfig.control.controlUrl,
-      defaultValue: DEFAULT_CONTROL_V1,
-    }).read();
+    this.remoteControl = await this.readRemoteControl();
     this.currentControl = mergeControlV1(this.remoteControl, this.uiControl);
 
     this.avatarAdapter = this.createAvatarAdapter();
@@ -808,10 +822,7 @@ export class BrowserSceneShellApp {
   private async refresh(): Promise<void> {
     this.currentState = await this.readAssistantState();
     this.hassStates = await this.readSceneStates();
-    this.remoteControl = await createJsonControlProvider({
-      url: this.rendererConfig.control.controlUrl,
-      defaultValue: this.currentControl,
-    }).read();
+    this.remoteControl = await this.readRemoteControl(this.currentControl);
     this.uiControl = mergeControlV1(DEFAULT_CONTROL_V1, this.uiControl);
     this.currentControl = mergeControlV1(this.remoteControl, this.uiControl);
 
@@ -1176,33 +1187,58 @@ export class BrowserSceneShellApp {
     return this.readJson<HomeAssistantEntityMap>(this.rendererConfig.state.entityMapUrl);
   }
 
+  private async readControlEntityMap(): Promise<HomeAssistantControlEntityMap | null> {
+    if (this.rendererConfig.control.provider !== "ha" || !this.rendererConfig.control.entityMapUrl) {
+      return null;
+    }
+    return this.readJson<HomeAssistantControlEntityMap>(this.rendererConfig.control.entityMapUrl);
+  }
+
+  private createHaStatesReader(): ReturnType<typeof createHomeAssistantStatesReader> | null {
+    if (this.rendererConfig.state.provider !== "ha") {
+      return null;
+    }
+    return createHomeAssistantStatesReader({
+      allowApiFallback: this.rendererConfig.state.haApiFallback === true,
+      apiUrl: this.rendererConfig.state.apiUrl || this.rendererConfig.control.apiUrl,
+    });
+  }
+
   private async readAssistantState(): Promise<StateV1> {
     const jsonFallback = async (): Promise<StateV1> => createJsonStateProvider({
       url: this.rendererConfig.state.stateUrl,
       defaultValue: this.currentState ?? DEFAULT_STATE_V1,
     }).read();
 
-    if (this.rendererConfig.state.provider !== "ha" || !this.entityMap) {
+    if (this.rendererConfig.state.provider !== "ha" || !this.entityMap || !this.haStatesReader) {
       return jsonFallback();
     }
-
-    const provider = createHomeAssistantStateProvider({
-      assistantName: this.rendererConfig.assistant.name,
-      entityMap: this.entityMap,
-      allowApiFallback: this.rendererConfig.state.haApiFallback === true,
-    });
-
-    return (await provider.read()) || jsonFallback();
+    const states = await this.haStatesReader.read();
+    return mapAssistantStateFromHomeAssistant(
+      states || {},
+      this.entityMap,
+      this.rendererConfig.assistant.name,
+    ) || jsonFallback();
   }
 
   private async readSceneStates(): Promise<HomeAssistantStates | null> {
-    if (this.rendererConfig.state.provider !== "ha") {
+    if (!this.haStatesReader) {
       return null;
     }
-    const reader = createHomeAssistantStatesReader({
-      allowApiFallback: this.rendererConfig.state.haApiFallback === true,
-    });
-    return reader.read();
+    return this.haStatesReader.read();
+  }
+
+  private async readRemoteControl(defaultValue = DEFAULT_CONTROL_V1): Promise<ControlV1> {
+    const jsonFallback = async (): Promise<ControlV1> => createJsonControlProvider({
+      url: this.rendererConfig.control.controlUrl,
+      defaultValue,
+    }).read();
+
+    if (this.rendererConfig.control.provider !== "ha" || !this.controlEntityMap || !this.haStatesReader) {
+      return jsonFallback();
+    }
+    const states = await this.haStatesReader.read();
+    return mapAssistantControlFromHomeAssistant(states || {}, this.controlEntityMap) || jsonFallback();
   }
 
   private async readWeatherData(): Promise<WeatherOverviewPayload> {

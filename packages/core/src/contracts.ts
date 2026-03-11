@@ -16,13 +16,16 @@ export interface RendererConfigV1 {
   state: {
     provider: "json" | "ha";
     stateUrl: string;
+    apiUrl?: string;
     haApiFallback?: boolean;
     idleLinesUrl?: string;
     entityMapUrl?: string;
   };
   control: {
-    provider: "json";
+    provider: "json" | "ha";
     controlUrl: string;
+    apiUrl?: string;
+    entityMapUrl?: string;
   };
 }
 

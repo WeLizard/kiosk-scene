@@ -24,6 +24,7 @@ interface SceneHostBootstrap {
     sceneConfigUrl?: string;
     entityMapUrl?: string;
     avatarManifestUrl?: string;
+    haStatesUrl?: string;
     avatarCatalogUrl?: string;
     avatarImportUrl?: string;
     avatarPackApiUrl?: string;
@@ -65,13 +66,16 @@ interface HostedRendererConfig {
   state?: {
     provider?: "json" | "ha";
     stateUrl?: string;
+    apiUrl?: string;
     haApiFallback?: boolean;
     idleLinesUrl?: string;
     entityMapUrl?: string;
   };
   control?: {
-    provider?: "json";
+    provider?: "json" | "ha";
     controlUrl?: string;
+    apiUrl?: string;
+    entityMapUrl?: string;
   };
 }
 
@@ -589,13 +593,16 @@ function absolutizeRendererConfig(config: HostedRendererConfig, rendererConfigUr
     state: {
       provider: config.state?.provider || "json",
       stateUrl: resolveHostedUrl(String(config.state?.stateUrl || "").trim(), rendererConfigUrl),
+      apiUrl: resolveHostedUrl(String(config.state?.apiUrl || "").trim(), rendererConfigUrl) || undefined,
       haApiFallback: config.state?.haApiFallback === true,
       idleLinesUrl: resolveHostedUrl(String(config.state?.idleLinesUrl || "").trim(), rendererConfigUrl),
       entityMapUrl: resolveHostedUrl(String(config.state?.entityMapUrl || "").trim(), rendererConfigUrl),
     },
     control: {
-      provider: "json",
+      provider: config.control?.provider || "json",
       controlUrl: resolveHostedUrl(String(config.control?.controlUrl || "").trim(), rendererConfigUrl),
+      apiUrl: resolveHostedUrl(String(config.control?.apiUrl || "").trim(), rendererConfigUrl) || undefined,
+      entityMapUrl: resolveHostedUrl(String(config.control?.entityMapUrl || "").trim(), rendererConfigUrl) || undefined,
     },
   };
 }
@@ -647,6 +654,20 @@ async function resolveRuntimeRendererConfigUrl(
     await readJson<HostedRendererConfig>(rendererConfigUrl),
     rendererConfigUrl,
   );
+  const haStatesUrl = resolveHostedUrl(
+    String(bootstrap.files?.haStatesUrl || "").trim(),
+    bootstrapUrl,
+  );
+  if (haStatesUrl) {
+    rendererConfig.state = {
+      ...(rendererConfig.state || {}),
+      apiUrl: rendererConfig.state?.apiUrl || haStatesUrl,
+    };
+    rendererConfig.control = {
+      ...(rendererConfig.control || {}),
+      apiUrl: rendererConfig.control?.apiUrl || haStatesUrl,
+    };
+  }
   const activeAvatarManifestUrl = selectedAvatarManifestUrl || String(rendererConfig.avatar?.manifestUrl || "").trim();
   if (!activeAvatarManifestUrl) {
     return URL.createObjectURL(
@@ -692,6 +713,9 @@ void (async () => {
     const packId = String(bootstrap.packId || "").trim();
     const isNeiriPack = packId.toLowerCase() === "neiri";
     const rendererConfigUrl = await resolveRuntimeRendererConfigUrl(bootstrap, bootstrapUrl);
+    const runtimeRendererConfig = rendererConfigUrl
+      ? await readJson<HostedRendererConfig>(rendererConfigUrl)
+      : null;
     if (!rendererConfigUrl) {
       renderStatus(
         root,
@@ -716,6 +740,7 @@ void (async () => {
             openMeteoUrl: OPEN_METEO_URL,
             locale: "ru-RU",
             iconBaseUrl: "./assets",
+            apiUrl: String(runtimeRendererConfig?.state?.apiUrl || "").trim() || undefined,
             allowApiFallback: true,
           })
         : undefined,

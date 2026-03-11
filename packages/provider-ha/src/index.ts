@@ -1,5 +1,5 @@
-import type { StateProvider, StateV1 } from "@kiosk-scene/core";
-import { sanitizeStateV1, trimText } from "@kiosk-scene/core";
+import type { ControlProvider, ControlV1, StateProvider, StateV1, ViewPreset } from "@kiosk-scene/core";
+import { DEFAULT_CONTROL_V1, sanitizeControlV1, sanitizeStateV1, trimText } from "@kiosk-scene/core";
 
 export interface HomeAssistantEntityMap {
   online: string;
@@ -15,6 +15,18 @@ export interface HomeAssistantEntityMap {
   intensity?: string;
   motion?: string;
   revision: string;
+}
+
+export interface HomeAssistantControlEntityMap {
+  viewPreset?: string;
+  pageMode?: string;
+  pageTarget?: string;
+  pageUntil?: string;
+  cue?: string;
+  emotion?: string;
+  motion?: string;
+  cueUntil?: string;
+  revision?: string;
 }
 
 export interface HomeAssistantStateEntity {
@@ -35,6 +47,10 @@ export interface HomeAssistantStateProviderOptions {
   cacheTtlMs?: number;
   authCooldownMs?: number;
   readToken?: () => string;
+}
+
+export interface HomeAssistantControlProviderOptions extends HomeAssistantStatesReaderOptions {
+  entityMap: HomeAssistantControlEntityMap;
 }
 
 export interface HomeAssistantStatesReaderOptions {
@@ -167,6 +183,63 @@ export function mapAssistantStateFromHomeAssistant(
   });
 }
 
+const VIEW_PRESETS: ViewPreset[] = ["full", "torso", "head"];
+
+function parseHomeAssistantViewPreset(entity: HomeAssistantStateEntity | null | undefined): ViewPreset | null {
+  const normalized = trimText(entity?.state, 16).toLowerCase() as ViewPreset;
+  return VIEW_PRESETS.includes(normalized) ? normalized : null;
+}
+
+export function mapAssistantControlFromHomeAssistant(
+  states: HomeAssistantStates,
+  entityMap: HomeAssistantControlEntityMap,
+): ControlV1 | null {
+  const viewPresetEntity = entityMap.viewPreset ? states[entityMap.viewPreset] : null;
+  const pageModeEntity = entityMap.pageMode ? states[entityMap.pageMode] : null;
+  const pageTargetEntity = entityMap.pageTarget ? states[entityMap.pageTarget] : null;
+  const pageUntilEntity = entityMap.pageUntil ? states[entityMap.pageUntil] : null;
+  const cueEntity = entityMap.cue ? states[entityMap.cue] : null;
+  const emotionEntity = entityMap.emotion ? states[entityMap.emotion] : null;
+  const motionEntity = entityMap.motion ? states[entityMap.motion] : null;
+  const cueUntilEntity = entityMap.cueUntil ? states[entityMap.cueUntil] : null;
+  const revisionEntity = entityMap.revision ? states[entityMap.revision] : null;
+
+  if (
+    !viewPresetEntity
+    && !pageModeEntity
+    && !pageTargetEntity
+    && !cueEntity
+    && !emotionEntity
+    && !motionEntity
+  ) {
+    return null;
+  }
+
+  const requestedPageTarget = trimText(pageTargetEntity?.state, 40) || null;
+  const requestedPageUntil = trimText(pageUntilEntity?.state, 64) || null;
+  const explicitPageMode = trimText(pageModeEntity?.state, 16).toLowerCase();
+  const pageMode = explicitPageMode === "auto"
+    ? "auto"
+    : (explicitPageMode === "pinned" || requestedPageTarget || requestedPageUntil ? "pinned" : "auto");
+
+  return sanitizeControlV1({
+    ...DEFAULT_CONTROL_V1,
+    revision: Number(revisionEntity?.state) || 0,
+    viewPreset: parseHomeAssistantViewPreset(viewPresetEntity),
+    page: {
+      mode: pageMode,
+      target: pageMode === "pinned" ? requestedPageTarget : null,
+      until: pageMode === "pinned" ? requestedPageUntil : null,
+    },
+    cue: {
+      cue: trimText(cueEntity?.state, 32) || null,
+      emotion: trimText(emotionEntity?.state, 32) || null,
+      motion: trimText(motionEntity?.state, 32) || null,
+      until: trimText(cueUntilEntity?.state, 64) || null,
+    },
+  });
+}
+
 function parseHomeAssistantBoolean(entity: HomeAssistantStateEntity | null | undefined, fallback?: boolean): boolean | undefined {
   const normalized = trimText(entity?.state, 16).toLowerCase();
   if (!normalized) {
@@ -214,12 +287,30 @@ export function createHomeAssistantStateProvider(
   };
 }
 
+export function createHomeAssistantControlProvider(
+  options: HomeAssistantControlProviderOptions,
+): ControlProvider<ControlV1 | null> {
+  const statesReader = createHomeAssistantStatesReader(options);
+
+  return {
+    id: "ha-control",
+    async read() {
+      const states = await statesReader.read();
+      if (!states) {
+        return null;
+      }
+      return mapAssistantControlFromHomeAssistant(states, options.entityMap);
+    },
+  };
+}
+
 export function createHomeAssistantStatesReader(
   options: HomeAssistantStatesReaderOptions = {},
 ): StateProvider<HomeAssistantStates | null> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const cacheTtlMs = Math.max(500, options.cacheTtlMs ?? 2500);
   const authCooldownMs = Math.max(60_000, options.authCooldownMs ?? 10 * 60 * 1000);
+  const explicitApiUrl = trimText(options.apiUrl, 4096);
 
   let cache: HomeAssistantStates | null = null;
   let cacheAt = 0;
@@ -236,7 +327,7 @@ export function createHomeAssistantStatesReader(
     if (cache && now - cacheAt < cacheTtlMs) {
       return cache;
     }
-    if (!options.allowApiFallback || typeof fetchImpl !== "function") {
+    if ((!explicitApiUrl && !options.allowApiFallback) || typeof fetchImpl !== "function") {
       return cache;
     }
     if (now < cooldownUntil) {
@@ -251,7 +342,7 @@ export function createHomeAssistantStatesReader(
       return cache;
     }
 
-    inFlight = fetchImpl(options.apiUrl || "/api/states", {
+    inFlight = fetchImpl(explicitApiUrl || "/api/states", {
       cache: "no-store",
       headers: {
         Authorization: `Bearer ${token}`,

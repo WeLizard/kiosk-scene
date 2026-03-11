@@ -17,7 +17,7 @@ export function parseCueDirectives(value: unknown, maxTextLength = 220): ParsedC
     motion: "",
   };
 
-  const cleaned = baseText.replace(/\[(emotion|activity|cue|motion)\s*:\s*([a-z0-9_-]+)\]/gi, (_, kind, cue) => {
+  const cleaned = baseText.replace(/\[(emotion|activity|cue|motion|page|preset|view|size)\s*:\s*([a-z0-9_-]+)\]/gi, (_, kind, cue) => {
     const normalizedKind = trimText(kind, 16).toLowerCase();
     const normalizedCue = trimText(cue, 32).toLowerCase();
     if (

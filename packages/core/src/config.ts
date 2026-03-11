@@ -16,12 +16,15 @@ export const DEFAULT_RENDERER_CONFIG_V1: RendererConfigV1 = {
   state: {
     provider: "json",
     stateUrl: "./state.json",
+    apiUrl: "",
     haApiFallback: false,
     idleLinesUrl: "./idle-lines.json",
   },
   control: {
     provider: "json",
     controlUrl: "./control.json",
+    apiUrl: "",
+    entityMapUrl: "",
   },
 };
 
@@ -71,13 +74,16 @@ export function sanitizeRendererConfigV1(value: unknown): RendererConfigV1 {
     state: {
       provider: merged.state?.provider === "ha" ? "ha" : "json",
       stateUrl: trimText(merged.state?.stateUrl, 1024) || DEFAULT_RENDERER_CONFIG_V1.state.stateUrl,
+      apiUrl: trimText(merged.state?.apiUrl, 1024) || undefined,
       haApiFallback: merged.state?.haApiFallback === true,
       idleLinesUrl: trimText(merged.state?.idleLinesUrl, 1024) || DEFAULT_RENDERER_CONFIG_V1.state.idleLinesUrl,
       entityMapUrl: trimText(merged.state?.entityMapUrl, 1024) || undefined,
     },
     control: {
-      provider: "json",
+      provider: merged.control?.provider === "ha" ? "ha" : "json",
       controlUrl: trimText(merged.control?.controlUrl, 1024) || DEFAULT_RENDERER_CONFIG_V1.control.controlUrl,
+      apiUrl: trimText(merged.control?.apiUrl, 1024) || undefined,
+      entityMapUrl: trimText(merged.control?.entityMapUrl, 1024) || undefined,
     },
   };
 }

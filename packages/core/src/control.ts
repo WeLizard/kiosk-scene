@@ -43,12 +43,16 @@ export function sanitizeControlV1(control: unknown, now = Date.now()): ControlV1
   normalized.viewPreset = VIEW_PRESETS.includes(preset) ? preset : null;
 
   const pageUntil = parseIsoTime(normalized.page.until);
-  if (normalized.page.mode === "pinned" && (!pageUntil || pageUntil <= now || !normalized.page.target)) {
-    normalized.page = { mode: "auto", target: null, until: null };
+  if (normalized.page.mode === "pinned") {
+    if (!normalized.page.target) {
+      normalized.page = { mode: "auto", target: null, until: null };
+    } else if (normalized.page.until && (!pageUntil || pageUntil <= now)) {
+      normalized.page = { mode: "auto", target: null, until: null };
+    }
   }
 
   const cueUntil = parseIsoTime(normalized.cue.until);
-  if (!cueUntil || cueUntil <= now) {
+  if (normalized.cue.until && (!cueUntil || cueUntil <= now)) {
     normalized.cue = { cue: null, emotion: null, motion: null, until: null };
   }
 

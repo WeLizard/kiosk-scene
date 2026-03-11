@@ -1,5 +1,5 @@
 name: Kiosk Scene
-version: "0.10.27"
+version: "0.10.28"
 slug: kiosk_scene
 description: Хостинг kiosk-scene как отдельного add-on Home Assistant.
 url: https://github.com/WeLizard/kiosk-scene
@@ -11,7 +11,7 @@ startup: services
 boot: auto
 init: false
 hassio_api: false
-homeassistant_api: false
+homeassistant_api: true
 host_network: true
 ingress: true
 ingress_port: 48123
