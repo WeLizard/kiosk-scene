@@ -337,16 +337,21 @@ export function createHomeAssistantStatesReader(
       return inFlight;
     }
 
-    const token = trimText(options.readToken?.() ?? readHomeAssistantTokenFromLocalStorage(), 4096);
-    if (!token) {
+    const token = explicitApiUrl
+      ? ""
+      : trimText(options.readToken?.() ?? readHomeAssistantTokenFromLocalStorage(), 4096);
+    if (!explicitApiUrl && !token) {
       return cache;
+    }
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
     inFlight = fetchImpl(explicitApiUrl || "/api/states", {
       cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
     })
       .then(async (response) => {
         if (!response.ok) {
