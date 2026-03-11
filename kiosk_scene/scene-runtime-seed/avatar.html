@@ -304,6 +304,7 @@
     const loadingSubtitleEl = document.getElementById('loading-subtitle');
     const SEARCH_PARAMS = new URLSearchParams(window.location.search);
     const EXPLICIT_RENDERER_CONFIG_URL = SEARCH_PARAMS.get('rendererConfigUrl') || '';
+    const EXTERNAL_STATE_MODE = SEARCH_PARAMS.get('externalState') === '1';
     const RENDERER_CONFIG_URL = EXPLICIT_RENDERER_CONFIG_URL || './renderer.config.json';
     const AVATAR_MANIFEST_URL = './avatar.manifest.json';
     const UI_LOCALE = String(navigator.language || 'ru-RU').toLowerCase();
@@ -1798,15 +1799,20 @@
       if (app && app.ticker && typeof app.ticker.start === 'function') {
         app.ticker.start();
       }
-      if (statePollingStarted && statePollingTimer === null) {
+      if (!EXTERNAL_STATE_MODE && statePollingStarted && statePollingTimer === null) {
         statePollingTimer = window.setInterval(refreshAvatarState, POLL_MS);
       }
-      if (refreshState) {
+      if (refreshState && !EXTERNAL_STATE_MODE) {
         void refreshAvatarState();
       }
     }
 
     function startStatePolling() {
+      if (EXTERNAL_STATE_MODE) {
+        statePollingStarted = false;
+        stopStatePolling();
+        return;
+      }
       if (statePollingStarted) {
         syncRuntimeActivity({ refreshState: false, reason: 'polling resumed' });
         return;
@@ -2415,7 +2421,6 @@
   </script>
 </body>
 </html>
-
 
 
 

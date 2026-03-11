@@ -175,6 +175,9 @@ function buildRuntimeSrc(runtimeUrl: string, options: Live2dAdapterOptions): str
   if (options.displayMode !== false && query.display == null) {
     query.display = true;
   }
+  if (query.externalState == null) {
+    query.externalState = true;
+  }
   for (const [key, rawValue] of Object.entries(query)) {
     const normalizedKey = trimText(key, 64);
     if (!normalizedKey || rawValue == null) {
