@@ -2087,14 +2087,30 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         font: 11px/1.25 "Aptos","Segoe UI",sans-serif;
         color: #4f6a7c;
       }
-      #scene-editor-shell .avatar-import-input {
-        display: none !important;
-      }
       #scene-editor-shell .avatar-import-actions {
         display: flex;
         align-items: center;
         gap: 10px;
         flex-wrap: wrap;
+      }
+      #scene-editor-shell .avatar-import-button {
+        position: relative;
+        overflow: hidden;
+      }
+      #scene-editor-shell .avatar-import-button.is-disabled {
+        opacity: 0.58;
+        cursor: not-allowed;
+      }
+      #scene-editor-shell .avatar-import-button input[type="file"] {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+      }
+      #scene-editor-shell .avatar-import-button.is-disabled input[type="file"] {
+        cursor: not-allowed;
       }
       #scene-editor-shell .avatar-import-file {
         display: inline-flex;
@@ -2387,23 +2403,20 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             <div class="card-stack" style="margin-top:16px;">
               <div class="field is-wide">
                 <label>${copy.avatarImportSelect}</label>
-                <input
-                  id="avatar-pack-archive"
-                  class="avatar-import-input"
-                  type="file"
-                  accept=".zip,application/zip"
-                  data-avatar-archive
-                  hidden
-                  aria-hidden="true"
-                  tabindex="-1"
-                >
               </div>
               <div class="avatar-import-actions">
-                <button class="scene-editor-button" type="button" data-action="import-avatar"${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}>
+                <label class="scene-editor-button avatar-import-button${state.avatarImporting || !options.avatarImportUrl ? " is-disabled" : ""}">
                   ${state.avatarImporting
                     ? copy.avatarImporting
                     : copy.avatarImportChooseButton}
-                </button>
+                  <input
+                    id="avatar-pack-archive"
+                    type="file"
+                    accept=".zip,application/zip"
+                    data-avatar-archive
+                    ${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}
+                  >
+                </label>
                 <div class="avatar-import-file">${escapeHtml(avatarArchiveLabel)}</div>
               </div>
               <div class="meta">${copy.avatarImportHint}</div>
@@ -2536,6 +2549,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       </div>
     `;
     const liveAvatarArchiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
+    liveAvatarArchiveInput?.addEventListener("click", () => {
+      liveAvatarArchiveInput.value = "";
+    });
     liveAvatarArchiveInput?.addEventListener("change", () => {
       const archive = liveAvatarArchiveInput.files?.[0] || null;
       handleAvatarArchiveSelection(archive);
@@ -2630,24 +2646,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     state.status = text;
     state.statusTone = tone;
     render();
-  };
-
-  const openAvatarArchivePicker = (): void => {
-    const input = wrapper.querySelector<HTMLInputElement>("[data-avatar-archive]");
-    if (!input || state.avatarImporting || !options.avatarImportUrl) {
-      return;
-    }
-    input.value = "";
-    const picker = input as HTMLInputElement & { showPicker?: () => void };
-    if (typeof picker.showPicker === "function") {
-      try {
-        picker.showPicker();
-        return;
-      } catch {
-        // Fallback to click() below.
-      }
-    }
-    input.click();
   };
 
   const syncSelection = (): void => {
@@ -2908,10 +2906,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       markDirty();
       syncSelection();
       render();
-      return;
-    }
-    if (action === "import-avatar") {
-      openAvatarArchivePicker();
       return;
     }
     if (action === "add-card-template" && state.selectedPageId) {
