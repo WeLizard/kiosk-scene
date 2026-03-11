@@ -2136,34 +2136,22 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         gap: 10px;
         flex-wrap: wrap;
       }
-      #scene-editor-shell .avatar-import-button {
-        position: relative;
-        overflow: hidden;
-      }
       #scene-editor-shell .avatar-import-button.is-disabled {
         opacity: 0.58;
         cursor: not-allowed;
       }
-      #scene-editor-shell .avatar-import-button input[type="file"] {
+      #scene-editor-shell .avatar-import-input {
         position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        border: 0;
         opacity: 0;
-        cursor: pointer;
-      }
-      #scene-editor-shell .avatar-import-button.is-disabled input[type="file"] {
-        cursor: not-allowed;
-      }
-      #scene-editor-shell .avatar-import-file {
-        display: inline-flex;
-        align-items: center;
-        min-height: 40px;
-        padding: 0 12px;
-        border-radius: 999px;
-        background: rgba(236, 242, 246, 0.92);
-        color: #385268;
-        font: 12px/1.3 "Aptos","Segoe UI",sans-serif;
+        pointer-events: none;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        clip-path: inset(50%);
       }
       @media (max-width: 980px) {
         #scene-editor-shell {
@@ -2228,6 +2216,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   document.documentElement.dataset.editorMode = "true";
   document.body.dataset.editorMode = "true";
   document.body.style.overflow = "auto";
+  if ("scrollRestoration" in window.history) {
+    window.history.scrollRestoration = "manual";
+  }
+  window.scrollTo(0, 0);
+  window.requestAnimationFrame(() => window.scrollTo(0, 0));
 
   const previewStage = wrapper.querySelector<HTMLElement>("[data-preview-stage]");
   const previewCanvas = wrapper.querySelector<HTMLElement>("[data-preview-canvas]");
@@ -2402,9 +2395,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         )
       : copy.entityBindingEmpty;
     const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
-    const avatarArchiveLabel = state.pendingAvatarZipName
-      ? copy.avatarImportSelected(state.pendingAvatarZipName)
-      : copy.avatarImportNotSelected;
     const avatarImportStatus = state.avatarImportStatus
       ? `<div class="scene-editor-status" data-tone="${state.avatarImportTone}">${escapeHtml(state.avatarImportStatus)}</div>`
       : "";
@@ -2448,20 +2438,30 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
                 <label>${copy.avatarImportSelect}</label>
               </div>
               <div class="avatar-import-actions">
-                <label class="scene-editor-button avatar-import-button${state.avatarImporting || !options.avatarImportUrl ? " is-disabled" : ""}">
+                <button
+                  class="scene-editor-button avatar-import-button${state.avatarImporting || !options.avatarImportUrl ? " is-disabled" : ""}"
+                  type="button"
+                  data-action="choose-avatar-archive"
+                  ${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}
+                >
                   ${state.avatarImporting
                     ? copy.avatarImporting
                     : copy.avatarImportChooseButton}
-                  <input
-                    id="avatar-pack-archive"
-                    type="file"
-                    accept=".zip,application/zip"
-                    data-avatar-archive
-                    ${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}
-                  >
-                </label>
-                <div class="avatar-import-file">${escapeHtml(avatarArchiveLabel)}</div>
+                </button>
+                <input
+                  id="avatar-pack-archive"
+                  class="avatar-import-input"
+                  type="file"
+                  accept=".zip,application/zip"
+                  data-avatar-archive
+                  tabindex="-1"
+                  aria-hidden="true"
+                  ${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}
+                >
               </div>
+              ${state.pendingAvatarZipName
+                ? `<div class="meta">${escapeHtml(copy.avatarImportSelected(state.pendingAvatarZipName))}</div>`
+                : ""}
               <div class="meta">${copy.avatarImportHint}</div>
               ${avatarImportStatus}
             </div>
@@ -2592,6 +2592,23 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       </div>
     `;
     const liveAvatarArchiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
+    const chooseAvatarArchiveButton = dashboardHost.querySelector<HTMLButtonElement>("[data-action='choose-avatar-archive']");
+    chooseAvatarArchiveButton?.addEventListener("click", () => {
+      if (!liveAvatarArchiveInput || liveAvatarArchiveInput.disabled) {
+        return;
+      }
+      liveAvatarArchiveInput.value = "";
+      const pickerCapableInput = liveAvatarArchiveInput as HTMLInputElement & { showPicker?: () => void };
+      try {
+        if (typeof pickerCapableInput.showPicker === "function") {
+          pickerCapableInput.showPicker();
+          return;
+        }
+      } catch {
+        // Fall back to click() when the browser refuses showPicker().
+      }
+      liveAvatarArchiveInput.click();
+    });
     liveAvatarArchiveInput?.addEventListener("click", () => {
       liveAvatarArchiveInput.value = "";
     });
