@@ -562,7 +562,8 @@ const AVATAR_SEMANTIC_FIELDS = [
   { key: "speaking", labelKey: "avatarSemanticSpeaking" },
 ] as const;
 
-const AVATAR_IMPORT_CHUNK_BYTES = 4 * 1024 * 1024;
+const DIRECT_AVATAR_IMPORT_CHUNK_BYTES = 4 * 1024 * 1024;
+const INGRESS_AVATAR_IMPORT_CHUNK_BYTES = 192 * 1024;
 
 type AvatarSemanticField = (typeof AVATAR_SEMANTIC_FIELDS)[number];
 
@@ -1206,15 +1207,17 @@ async function importAvatarPack(url: string, archive: File): Promise<AvatarPackS
   if (!target) {
     throw new Error("Avatar import API is not configured.");
   }
-  if (archive.size > AVATAR_IMPORT_CHUNK_BYTES) {
+  const ingressUpload = /\/api\/hassio_ingress\//.test(target);
+  const chunkBytes = ingressUpload ? INGRESS_AVATAR_IMPORT_CHUNK_BYTES : DIRECT_AVATAR_IMPORT_CHUNK_BYTES;
+  if (ingressUpload || archive.size > chunkBytes) {
     const uploadId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const chunkCount = Math.max(1, Math.ceil(archive.size / AVATAR_IMPORT_CHUNK_BYTES));
+    const chunkCount = Math.max(1, Math.ceil(archive.size / chunkBytes));
     let importedSummary: AvatarPackSummary | null = null;
     for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
-      const start = chunkIndex * AVATAR_IMPORT_CHUNK_BYTES;
-      const end = Math.min(archive.size, start + AVATAR_IMPORT_CHUNK_BYTES);
+      const start = chunkIndex * chunkBytes;
+      const end = Math.min(archive.size, start + chunkBytes);
       const formData = new FormData();
       formData.set("uploadId", uploadId);
       formData.set("filename", archive.name);
