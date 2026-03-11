@@ -381,6 +381,23 @@ function prepareEditorViewport(): void {
     resetScroll();
     window.setTimeout(resetScroll, 120);
   });
+  let userInteracted = false;
+  const stopGuard = (): void => {
+    userInteracted = true;
+  };
+  const interactionEvents = ["pointerdown", "wheel", "touchstart", "keydown"] as const;
+  for (const eventName of interactionEvents) {
+    window.addEventListener(eventName, stopGuard, { once: true, passive: true });
+  }
+  let attempts = 0;
+  const guardTimer = window.setInterval(() => {
+    if (userInteracted || attempts >= 24) {
+      window.clearInterval(guardTimer);
+      return;
+    }
+    resetScroll();
+    attempts += 1;
+  }, 80);
 }
 
 function mountEditorShell(options: {
