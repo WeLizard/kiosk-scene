@@ -2144,6 +2144,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         position: absolute;
         width: 1px;
         height: 1px;
+        min-height: 1px;
+        max-width: 1px;
+        max-height: 1px;
         margin: -1px;
         padding: 0;
         border: 0;
@@ -2216,11 +2219,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   document.documentElement.dataset.editorMode = "true";
   document.body.dataset.editorMode = "true";
   document.body.style.overflow = "auto";
-  if ("scrollRestoration" in window.history) {
-    window.history.scrollRestoration = "manual";
-  }
-  window.scrollTo(0, 0);
-  window.requestAnimationFrame(() => window.scrollTo(0, 0));
 
   const previewStage = wrapper.querySelector<HTMLElement>("[data-preview-stage]");
   const previewCanvas = wrapper.querySelector<HTMLElement>("[data-preview-canvas]");

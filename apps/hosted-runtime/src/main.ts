@@ -366,6 +366,23 @@ function isEditorMode(): boolean {
   return params.get("editor") === "1";
 }
 
+function prepareEditorViewport(): void {
+  if (!isEditorMode()) {
+    return;
+  }
+  const resetScroll = (): void => window.scrollTo(0, 0);
+  if ("scrollRestoration" in window.history) {
+    window.history.scrollRestoration = "manual";
+  }
+  resetScroll();
+  window.addEventListener("pageshow", resetScroll, { once: true });
+  window.addEventListener("load", resetScroll, { once: true });
+  window.requestAnimationFrame(() => {
+    resetScroll();
+    window.setTimeout(resetScroll, 120);
+  });
+}
+
 function mountEditorShell(options: {
   packId: string;
   editorFormUrl: string;
@@ -648,6 +665,7 @@ if (!root) {
 
 const copy = COPY[resolveUiLang()];
 
+prepareEditorViewport();
 renderStatus(root, copy.startingTitle, copy.startingBody);
 
 void (async () => {
