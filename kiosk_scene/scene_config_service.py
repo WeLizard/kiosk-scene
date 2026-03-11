@@ -1708,8 +1708,11 @@ def is_placeholder_page_label(value: Any) -> bool:
 
 
 def card_has_meaningful_content(card: dict[str, Any]) -> bool:
+    for key in ("entity", "stateEntity", "downEntity", "upEntity"):
+        if trim_text(card.get(key), "", 255):
+            return True
     for key, value in card.items():
-        if key == "type":
+        if key in ("type", "caption", "hint", "onText", "offText"):
             continue
         if isinstance(value, str) and trim_text(value, "", 255):
             return True

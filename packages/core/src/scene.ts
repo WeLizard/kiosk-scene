@@ -32,8 +32,14 @@ function hasMeaningfulCardContent(card: unknown): boolean {
   if (!isObjectRecord(card)) {
     return false;
   }
+  const bindingKeys = ["entity", "stateEntity", "downEntity", "upEntity"];
+  for (const key of bindingKeys) {
+    if (typeof card[key] === "string" && trimText(card[key], 255)) {
+      return true;
+    }
+  }
   for (const [key, rawValue] of Object.entries(card)) {
-    if (key === "type") {
+    if (key === "type" || key === "caption" || key === "hint" || key === "onText" || key === "offText") {
       continue;
     }
     if (typeof rawValue === "string" && trimText(rawValue, 255)) {
