@@ -313,6 +313,9 @@ function normalizeHostedAvatarManifest(
   manifestUrl: string,
 ): AvatarManifestV1 {
   const normalized = sanitizeAvatarManifestV1(manifest);
+  const sharedLive2dRuntimeUrl = normalized.adapter === "live2d"
+    ? resolveHostedUrl("../../scene-runtime/avatar.html", manifestUrl)
+    : "";
   const assetRoot = resolveHostedUrl(String(normalized.assetRoot || "").trim(), manifestUrl);
   const remapHostedAssetValue = (value: string): string => {
     const normalizedValue = String(value || "").trim();
@@ -333,7 +336,7 @@ function normalizeHostedAvatarManifest(
   return {
     ...normalized,
     assetRoot,
-    runtimeUrl: resolveHostedUrl(String(normalized.runtimeUrl || "").trim(), manifestUrl),
+    runtimeUrl: sharedLive2dRuntimeUrl || resolveHostedUrl(String(normalized.runtimeUrl || "").trim(), manifestUrl),
     entry: remapHostedAssetValue(String(normalized.entry || "").trim()),
     modelUrl: remapHostedAssetValue(String(normalized.modelUrl || "").trim()),
     fallbackPortrait: remapHostedAssetValue(String(normalized.fallbackPortrait || "").trim()),
