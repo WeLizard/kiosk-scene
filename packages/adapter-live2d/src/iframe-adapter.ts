@@ -187,6 +187,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
   private splashEl: HTMLDivElement | null = null;
   private splashTextEl: HTMLDivElement | null = null;
   private assetRoot = "";
+  private rendererConfigBlobUrl = "";
   private currentState: StateV1;
   private currentCue: ControlCueV1 = { ...DEFAULT_CUE };
   private currentPreset: ViewPreset = "full";
@@ -216,7 +217,25 @@ class Live2dIframeAdapter implements AvatarAdapter {
     this.assetRoot = trimText(context.assetRoot, 1024) || this.manifest.assetRoot;
 
     const runtimeUrl = resolveRuntimeUrl(this.options, this.manifest, this.assetRoot);
-    const iframeSrc = buildRuntimeSrc(runtimeUrl, this.options);
+    const iframeQuery: Record<string, QueryValue> = {
+      ...(this.options.query || {}),
+    };
+    try {
+      const runtimeOrigin = new URL(runtimeUrl, window.location.href).origin;
+      if (runtimeOrigin === window.location.origin) {
+        const legacyConfig = createLegacyRendererConfig(this.rendererConfig, this.manifest, this.assetRoot);
+        this.rendererConfigBlobUrl = URL.createObjectURL(
+          new Blob([JSON.stringify(legacyConfig)], { type: "application/json" }),
+        );
+        iframeQuery.rendererConfigUrl = this.rendererConfigBlobUrl;
+      }
+    } catch {
+      this.rendererConfigBlobUrl = "";
+    }
+    const iframeSrc = buildRuntimeSrc(runtimeUrl, {
+      ...this.options,
+      query: iframeQuery,
+    });
     this.targetOrigin = resolveTargetOrigin(iframeSrc, this.options.targetOrigin);
 
     const containerEl = document.createElement("div");
@@ -272,6 +291,10 @@ class Live2dIframeAdapter implements AvatarAdapter {
     this.isReady = false;
     this.targetOrigin = "*";
     this.assetRoot = "";
+    if (this.rendererConfigBlobUrl) {
+      URL.revokeObjectURL(this.rendererConfigBlobUrl);
+      this.rendererConfigBlobUrl = "";
+    }
     if (this.host) {
       this.host.innerHTML = "";
     }

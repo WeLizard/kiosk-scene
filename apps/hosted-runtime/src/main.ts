@@ -311,9 +311,19 @@ function remapLegacyHostedUrl(value: string, bootstrapUrl: string): string {
 function normalizeHostedAvatarManifest(
   manifest: AvatarManifestV1,
   manifestUrl: string,
-  bootstrapUrl: string,
 ): AvatarManifestV1 {
   const normalized = sanitizeAvatarManifestV1(manifest);
+  const assetRoot = resolveHostedUrl(String(normalized.assetRoot || "").trim(), manifestUrl);
+  const remapHostedAssetValue = (value: string): string => {
+    const normalizedValue = String(value || "").trim();
+    if (!normalizedValue) {
+      return "";
+    }
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalizedValue) || normalizedValue.startsWith("/")) {
+      return resolveHostedUrl(normalizedValue, manifestUrl);
+    }
+    return normalizedValue;
+  };
   const presetThumbs = Object.fromEntries(
     Object.entries(normalized.presetThumbs || {})
       .map(([key, value]) => [key, resolveHostedUrl(String(value || ""), manifestUrl)])
@@ -322,12 +332,12 @@ function normalizeHostedAvatarManifest(
 
   return {
     ...normalized,
-    assetRoot: resolveHostedUrl(String(normalized.assetRoot || "").trim(), manifestUrl),
+    assetRoot,
     runtimeUrl: resolveHostedUrl(String(normalized.runtimeUrl || "").trim(), manifestUrl),
-    entry: resolveHostedUrl(String(normalized.entry || "").trim(), manifestUrl),
-    modelUrl: resolveHostedUrl(String(normalized.modelUrl || "").trim(), manifestUrl),
-    fallbackPortrait: resolveHostedUrl(String(normalized.fallbackPortrait || "").trim(), manifestUrl),
-    motionMapUrl: resolveHostedUrl(String(normalized.motionMapUrl || "").trim(), manifestUrl),
+    entry: remapHostedAssetValue(String(normalized.entry || "").trim()),
+    modelUrl: remapHostedAssetValue(String(normalized.modelUrl || "").trim()),
+    fallbackPortrait: remapHostedAssetValue(String(normalized.fallbackPortrait || "").trim()),
+    motionMapUrl: remapHostedAssetValue(String(normalized.motionMapUrl || "").trim()),
     presetThumbs,
   };
 }
@@ -607,7 +617,6 @@ async function resolveRuntimeRendererConfigUrl(
   const normalizedAvatarManifest = normalizeHostedAvatarManifest(
     await readJson<AvatarManifestV1>(resolvedAvatarManifestUrl),
     resolvedAvatarManifestUrl,
-    bootstrapUrl,
   );
   const avatarManifestBlobUrl = URL.createObjectURL(
     new Blob([JSON.stringify(normalizedAvatarManifest)], { type: "application/json" }),

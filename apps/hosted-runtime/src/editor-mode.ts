@@ -40,7 +40,9 @@ type EditorCopy = {
   avatarImport: string;
   avatarImportHint: string;
   avatarImportSelect: string;
+  avatarImportNotSelected: string;
   avatarImportSelected: (name: string) => string;
+  avatarImportChooseButton: string;
   avatarImportButton: string;
   avatarImporting: string;
   avatarImportSuccess: (name: string) => string;
@@ -167,6 +169,8 @@ const CARD_TYPE_OPTIONS = [
 
 const COMMON_CARD_FIELDS = ["caption", "hint"] as const;
 type CardTypeOption = (typeof CARD_TYPE_OPTIONS)[number];
+const LEGACY_LIVE2D_PREFIX = "/local/live2d/";
+const SCENE_LEGACY_LIVE2D_PREFIX = "/scene-legacy/live2d/";
 
 const CARD_TYPE_DESCRIPTIONS: Record<UiLang, Record<CardTypeOption, string>> = {
   ru: {
@@ -231,7 +235,9 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarImport: "Импорт аватара",
     avatarImportHint: "Импорт сразу создаёт отдельный avatar-pack, находит model3.json и подготавливает черновик motion-map.",
     avatarImportSelect: "ZIP-архив Live2D-модели",
+    avatarImportNotSelected: "Файл не выбран",
     avatarImportSelected: (name) => `Выбран архив: ${name}`,
+    avatarImportChooseButton: "Выбрать ZIP",
     avatarImportButton: "Выбрать ZIP и импортировать",
     avatarImporting: "Импортирую avatar-pack...",
     avatarImportSuccess: (name) => `Импортирован avatar-pack: ${name}`,
@@ -368,7 +374,9 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarImport: "Import avatar",
     avatarImportHint: "Import creates a separate avatar pack, detects model3.json and prepares a draft motion map.",
     avatarImportSelect: "Choose avatar ZIP",
+    avatarImportNotSelected: "No file selected",
     avatarImportSelected: (name) => `Selected archive: ${name}`,
+    avatarImportChooseButton: "Choose ZIP",
     avatarImportButton: "Choose and import ZIP",
     avatarImporting: "Importing avatar pack...",
     avatarImportSuccess: (name) => `Imported avatar pack: ${name}`,
@@ -1014,6 +1022,34 @@ function resolveEditorUrl(value: string, baseUrl: string): string {
   return new URL(normalized, baseUrl).toString();
 }
 
+function remapLegacyHostedAssetUrl(value: string, baseUrl: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.startsWith(LEGACY_LIVE2D_PREFIX)) {
+    return resolveEditorUrl(
+      `${SCENE_LEGACY_LIVE2D_PREFIX}${normalized.slice(LEGACY_LIVE2D_PREFIX.length)}`,
+      baseUrl,
+    );
+  }
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
+    try {
+      const parsed = new URL(normalized, baseUrl);
+      if (parsed.pathname.startsWith(LEGACY_LIVE2D_PREFIX)) {
+        const relativePath = parsed.pathname.slice(LEGACY_LIVE2D_PREFIX.length);
+        return resolveEditorUrl(
+          `${SCENE_LEGACY_LIVE2D_PREFIX}${relativePath}${parsed.search}${parsed.hash}`,
+          baseUrl,
+        );
+      }
+    } catch {
+      return normalized;
+    }
+  }
+  return normalized;
+}
+
 function ensureDirectoryUrl(value: string): string {
   const normalized = String(value || "").trim();
   if (!normalized) {
@@ -1024,7 +1060,10 @@ function ensureDirectoryUrl(value: string): string {
 
 function resolveAvatarAssetBaseUrl(manifestUrl: string, assetRoot: string): string {
   const manifestDirUrl = new URL("./", manifestUrl).toString();
-  const resolvedRoot = resolveEditorUrl(assetRoot, manifestDirUrl);
+  const resolvedRoot = resolveEditorUrl(
+    remapLegacyHostedAssetUrl(assetRoot, manifestDirUrl) || assetRoot,
+    manifestDirUrl,
+  );
   return ensureDirectoryUrl(resolvedRoot || manifestDirUrl);
 }
 
@@ -1033,7 +1072,21 @@ function resolveAvatarAssetUrl(manifestUrl: string, assetRoot: string, value: st
   if (!normalized) {
     return "";
   }
-  return resolveEditorUrl(normalized, resolveAvatarAssetBaseUrl(manifestUrl, assetRoot));
+  return resolveEditorUrl(
+    remapLegacyHostedAssetUrl(normalized, manifestUrl) || normalized,
+    resolveAvatarAssetBaseUrl(manifestUrl, assetRoot),
+  );
+}
+
+function resolveManifestAssetUrl(manifestUrl: string, value: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  return resolveEditorUrl(
+    remapLegacyHostedAssetUrl(normalized, manifestUrl) || normalized,
+    new URL("./", manifestUrl).toString(),
+  );
 }
 
 function normalizeAvatarSummary(item: Partial<AvatarPackSummary>): AvatarPackSummary {
@@ -1067,6 +1120,7 @@ async function loadBundledAvatarSummary(manifestUrl: string, packId: string): Pr
     assetRoot?: string;
     fallbackPortrait?: string;
     motionMapUrl?: string;
+    presetThumbs?: Record<string, string>;
     capabilities?: Partial<AvatarPackSummary["capabilities"]>;
   };
   if (!response.ok) {
@@ -1088,11 +1142,14 @@ async function loadBundledAvatarSummary(manifestUrl: string, packId: string): Pr
     }
   }
 
+  const previewUrl = resolveManifestAssetUrl(target, String(manifest.presetThumbs?.full || "").trim())
+    || resolveAvatarAssetUrl(target, assetRoot, String(manifest.fallbackPortrait || "").trim());
+
   return normalizeAvatarSummary({
     id: "",
     name: String(manifest.name || "").trim() || packId || "",
     manifestUrl: target,
-    previewUrl: resolveAvatarAssetUrl(target, assetRoot, String(manifest.fallbackPortrait || "").trim()),
+    previewUrl,
     motionCount,
     capabilities: manifest.capabilities,
   });
@@ -2015,10 +2072,24 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         clip: rect(0, 0, 0, 0);
         white-space: nowrap;
         border: 0;
-      }
-      #scene-editor-shell .avatar-import-trigger.is-disabled {
+        opacity: 0;
         pointer-events: none;
-        opacity: 0.55;
+      }
+      #scene-editor-shell .avatar-import-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      #scene-editor-shell .avatar-import-file {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(236, 242, 246, 0.92);
+        color: #385268;
+        font: 12px/1.3 "Aptos","Segoe UI",sans-serif;
       }
       @media (max-width: 980px) {
         #scene-editor-shell {
@@ -2255,7 +2326,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
     const avatarArchiveLabel = state.pendingAvatarZipName
       ? copy.avatarImportSelected(state.pendingAvatarZipName)
-      : copy.avatarImportHint;
+      : copy.avatarImportNotSelected;
     const avatarImportStatus = state.avatarImportStatus
       ? `<div class="scene-editor-status" data-tone="${state.avatarImportTone}">${escapeHtml(state.avatarImportStatus)}</div>`
       : "";
@@ -2296,13 +2367,20 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
             <div class="card-stack" style="margin-top:16px;">
               <div class="field is-wide">
+                <label for="avatar-pack-archive">${copy.avatarImportSelect}</label>
                 <input id="avatar-pack-archive" class="avatar-import-input" type="file" accept=".zip,application/zip" data-avatar-archive>
-                <label class="scene-editor-button avatar-import-trigger${state.avatarImporting || !options.avatarImportUrl ? " is-disabled" : ""}" for="avatar-pack-archive">
-                  ${state.avatarImporting ? copy.avatarImporting : copy.avatarImportButton}
-                </label>
-                <div class="meta">${copy.avatarImportSelect}</div>
               </div>
-              <div class="meta">${escapeHtml(avatarArchiveLabel)}</div>
+              <div class="avatar-import-actions">
+                <button class="scene-editor-button" type="button" data-action="import-avatar"${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}>
+                  ${state.avatarImporting
+                    ? copy.avatarImporting
+                    : state.pendingAvatarZip
+                      ? copy.avatarImportButton
+                      : copy.avatarImportChooseButton}
+                </button>
+                <div class="avatar-import-file">${escapeHtml(avatarArchiveLabel)}</div>
+              </div>
+              <div class="meta">${copy.avatarImportHint}</div>
               ${avatarImportStatus}
             </div>
             ${selectedAvatarPackId
@@ -2408,27 +2486,25 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             <div class="meta">${copy.entityBindingTargets}</div>
             ${renderBindingTargets(copy, selectedCard, state.selectedCardIndex, state.focusedBinding)}
           </div>
-          ${state.focusedBinding ? `
-            <div class="field ha-search" style="margin-top:12px;">
-              <label for="ha-entity-search">${copy.entitySearch}</label>
-              <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
-            </div>
-            <div class="ha-list">
-              ${filteredEntities.length ? filteredEntities.map((entity) => `
-                <article class="ha-entity">
-                  <div class="ha-entity-row">
-                    <div>
-                      <strong>${escapeHtml(entity.name)}</strong>
-                      <div class="meta">${escapeHtml(entity.domain)}</div>
-                    </div>
-                    <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}">${copy.useEntity}</button>
+          <div class="field ha-search" style="margin-top:12px;">
+            <label for="ha-entity-search">${copy.entitySearch}</label>
+            <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
+          </div>
+          <div class="ha-list">
+            ${filteredEntities.length ? filteredEntities.map((entity) => `
+              <article class="ha-entity">
+                <div class="ha-entity-row">
+                  <div>
+                    <strong>${escapeHtml(entity.name)}</strong>
+                    <div class="meta">${escapeHtml(entity.domain)}</div>
                   </div>
-                  <code>${escapeHtml(entity.entityId)}</code>
-                  <div class="ha-state">${escapeHtml(entity.state)}${entity.unit ? ` · ${escapeHtml(entity.unit)}` : ""}</div>
-                </article>
-              `).join("") : `<div class="meta">${copy.noEntities}</div>`}
-            </div>
-          ` : ""}
+                  <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}"${state.focusedBinding ? "" : " disabled"}>${copy.useEntity}</button>
+                </div>
+                <code>${escapeHtml(entity.entityId)}</code>
+                <div class="ha-state">${escapeHtml(entity.state)}${entity.unit ? ` · ${escapeHtml(entity.unit)}` : ""}</div>
+              </article>
+            `).join("") : `<div class="meta">${copy.noEntities}</div>`}
+          </div>
           </section>
         </div>
       </div>
@@ -2438,9 +2514,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       const archive = liveAvatarArchiveInput.files?.[0] || null;
       handleAvatarArchiveSelection(archive);
       liveAvatarArchiveInput.value = "";
-      if (archive) {
-        void importAvatarArchive(archive);
-      }
     });
 
     for (const pageChip of Array.from(dashboardHost.querySelectorAll<HTMLElement>(".page-chip[data-page-id]"))) {
@@ -2531,6 +2604,24 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     state.status = text;
     state.statusTone = tone;
     render();
+  };
+
+  const openAvatarArchivePicker = (): void => {
+    const input = wrapper.querySelector<HTMLInputElement>("[data-avatar-archive]");
+    if (!input || state.avatarImporting || !options.avatarImportUrl) {
+      return;
+    }
+    input.value = "";
+    const picker = input as HTMLInputElement & { showPicker?: () => void };
+    if (typeof picker.showPicker === "function") {
+      try {
+        picker.showPicker();
+        return;
+      } catch {
+        // Fallback to click() below.
+      }
+    }
+    input.click();
   };
 
   const syncSelection = (): void => {
@@ -2791,6 +2882,14 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       markDirty();
       syncSelection();
       render();
+      return;
+    }
+    if (action === "import-avatar") {
+      if (state.pendingAvatarZip) {
+        void importAvatarArchive(state.pendingAvatarZip);
+      } else {
+        openAvatarArchivePicker();
+      }
       return;
     }
     if (action === "add-card-template" && state.selectedPageId) {

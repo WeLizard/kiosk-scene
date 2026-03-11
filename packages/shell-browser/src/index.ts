@@ -6,6 +6,7 @@ import {
   createViewPresetControl,
   DEFAULT_ASSISTANT_PRESENTATION_COPY_EN,
   DEFAULT_CONTROL_V1,
+  DEFAULT_STATE_V1,
   mergeControlV1,
   mergeControlCueIntoState,
   nextIdleDelayMs,
@@ -232,10 +233,23 @@ function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: stri
     manifestBaseUrl,
     trimText(manifest.assetRoot, 1024) || "./assets",
   );
+  const assetBaseUrl = assetRoot ? withTrailingSlash(assetRoot) : manifestBaseUrl;
+  const resolveAvatarAssetUrl = (value: string): string => {
+    const normalized = trimText(value, 1024);
+    if (!normalized) {
+      return "";
+    }
+    return resolveUrlAgainst(assetBaseUrl, normalized);
+  };
   return {
     ...manifest,
     assetRoot,
     runtimeUrl: resolveUrlAgainst(manifestBaseUrl, manifest.runtimeUrl || ""),
+    entry: resolveAvatarAssetUrl(manifest.entry || ""),
+    modelUrl: resolveAvatarAssetUrl(manifest.modelUrl || ""),
+    fallbackPortrait: resolveAvatarAssetUrl(manifest.fallbackPortrait || ""),
+    motionMapUrl: resolveAvatarAssetUrl(manifest.motionMapUrl || ""),
+    expressionMapUrl: resolveAvatarAssetUrl(manifest.expressionMapUrl || ""),
     presetThumbs: Object.fromEntries(
       Object.entries(manifest.presetThumbs || {})
         .map(([key, value]) => [key, resolveUrlAgainst(manifestBaseUrl, value)])
@@ -1144,7 +1158,7 @@ export class BrowserSceneShellApp {
   private async readAssistantState(): Promise<StateV1> {
     const jsonFallback = async (): Promise<StateV1> => createJsonStateProvider({
       url: this.rendererConfig.state.stateUrl,
-      defaultValue: this.currentState,
+      defaultValue: this.currentState ?? DEFAULT_STATE_V1,
     }).read();
 
     if (this.rendererConfig.state.provider !== "ha" || !this.entityMap) {

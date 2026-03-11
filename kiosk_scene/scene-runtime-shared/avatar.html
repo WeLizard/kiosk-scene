@@ -302,7 +302,9 @@
     const statusEl = document.getElementById('status');
     const fallbackPortraitEl = document.getElementById('fallback-portrait');
     const loadingSubtitleEl = document.getElementById('loading-subtitle');
-    const RENDERER_CONFIG_URL = './renderer.config.json';
+    const SEARCH_PARAMS = new URLSearchParams(window.location.search);
+    const EXPLICIT_RENDERER_CONFIG_URL = SEARCH_PARAMS.get('rendererConfigUrl') || '';
+    const RENDERER_CONFIG_URL = EXPLICIT_RENDERER_CONFIG_URL || './renderer.config.json';
     const AVATAR_MANIFEST_URL = './avatar.manifest.json';
     const DEFAULT_RENDERER_CONFIG = {
       version: 1,
@@ -325,7 +327,6 @@
         label: 'haru-t03'
       }
     ];
-    const SEARCH_PARAMS = new URLSearchParams(window.location.search);
     const IS_DISPLAY_MODE = SEARCH_PARAMS.get('display') === '1';
     const TOUCH_DEBUG = SEARCH_PARAMS.get('debug') === 'touch';
     const TYPEWRITER_START_DELAY_MS = 220;
@@ -827,6 +828,24 @@
     }
 
     async function loadRendererConfig() {
+      const explicitRendererConfigUrl = trimText(EXPLICIT_RENDERER_CONFIG_URL, 2048);
+      if (explicitRendererConfigUrl) {
+        try {
+          const requestUrl = explicitRendererConfigUrl.startsWith('blob:')
+            ? explicitRendererConfigUrl
+            : `${explicitRendererConfigUrl}${explicitRendererConfigUrl.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+          const response = await fetch(requestUrl, { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(`Renderer config HTTP ${response.status}`);
+          }
+          const payload = await response.json();
+          rendererConfig = deepMergeConfig(DEFAULT_RENDERER_CONFIG, payload || {});
+          applyRendererConfig();
+          return;
+        } catch (error) {
+          console.warn('Failed to load explicit renderer config', error);
+        }
+      }
       const fromParent = await requestParentRendererConfig();
       if (fromParent && getModelJsonUrl()) {
         return;
@@ -874,12 +893,20 @@
     }
 
     function syncFallbackPortrait(url) {
-      const portrait = trimText(url, 512);
+      const portrait = trimText(url, 512) || getPresetThumbUrl();
       if (portrait) {
         fallbackPortraitEl.src = portrait;
         return;
       }
       fallbackPortraitEl.removeAttribute('src');
+    }
+
+    function getPresetThumbUrl() {
+      const presetThumbs = rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.presetThumbs;
+      return trimText(
+        presetThumbs && (presetThumbs[currentViewPreset] || presetThumbs.full),
+        512,
+      );
     }
 
     function uniqueAssetCandidates(items) {
@@ -936,18 +963,6 @@
       }
       const probeUrl = `${target}${target.includes('?') ? '&' : '?'}probe=${Date.now()}`;
       try {
-        const response = await fetch(probeUrl, { method: 'HEAD', cache: 'no-store' });
-        if (response.ok) {
-          return true;
-        }
-        if (response.status !== 405) {
-          return false;
-        }
-      } catch (_) {
-        return false;
-      }
-
-      try {
         const response = await fetch(probeUrl, { method: 'GET', cache: 'no-store' });
         return response.ok;
       } catch (_) {
@@ -963,15 +978,11 @@
           existing.push(candidate);
         }
       }
-      return existing.length ? existing : candidates;
+      return existing;
     }
 
     async function resolveAvailablePortraitUrl(candidate) {
-      const portrait = trimText(candidate && candidate.fallbackPortrait, 512);
-      if (!portrait) {
-        return '';
-      }
-      return (await assetExists(portrait)) ? portrait : '';
+      return trimText(candidate && candidate.fallbackPortrait, 512);
     }
 
     function getAppUrl() {
@@ -1631,6 +1642,7 @@
     }
 
     function showStaticPortrait(reason) {
+      syncFallbackPortrait('');
       clearLoadingState();
       frameEl.classList.remove('is-ready');
       fallbackPortraitEl.classList.remove('hidden');
@@ -1943,7 +1955,8 @@
         startLoadingState('Проверяю набор модели…');
         const modelCandidates = await resolveAvailableModelCandidates();
         if (!modelCandidates.length) {
-          throw new Error('No modelJson configured');
+          showStaticPortrait('Статичный портрет');
+          return;
         }
         let lastModelError = null;
         for (const candidate of modelCandidates) {
