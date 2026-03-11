@@ -70,6 +70,8 @@ const DEFAULT_BUBBLE_STATE: Live2dBubbleState = {
   typewriter: true,
 };
 
+const RENDERER_READY_TIMEOUT_MS = 15_000;
+
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -156,6 +158,17 @@ function resolveSplashText(): string {
   return locale.startsWith("ru") ? "Поднимаю рендер аватара…" : "Loading compatibility renderer...";
 }
 
+function resolveAssistantFallbackName(localeHint: string): string {
+  const locale = String(localeHint || navigator.language || "").toLowerCase();
+  return locale.startsWith("ru") ? "Ассистент" : "Assistant";
+}
+
+function resolveAvatarFrameTitle(localeHint: string, assistantName: string): string {
+  const locale = String(localeHint || navigator.language || "").toLowerCase();
+  const normalizedName = trimText(assistantName, 40) || resolveAssistantFallbackName(locale);
+  return locale.startsWith("ru") ? `${normalizedName}: аватар` : `${normalizedName} avatar`;
+}
+
 function buildRuntimeSrc(runtimeUrl: string, options: Live2dAdapterOptions): string {
   const url = new URL(runtimeUrl, window.location.href);
   const query = { ...(options.query || {}) };
@@ -228,6 +241,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
   private targetOrigin = "*";
   private isReady = false;
   private bubbleRevision = 0;
+  private readyTimeoutHandle: number | null = null;
 
   constructor(options: Live2dAdapterOptions = {}) {
     this.options = options;
@@ -288,7 +302,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
     iframeEl.className = "ks-live2d-iframe";
     iframeEl.src = iframeSrc;
     iframeEl.title = trimText(this.options.iframeTitle, 80)
-      || `${trimText(this.rendererConfig.assistant.name, 40) || "Assistant"} avatar`;
+      || resolveAvatarFrameTitle(this.rendererConfig.assistant.locale || "", this.rendererConfig.assistant.name);
     iframeEl.loading = "eager";
     iframeEl.allow = "autoplay";
     Object.assign(iframeEl.style, {
@@ -307,6 +321,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
     this.host.append(containerEl);
 
     iframeEl.addEventListener("load", () => {
+      this.armReadyTimeout();
       this.postRendererConfig();
       void this.flush();
     });
@@ -324,6 +339,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
     this.isReady = false;
     this.targetOrigin = "*";
     this.assetRoot = "";
+    this.clearReadyTimeout();
     if (this.rendererConfigBlobUrl) {
       URL.revokeObjectURL(this.rendererConfigBlobUrl);
       this.rendererConfigBlobUrl = "";
@@ -409,6 +425,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
     }
 
     this.isReady = true;
+    this.clearReadyTimeout();
     this.setSplashVisible(false);
     void this.flush();
   };
@@ -443,7 +460,8 @@ class Live2dIframeAdapter implements AvatarAdapter {
     });
 
     const titleEl = document.createElement("div");
-    titleEl.textContent = trimText(this.rendererConfig.assistant.name, 40) || "Live2D";
+    titleEl.textContent = trimText(this.rendererConfig.assistant.name, 40)
+      || resolveAssistantFallbackName(this.rendererConfig.assistant.locale || "");
     Object.assign(titleEl.style, {
       fontSize: "14px",
       fontWeight: "600",
@@ -472,6 +490,24 @@ class Live2dIframeAdapter implements AvatarAdapter {
     this.splashEl.style.opacity = visible ? "1" : "0";
     this.splashEl.style.visibility = visible ? "visible" : "hidden";
     this.splashEl.style.pointerEvents = visible ? "auto" : "none";
+  }
+
+  private clearReadyTimeout(): void {
+    if (this.readyTimeoutHandle != null) {
+      window.clearTimeout(this.readyTimeoutHandle);
+      this.readyTimeoutHandle = null;
+    }
+  }
+
+  private armReadyTimeout(): void {
+    this.clearReadyTimeout();
+    this.readyTimeoutHandle = window.setTimeout(() => {
+      if (this.isReady) {
+        return;
+      }
+      console.warn("Live2D iframe did not report ready in time; hiding splash guard.");
+      this.setSplashVisible(false);
+    }, RENDERER_READY_TIMEOUT_MS);
   }
 
   private getLegacyRendererConfig(): Live2dLegacyRendererConfig | null {

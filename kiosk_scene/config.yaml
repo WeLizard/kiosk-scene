@@ -1,5 +1,5 @@
 name: Kiosk Scene
-version: "0.10.35"
+version: "0.10.36"
 slug: kiosk_scene
 description: Хостинг kiosk-scene как отдельного add-on Home Assistant.
 url: https://github.com/WeLizard/kiosk-scene

@@ -272,9 +272,9 @@
 <body class="is-loading">
   <div class="shell">
     <div class="frame" id="frame">
-      <div id="badge">Assistant</div>
+      <div id="badge">Ассистент</div>
       <div id="meta">режим совместимости</div>
-      <img id="fallback-portrait" src="" alt="Avatar portrait">
+      <img id="fallback-portrait" src="" alt="Портрет аватара">
       <div id="loading-overlay" aria-live="polite">
         <div class="loading-panel">
           <div class="loading-spinner" aria-hidden="true"></div>
@@ -306,9 +306,14 @@
     const EXPLICIT_RENDERER_CONFIG_URL = SEARCH_PARAMS.get('rendererConfigUrl') || '';
     const RENDERER_CONFIG_URL = EXPLICIT_RENDERER_CONFIG_URL || './renderer.config.json';
     const AVATAR_MANIFEST_URL = './avatar.manifest.json';
+    const UI_LOCALE = String(navigator.language || 'ru-RU').toLowerCase();
+    const UI_TEXT = {
+      assistantName: UI_LOCALE.startsWith('ru') ? 'Ассистент' : 'Assistant',
+      portraitAlt: UI_LOCALE.startsWith('ru') ? 'Портрет аватара' : 'Avatar portrait'
+    };
     const DEFAULT_RENDERER_CONFIG = {
       version: 1,
-      assistant: { name: 'Assistant' },
+      assistant: { name: UI_TEXT.assistantName },
       links: { appUrl: '/app/openclaw_assistant' },
       state: {
         stateUrl: '/local/live2d/state.json'
@@ -896,9 +901,10 @@
     }
 
     function applyRendererConfig() {
-      const assistantName = trimText(rendererConfig && rendererConfig.assistant && rendererConfig.assistant.name, 40) || 'Assistant';
+      const assistantName = trimText(rendererConfig && rendererConfig.assistant && rendererConfig.assistant.name, 40) || UI_TEXT.assistantName;
       badgeEl.textContent = assistantName;
-      fallbackPortraitEl.alt = assistantName;
+      fallbackPortraitEl.alt = assistantName || UI_TEXT.portraitAlt;
+      document.title = `${assistantName} · Kiosk Scene`;
     }
 
     function getStateUrl() {
@@ -908,11 +914,43 @@
       );
     }
 
-    function getMotionMapUrl() {
-      return resolvePageUrl(
+    function uniqueUrls(items) {
+      const seen = new Set();
+      return items.filter((item) => {
+        const normalized = trimText(item, 2048);
+        if (!normalized || seen.has(normalized)) {
+          return false;
+        }
+        seen.add(normalized);
+        return true;
+      });
+    }
+
+    function resolveSiblingAssetUrl(referenceUrl, candidate) {
+      const normalizedReference = trimText(referenceUrl, 2048);
+      const normalizedCandidate = trimText(candidate, 512);
+      if (!normalizedReference || !normalizedCandidate) {
+        return '';
+      }
+      try {
+        return new URL(normalizedCandidate, normalizedReference).toString();
+      } catch {
+        return '';
+      }
+    }
+
+    function getMotionMapUrls() {
+      const explicit = resolvePageUrl(
         trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.motionMapUrl, 512)
           || DEFAULT_RENDERER_CONFIG.assetPack.motionMapUrl
       );
+      const modelJsonUrl = getModelJsonUrl();
+      const portraitUrl = getFallbackPortraitUrl();
+      return uniqueUrls([
+        explicit,
+        resolveSiblingAssetUrl(modelJsonUrl, './motion-map.json'),
+        resolveSiblingAssetUrl(portraitUrl, '../motion-map.json')
+      ]);
     }
 
     function getModelJsonUrl() {
@@ -1667,17 +1705,21 @@
     }
 
     async function loadMotionMap() {
-      try {
-        const response = await fetch(`${getMotionMapUrl()}?ts=${Date.now()}`, { cache: 'no-store' });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+      const urls = getMotionMapUrls();
+      for (const url of urls) {
+        try {
+          const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}ts=${Date.now()}`, { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const payload = await response.json();
+          if (payload && Array.isArray(payload.motions) && payload.semantic) {
+            motionMap = payload;
+            return;
+          }
+        } catch (error) {
+          console.warn('Failed to load motion map candidate', url, error);
         }
-        const payload = await response.json();
-        if (payload && Array.isArray(payload.motions) && payload.semantic) {
-          motionMap = payload;
-        }
-      } catch (error) {
-        console.warn('Failed to load motion map', error);
       }
     }
 
@@ -2373,8 +2415,6 @@
   </script>
 </body>
 </html>
-
-
 
 
 

@@ -746,6 +746,7 @@ export class BrowserSceneShellApp {
   private bindCarouselControls(): void {
     let lastPointerInputAt = 0;
     let lastTouchInputAt = 0;
+    let lastMouseInputAt = 0;
 
     const beginDrag = (pointerId: number | string, clientX: number, clientY: number, target: EventTarget | null): boolean => {
       if (this.orderedPages.length < 2 || this.isCarouselInteractiveTarget(target)) {
@@ -808,7 +809,14 @@ export class BrowserSceneShellApp {
       this.updateCarouselPosition();
     };
 
-    const shouldHandleTouchFallback = (): boolean => Date.now() - lastPointerInputAt > 500;
+    const shouldHandleTouchFallback = (): boolean => (
+      Date.now() - lastPointerInputAt > 500
+      && Date.now() - lastMouseInputAt > 500
+    );
+    const shouldHandleMouseFallback = (): boolean => (
+      Date.now() - lastPointerInputAt > 500
+      && Date.now() - lastTouchInputAt > 500
+    );
 
     this.carouselShellEl.addEventListener("keydown", (event) => {
       if (event.key === "ArrowLeft") {
@@ -904,6 +912,38 @@ export class BrowserSceneShellApp {
 
     this.carouselShellEl.addEventListener("touchend", finalizeTouch, { passive: false });
     this.carouselShellEl.addEventListener("touchcancel", finalizeTouch, { passive: false });
+
+    this.carouselShellEl.addEventListener("mousedown", (event) => {
+      if (event.button !== 0 || !shouldHandleMouseFallback()) {
+        return;
+      }
+      if (!beginDrag("mouse-fallback", event.clientX, event.clientY, event.target)) {
+        return;
+      }
+      lastMouseInputAt = Date.now();
+      event.preventDefault();
+    });
+
+    window.addEventListener("mousemove", (event) => {
+      if (!this.carouselDragState || this.carouselDragState.pointerId !== "mouse-fallback") {
+        return;
+      }
+      lastMouseInputAt = Date.now();
+      if (moveDrag("mouse-fallback", event.clientX, event.clientY)) {
+        event.preventDefault();
+      }
+    });
+
+    window.addEventListener("mouseup", (event) => {
+      if (!this.carouselDragState || this.carouselDragState.pointerId !== "mouse-fallback") {
+        return;
+      }
+      lastMouseInputAt = Date.now();
+      if (event.button === 0) {
+        event.preventDefault();
+      }
+      finalizeDrag("mouse-fallback");
+    });
   }
 
   private async refresh(): Promise<void> {
