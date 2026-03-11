@@ -151,6 +151,11 @@ function resolveTargetOrigin(runtimeUrl: string, override?: string): string {
   }
 }
 
+function resolveSplashText(): string {
+  const locale = String(navigator.language || "").toLowerCase();
+  return locale.startsWith("ru") ? "Поднимаю рендер аватара…" : "Loading compatibility renderer...";
+}
+
 function buildRuntimeSrc(runtimeUrl: string, options: Live2dAdapterOptions): string {
   const url = new URL(runtimeUrl, window.location.href);
   const query = { ...(options.query || {}) };
@@ -447,7 +452,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
 
     const textEl = document.createElement("div");
     textEl.dataset.live2dSplashText = "true";
-    textEl.textContent = "Loading compatibility renderer...";
+    textEl.textContent = resolveSplashText();
     Object.assign(textEl.style, {
       fontSize: "12px",
       lineHeight: "1.35",

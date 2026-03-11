@@ -334,6 +334,7 @@
     const MOUTH_FORM_PARAM = 'ParamMouthForm';
     const STALE_MS = 15 * 60 * 1000;
     const POLL_MS = 2500;
+    const LIVE2D_MODEL_LOAD_TIMEOUT_MS = 12000;
     let rendererConfig = DEFAULT_RENDERER_CONFIG;
 
     const DEFAULT_MOTION_MAP = {
@@ -1680,6 +1681,24 @@
       }
     }
 
+    async function loadLive2DModelWithTimeout(candidate) {
+      let timeoutId = null;
+      try {
+        return await Promise.race([
+          PIXI.live2d.Live2DModel.from(candidate.modelJson),
+          new Promise((_, reject) => {
+            timeoutId = window.setTimeout(() => {
+              reject(new Error(`Timed out loading Live2D model: ${candidate.label || candidate.modelJson}`));
+            }, LIVE2D_MODEL_LOAD_TIMEOUT_MS);
+          }),
+        ]);
+      } finally {
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+      }
+    }
+
     function isRuntimeSuspended() {
       return displaySleepPaused || document.hidden;
     }
@@ -2090,7 +2109,7 @@
             startLoadingState('Загружаю модель…');
           }
           try {
-            model = await PIXI.live2d.Live2DModel.from(candidate.modelJson);
+            model = await loadLive2DModelWithTimeout(candidate);
             break;
           } catch (error) {
             lastModelError = error;
@@ -2354,7 +2373,6 @@
   </script>
 </body>
 </html>
-
 
 
 

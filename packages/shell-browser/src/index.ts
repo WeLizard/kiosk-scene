@@ -530,7 +530,7 @@ export function createHomeAssistantWeatherReader(options: HomeAssistantWeatherRe
 }
 
 interface CarouselDragState {
-  pointerId: number;
+  pointerId: number | string;
   startX: number;
   startY: number;
   deltaX: number;
@@ -744,6 +744,72 @@ export class BrowserSceneShellApp {
   }
 
   private bindCarouselControls(): void {
+    let lastPointerInputAt = 0;
+    let lastTouchInputAt = 0;
+
+    const beginDrag = (pointerId: number | string, clientX: number, clientY: number, target: EventTarget | null): boolean => {
+      if (this.orderedPages.length < 2 || this.isCarouselInteractiveTarget(target)) {
+        return false;
+      }
+      this.carouselDragState = {
+        pointerId,
+        startX: clientX,
+        startY: clientY,
+        deltaX: 0,
+        deltaY: 0,
+        locked: false,
+      };
+      return true;
+    };
+
+    const moveDrag = (pointerId: number | string, clientX: number, clientY: number): boolean => {
+      if (!this.carouselDragState || pointerId !== this.carouselDragState.pointerId) {
+        return false;
+      }
+      this.carouselDragState.deltaX = clientX - this.carouselDragState.startX;
+      this.carouselDragState.deltaY = clientY - this.carouselDragState.startY;
+
+      if (!this.carouselDragState.locked) {
+        if (Math.abs(this.carouselDragState.deltaX) < 10) {
+          return false;
+        }
+        if (Math.abs(this.carouselDragState.deltaY) > Math.abs(this.carouselDragState.deltaX)) {
+          this.clearDragState(pointerId, false);
+          return false;
+        }
+        this.carouselDragState.locked = true;
+        this.carouselShellEl.classList.add("is-dragging");
+      }
+
+      this.updateCarouselPosition({
+        instant: true,
+        dragOffsetPx: this.carouselDragState.deltaX,
+      });
+      return true;
+    };
+
+    const finalizeDrag = (pointerId: number | string): void => {
+      if (!this.carouselDragState || pointerId !== this.carouselDragState.pointerId) {
+        return;
+      }
+
+      const { locked, deltaX } = this.carouselDragState;
+      const width = this.carouselShellEl.clientWidth || 1;
+      const shouldStep = locked && Math.abs(deltaX) >= width * 0.16;
+      const direction: 1 | -1 = deltaX < 0 ? 1 : -1;
+
+      this.clearDragState(pointerId, false);
+
+      if (shouldStep) {
+        this.stepPage(direction);
+        return;
+      }
+
+      this.updateCarouselPosition();
+    };
+
+    const shouldHandleTouchFallback = (): boolean => Date.now() - lastPointerInputAt > 500;
+
     this.carouselShellEl.addEventListener("keydown", (event) => {
       if (event.key === "ArrowLeft") {
         event.preventDefault();
@@ -757,17 +823,14 @@ export class BrowserSceneShellApp {
     });
 
     this.carouselShellEl.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || this.orderedPages.length < 2 || this.isCarouselInteractiveTarget(event.target)) {
+      if (event.button !== 0 || (event.pointerType === "mouse" && Date.now() - lastTouchInputAt < 500)) {
         return;
       }
-      this.carouselDragState = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        deltaX: 0,
-        deltaY: 0,
-        locked: false,
-      };
+      lastPointerInputAt = Date.now();
+      if (!beginDrag(event.pointerId, event.clientX, event.clientY, event.target)) {
+        return;
+      }
+      event.preventDefault();
       this.carouselShellEl.setPointerCapture?.(event.pointerId);
     });
 
@@ -775,51 +838,72 @@ export class BrowserSceneShellApp {
       if (!this.carouselDragState || event.pointerId !== this.carouselDragState.pointerId) {
         return;
       }
-      this.carouselDragState.deltaX = event.clientX - this.carouselDragState.startX;
-      this.carouselDragState.deltaY = event.clientY - this.carouselDragState.startY;
-
-      if (!this.carouselDragState.locked) {
-        if (Math.abs(this.carouselDragState.deltaX) < 10) {
-          return;
-        }
-        if (Math.abs(this.carouselDragState.deltaY) > Math.abs(this.carouselDragState.deltaX)) {
-          this.clearDragState(event.pointerId, false);
-          return;
-        }
-        this.carouselDragState.locked = true;
-        this.carouselShellEl.classList.add("is-dragging");
+      lastPointerInputAt = Date.now();
+      if (moveDrag(event.pointerId, event.clientX, event.clientY)) {
+        event.preventDefault();
       }
-
-      event.preventDefault();
-      this.updateCarouselPosition({
-        instant: true,
-        dragOffsetPx: this.carouselDragState.deltaX,
-      });
     });
 
     const finalizePointer = (event: PointerEvent) => {
-      if (!this.carouselDragState || event.pointerId !== this.carouselDragState.pointerId) {
-        return;
-      }
-
-      const { locked, deltaX } = this.carouselDragState;
-      const width = this.carouselShellEl.clientWidth || 1;
-      const shouldStep = locked && Math.abs(deltaX) >= width * 0.16;
-      const direction: 1 | -1 = deltaX < 0 ? 1 : -1;
-
-      this.clearDragState(event.pointerId, false);
-
-      if (shouldStep) {
-        this.stepPage(direction);
-        return;
-      }
-
-      this.updateCarouselPosition();
+      lastPointerInputAt = Date.now();
+      finalizeDrag(event.pointerId);
     };
 
     this.carouselShellEl.addEventListener("pointerup", finalizePointer);
     this.carouselShellEl.addEventListener("pointercancel", finalizePointer);
     this.carouselShellEl.addEventListener("lostpointercapture", finalizePointer);
+
+    this.carouselShellEl.addEventListener("touchstart", (event) => {
+      if (!shouldHandleTouchFallback()) {
+        return;
+      }
+      const touch = event.changedTouches?.[0];
+      if (!touch) {
+        return;
+      }
+      if (!beginDrag(`touch-${touch.identifier}`, touch.clientX, touch.clientY, event.target)) {
+        return;
+      }
+      lastTouchInputAt = Date.now();
+      event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false });
+
+    this.carouselShellEl.addEventListener("touchmove", (event) => {
+      if (!shouldHandleTouchFallback() || !this.carouselDragState) {
+        return;
+      }
+      const activeTouch = Array.from(event.changedTouches || []).find(
+        (touch) => `touch-${touch.identifier}` === this.carouselDragState?.pointerId,
+      );
+      if (!activeTouch) {
+        return;
+      }
+      lastTouchInputAt = Date.now();
+      if (moveDrag(`touch-${activeTouch.identifier}`, activeTouch.clientX, activeTouch.clientY)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, { passive: false });
+
+    const finalizeTouch = (event: TouchEvent): void => {
+      if (!shouldHandleTouchFallback() || !this.carouselDragState) {
+        return;
+      }
+      const activeTouch = Array.from(event.changedTouches || []).find(
+        (touch) => `touch-${touch.identifier}` === this.carouselDragState?.pointerId,
+      );
+      if (!activeTouch) {
+        return;
+      }
+      lastTouchInputAt = Date.now();
+      event.preventDefault();
+      event.stopPropagation();
+      finalizeDrag(`touch-${activeTouch.identifier}`);
+    };
+
+    this.carouselShellEl.addEventListener("touchend", finalizeTouch, { passive: false });
+    this.carouselShellEl.addEventListener("touchcancel", finalizeTouch, { passive: false });
   }
 
   private async refresh(): Promise<void> {
@@ -1091,8 +1175,8 @@ export class BrowserSceneShellApp {
     return Boolean(target.closest("button, a, input, select, textarea, label"));
   }
 
-  private clearDragState(pointerId: number, keepCapture: boolean): void {
-    if (!keepCapture && this.carouselShellEl.hasPointerCapture?.(pointerId)) {
+  private clearDragState(pointerId: number | string, keepCapture: boolean): void {
+    if (typeof pointerId === "number" && !keepCapture && this.carouselShellEl.hasPointerCapture?.(pointerId)) {
       this.carouselShellEl.releasePointerCapture(pointerId);
     }
     this.carouselDragState = null;
