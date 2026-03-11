@@ -106,13 +106,31 @@ def _resolve_avatar_asset_url(pack_id: str, value: str, asset_root: str = "") ->
         return ""
     if normalized.startswith("/") or "://" in normalized:
         return normalized
+    normalized_parts = [
+        part
+        for part in PurePosixPath(normalized).parts
+        if part not in ("", ".")
+    ]
+    if not normalized_parts or ".." in normalized_parts:
+        return ""
+    normalized_path = "/".join(normalized_parts)
     root = str(asset_root or "").strip()
     if root and not (root.startswith("/") or "://" in root):
-        root = f"/avatar-packs/{quote(pack_id)}/{quote(root, safe='/')}"
+        root_parts = [
+            part
+            for part in PurePosixPath(root).parts
+            if part not in ("", ".")
+        ]
+        if ".." in root_parts:
+            return ""
+        quoted_root = quote("/".join(root_parts), safe="/") if root_parts else ""
+        root = f"/avatar-packs/{quote(pack_id)}"
+        if quoted_root:
+            root = f"{root}/{quoted_root}"
     elif not root:
         root = f"/avatar-packs/{quote(pack_id)}"
     root = root.rstrip("/")
-    return f"{root}/{quote(normalized, safe='/')}"
+    return f"{root}/{quote(normalized_path, safe='/')}"
 
 
 def slugify(value: str) -> str:
