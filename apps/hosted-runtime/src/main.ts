@@ -25,6 +25,7 @@ interface SceneHostBootstrap {
     entityMapUrl?: string;
     avatarManifestUrl?: string;
     haStatesUrl?: string;
+    haStatesStreamUrl?: string;
     avatarCatalogUrl?: string;
     avatarImportUrl?: string;
     avatarPackApiUrl?: string;
@@ -746,6 +747,10 @@ void (async () => {
 
     await bootstrapSceneShellApp(root, {
       rendererConfigUrl,
+      stateStreamUrl: resolveHostedUrl(
+        String(bootstrap.files?.haStatesStreamUrl || "").trim(),
+        bootstrapUrl,
+      ) || undefined,
       weatherUrl: isNeiriPack ? "./weather.json" : undefined,
       weatherReader: isNeiriPack
         ? createHomeAssistantWeatherReader({

@@ -62,6 +62,14 @@ WEATHER_ENTITY_ID = (
     os.environ.get("SCENE_WEATHER_ENTITY_ID", "weather.forecast_home_assistant").strip()
     or "weather.forecast_home_assistant"
 )
+HOME_ASSISTANT_STREAM_POLL_SEC = max(
+    0.5,
+    float(os.environ.get("SCENE_HA_STATES_STREAM_POLL_SEC", "1.0") or "1.0"),
+)
+HOME_ASSISTANT_STREAM_KEEPALIVE_SEC = max(
+    5.0,
+    float(os.environ.get("SCENE_HA_STATES_STREAM_KEEPALIVE_SEC", "15.0") or "15.0"),
+)
 
 _ha_states_cache_lock = threading.Lock()
 _ha_states_cache_at = 0.0
@@ -112,6 +120,7 @@ def build_bootstrap() -> dict[str, Any]:
             "entityMapUrl": pack_base_url + "entity-map.json",
             "avatarManifestUrl": pack_base_url + "avatar.manifest.json",
             "haStatesUrl": f"{PATH_PREFIX}/ha-states",
+            "haStatesStreamUrl": f"{PATH_PREFIX}/ha-states-stream",
             "avatarCatalogUrl": f"{PATH_PREFIX}/avatar-catalog",
             "avatarImportUrl": f"{PATH_PREFIX}/avatar-import",
             "avatarPackApiUrl": f"{PATH_PREFIX}/avatar-pack",
@@ -342,6 +351,15 @@ def load_filtered_home_assistant_states(pack_id: str | None = None) -> list[dict
         for state in snapshot
         if str(state.get("entity_id") or "").strip() in entity_ids
     ]
+
+
+def build_filtered_home_assistant_states_payload(pack_id: str | None = None) -> dict[str, Any]:
+    return {
+        "success": True,
+        "packId": str(pack_id or load_active_pack_id()).strip() or DEFAULT_PACK_ID,
+        "states": load_filtered_home_assistant_states(pack_id),
+        "emittedAt": int(time.time() * 1000),
+    }
 
 
 def resolve_motion_id(path: Path, fallback_index: int) -> str:
@@ -888,6 +906,18 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_event_stream_message(self, payload: Any, event: str = "snapshot") -> None:
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self.wfile.write(f"event: {event}\n".encode("utf-8"))
+        self.wfile.write(b"data: ")
+        self.wfile.write(body)
+        self.wfile.write(b"\n\n")
+        self.wfile.flush()
+
+    def send_event_stream_keepalive(self) -> None:
+        self.wfile.write(b": keepalive\n\n")
+        self.wfile.flush()
+
     def do_GET(self) -> None:
         parsed = urlsplit(self.path)
         path = parsed.path.rstrip("/") or "/"
@@ -924,6 +954,9 @@ class SceneHostHandler(BaseHTTPRequestHandler):
                     {"success": False, "error": f"Failed to proxy Home Assistant states: {exc}"},
                     status=HTTPStatus.BAD_GATEWAY,
                 )
+            return
+        if path == f"{PATH_PREFIX}/ha-states-stream":
+            self.handle_home_assistant_states_stream()
             return
         if path == f"{PATH_PREFIX}/avatar-catalog":
             self.send_json(load_avatar_catalog())
@@ -1068,6 +1101,34 @@ class SceneHostHandler(BaseHTTPRequestHandler):
                 {"success": False, "error": f"Avatar pack save failed: {exc}"},
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
+
+    def handle_home_assistant_states_stream(self) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        last_payload = ""
+        last_keepalive_at = 0.0
+        try:
+            while True:
+                payload = build_filtered_home_assistant_states_payload()
+                serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+                now = time.monotonic()
+                if serialized != last_payload:
+                    self.send_event_stream_message(payload)
+                    last_payload = serialized
+                    last_keepalive_at = now
+                elif now - last_keepalive_at >= HOME_ASSISTANT_STREAM_KEEPALIVE_SEC:
+                    self.send_event_stream_keepalive()
+                    last_keepalive_at = now
+                time.sleep(HOME_ASSISTANT_STREAM_POLL_SEC)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            logging.info("Home Assistant state stream client disconnected")
+        except Exception:
+            logging.exception("Home Assistant state stream failed")
 
 
 def main() -> None:

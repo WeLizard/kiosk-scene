@@ -34,6 +34,7 @@ import {
   createHomeAssistantStatesReader,
   mapAssistantControlFromHomeAssistant,
   mapAssistantStateFromHomeAssistant,
+  normalizeHomeAssistantStates,
   type HomeAssistantControlEntityMap,
   type HomeAssistantEntityMap,
   type HomeAssistantStates,
@@ -112,6 +113,7 @@ export interface SceneShellPresetLabels {
 
 export interface SceneShellOptions {
   rendererConfigUrl?: string;
+  stateStreamUrl?: string;
   weatherUrl?: string;
   weatherReader?: () => Promise<WeatherOverviewPatch | null>;
   refreshIntervalMs?: number;
@@ -572,8 +574,16 @@ export class BrowserSceneShellApp {
   private idleTimer: number | null = null;
   private avatarAdapter: AvatarAdapter | null = null;
   private refreshIntervalHandle: number | null = null;
+  private stateStream: EventSource | null = null;
   private orderedPages: ScenePageV1[] = [];
   private carouselDragState: CarouselDragState | null = null;
+  private lastPageStructureKey = "";
+  private slideMarkupCache = new Map<string, string>();
+  private lastDotsMarkup = "";
+  private lastAvatarStateKey = "";
+  private lastAvatarCueKey = "";
+  private lastAvatarBubbleKey = "";
+  private lastAvatarPreset: ViewPreset | "" = "";
 
   constructor(root: HTMLElement, options: SceneShellOptions = {}) {
     this.root = root;
@@ -704,12 +714,14 @@ export class BrowserSceneShellApp {
     this.lastAutoRotateAt = Date.now();
     await this.refresh();
 
-    if (this.refreshIntervalHandle) {
-      window.clearInterval(this.refreshIntervalHandle);
+    if (!this.connectStateStream()) {
+      if (this.refreshIntervalHandle) {
+        window.clearInterval(this.refreshIntervalHandle);
+      }
+      this.refreshIntervalHandle = window.setInterval(() => {
+        void this.refresh();
+      }, this.options.refreshIntervalMs ?? 10_000);
     }
-    this.refreshIntervalHandle = window.setInterval(() => {
-      void this.refresh();
-    }, this.options.refreshIntervalMs ?? 3000);
   }
 
   async dispose(): Promise<void> {
@@ -723,6 +735,8 @@ export class BrowserSceneShellApp {
     }
     await this.avatarAdapter?.dispose();
     this.avatarAdapter = null;
+    this.stateStream?.close();
+    this.stateStream = null;
   }
 
   private getRendererConfigUrl(): string {
@@ -731,6 +745,10 @@ export class BrowserSceneShellApp {
 
   private getWeatherUrl(): string {
     return trimText(this.options.weatherUrl, 1024) || "./weather.json";
+  }
+
+  private getStateStreamUrl(): string {
+    return trimText(this.options.stateStreamUrl, 2048);
   }
 
   private bindPresetControls(): void {
@@ -946,10 +964,42 @@ export class BrowserSceneShellApp {
     });
   }
 
-  private async refresh(): Promise<void> {
-    this.currentState = await this.readAssistantState();
-    this.hassStates = await this.readSceneStates();
-    this.remoteControl = await this.readRemoteControl(this.currentControl);
+  private connectStateStream(): boolean {
+    const streamUrl = this.getStateStreamUrl();
+    if (!streamUrl || typeof EventSource === "undefined") {
+      return false;
+    }
+
+    const resolvedStreamUrl = resolveUrlAgainst(window.location.href, streamUrl);
+    const stream = new EventSource(resolvedStreamUrl);
+    stream.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(String(event.data || "null")) as
+          | { states?: unknown }
+          | unknown[];
+        const normalizedStates = normalizeHomeAssistantStates(
+          Array.isArray(payload) ? payload : payload?.states,
+        );
+        if (!normalizedStates) {
+          return;
+        }
+        void this.refresh(normalizedStates);
+      } catch (error) {
+        console.warn("Failed to parse state stream payload", error);
+      }
+    };
+    stream.onerror = () => {
+      console.warn("Scene state stream disconnected; keeping EventSource reconnect logic active.");
+    };
+    this.stateStream = stream;
+    return true;
+  }
+
+  private async refresh(externalStates?: HomeAssistantStates | null): Promise<void> {
+    const statesSnapshot = externalStates ?? await this.readSceneStates();
+    this.currentState = await this.readAssistantState(statesSnapshot);
+    this.hassStates = statesSnapshot;
+    this.remoteControl = await this.readRemoteControl(this.currentControl, statesSnapshot);
     this.uiControl = mergeControlV1(DEFAULT_CONTROL_V1, this.uiControl);
     this.currentControl = mergeControlV1(this.remoteControl, this.uiControl);
 
@@ -982,30 +1032,43 @@ export class BrowserSceneShellApp {
       throw new Error("Avatar adapter is not initialized.");
     }
 
-    await this.avatarAdapter.setState(presentation.state);
-    await this.avatarAdapter.setCue(this.currentControl.cue);
-    await this.avatarAdapter.setViewPreset(this.currentPreset);
-    await this.avatarAdapter.showBubble(presentation.body, {
-      ttlMs: 0,
-      speak: false,
-      typewriter: false,
-    });
+    await this.syncAvatarPresentation(presentation);
 
     this.renderCarousel(orderedPages, presentation);
   }
 
   private renderCarousel(pages: ScenePageV1[], presentation: AssistantPresentationModel): void {
     this.orderedPages = pages.slice();
-    this.carouselTrackEl.innerHTML = pages.map((page, index) => {
+    const structureKey = JSON.stringify(
+      pages.map((page) => ({
+        id: page.id,
+        kind: page.kind,
+        title: page.title,
+        subtitle: page.subtitle || "",
+        slot: page.slot ?? null,
+        cardStyle: page.cardStyle || "",
+        stampCaption: page.stampCaption || "",
+        stampValue: page.stampValue || "",
+        cards: Array.isArray(page.cards)
+          ? page.cards.map((card) => ({
+              type: trimText(card.type, 32),
+              entity: trimText(card.entity, 255),
+              stateEntity: trimText(card.stateEntity, 255),
+              downEntity: trimText(card.downEntity, 255),
+              upEntity: trimText(card.upEntity, 255),
+              caption: trimText(card.caption, 48),
+              hint: trimText(card.hint, 72),
+            }))
+          : [],
+      })),
+    );
+    const slideMarkup = pages.map((page, index) => {
       if (page.kind === "overview") {
         return this.renderOverviewSlide(page, presentation, index);
       }
       return this.renderDynamicSlide(page, index, pages.length);
-    }).join("");
-
-    this.updateCarouselPosition();
-
-    this.dotsEl.innerHTML = pages.map((page, index) => `
+    });
+    const dotsMarkup = pages.map((page, index) => `
       <button
         class="carousel-dot ${index === this.activeIndex ? "is-active" : ""}"
         type="button"
@@ -1015,11 +1078,53 @@ export class BrowserSceneShellApp {
       ></button>
     `).join("");
 
-    for (const dot of Array.from(this.dotsEl.querySelectorAll<HTMLButtonElement>("[data-slide-index]"))) {
-      dot.addEventListener("click", () => {
-        this.pinPageByIndex(Number(dot.dataset.slideIndex) || 0);
-      }, { once: true });
+    if (structureKey !== this.lastPageStructureKey) {
+      this.carouselTrackEl.innerHTML = slideMarkup.join("");
+      this.dotsEl.innerHTML = dotsMarkup;
+      this.lastPageStructureKey = structureKey;
+      this.lastDotsMarkup = dotsMarkup;
+      this.slideMarkupCache = new Map(
+        pages.map((page, index) => [page.id, slideMarkup[index]]),
+      );
+      for (const dot of Array.from(this.dotsEl.querySelectorAll<HTMLButtonElement>("[data-slide-index]"))) {
+        dot.addEventListener("click", () => {
+          this.pinPageByIndex(Number(dot.dataset.slideIndex) || 0);
+        });
+      }
+    } else {
+      const currentSlides = Array.from(this.carouselTrackEl.children) as HTMLElement[];
+      slideMarkup.forEach((markup, index) => {
+        const page = pages[index];
+        if (this.slideMarkupCache.get(page.id) === markup) {
+          return;
+        }
+        const currentSlide = currentSlides[index];
+        if (!currentSlide) {
+          return;
+        }
+        const template = document.createElement("template");
+        template.innerHTML = markup.trim();
+        const nextSlide = template.content.firstElementChild;
+        if (!nextSlide) {
+          return;
+        }
+        currentSlide.replaceWith(nextSlide);
+        this.slideMarkupCache.set(page.id, markup);
+      });
+
+      if (this.lastDotsMarkup !== dotsMarkup) {
+        this.dotsEl.innerHTML = dotsMarkup;
+        this.lastDotsMarkup = dotsMarkup;
+        for (const dot of Array.from(this.dotsEl.querySelectorAll<HTMLButtonElement>("[data-slide-index]"))) {
+          dot.addEventListener("click", () => {
+            this.pinPageByIndex(Number(dot.dataset.slideIndex) || 0);
+          });
+        }
+      }
     }
+
+    this.updateCarouselPosition();
+    this.updateDotState();
   }
 
   private renderOverviewSlide(page: ScenePageV1, presentation: AssistantPresentationModel, index: number): string {
@@ -1321,16 +1426,19 @@ export class BrowserSceneShellApp {
     });
   }
 
-  private async readAssistantState(): Promise<StateV1> {
+  private async readAssistantState(statesSnapshot?: HomeAssistantStates | null): Promise<StateV1> {
     const jsonFallback = async (): Promise<StateV1> => createJsonStateProvider({
       url: this.rendererConfig.state.stateUrl,
       defaultValue: this.currentState ?? DEFAULT_STATE_V1,
     }).read();
 
-    if (this.rendererConfig.state.provider !== "ha" || !this.entityMap || !this.haStatesReader) {
+    if (this.rendererConfig.state.provider !== "ha" || !this.entityMap) {
       return jsonFallback();
     }
-    const states = await this.haStatesReader.read();
+    const states = statesSnapshot ?? await this.haStatesReader?.read() ?? null;
+    if (!states) {
+      return jsonFallback();
+    }
     return mapAssistantStateFromHomeAssistant(
       states || {},
       this.entityMap,
@@ -1345,17 +1453,56 @@ export class BrowserSceneShellApp {
     return this.haStatesReader.read();
   }
 
-  private async readRemoteControl(defaultValue = DEFAULT_CONTROL_V1): Promise<ControlV1> {
+  private async readRemoteControl(
+    defaultValue = DEFAULT_CONTROL_V1,
+    statesSnapshot?: HomeAssistantStates | null,
+  ): Promise<ControlV1> {
     const jsonFallback = async (): Promise<ControlV1> => createJsonControlProvider({
       url: this.rendererConfig.control.controlUrl,
       defaultValue,
     }).read();
 
-    if (this.rendererConfig.control.provider !== "ha" || !this.controlEntityMap || !this.haStatesReader) {
+    if (this.rendererConfig.control.provider !== "ha" || !this.controlEntityMap) {
       return jsonFallback();
     }
-    const states = await this.haStatesReader.read();
+    const states = statesSnapshot ?? await this.haStatesReader?.read() ?? null;
+    if (!states) {
+      return jsonFallback();
+    }
     return mapAssistantControlFromHomeAssistant(states || {}, this.controlEntityMap) || jsonFallback();
+  }
+
+  private async syncAvatarPresentation(presentation: AssistantPresentationModel): Promise<void> {
+    if (!this.avatarAdapter) {
+      return;
+    }
+
+    const avatarStateKey = JSON.stringify(presentation.state);
+    if (avatarStateKey !== this.lastAvatarStateKey) {
+      await this.avatarAdapter.setState(presentation.state);
+      this.lastAvatarStateKey = avatarStateKey;
+    }
+
+    const avatarCueKey = JSON.stringify(this.currentControl.cue || DEFAULT_CONTROL_V1.cue);
+    if (avatarCueKey !== this.lastAvatarCueKey) {
+      await this.avatarAdapter.setCue(this.currentControl.cue);
+      this.lastAvatarCueKey = avatarCueKey;
+    }
+
+    if (this.currentPreset !== this.lastAvatarPreset) {
+      await this.avatarAdapter.setViewPreset(this.currentPreset);
+      this.lastAvatarPreset = this.currentPreset;
+    }
+
+    const bubbleKey = presentation.body || "";
+    if (bubbleKey !== this.lastAvatarBubbleKey) {
+      await this.avatarAdapter.showBubble(presentation.body, {
+        ttlMs: 0,
+        speak: false,
+        typewriter: false,
+      });
+      this.lastAvatarBubbleKey = bubbleKey;
+    }
   }
 
   private async readWeatherData(): Promise<WeatherOverviewPayload> {
