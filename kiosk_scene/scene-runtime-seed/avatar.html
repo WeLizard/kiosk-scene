@@ -901,19 +901,31 @@
     }
 
     function getStateUrl() {
-      return trimText(rendererConfig && rendererConfig.state && rendererConfig.state.stateUrl, 512) || DEFAULT_RENDERER_CONFIG.state.stateUrl;
+      return resolvePageUrl(
+        trimText(rendererConfig && rendererConfig.state && rendererConfig.state.stateUrl, 512)
+          || DEFAULT_RENDERER_CONFIG.state.stateUrl
+      );
     }
 
     function getMotionMapUrl() {
-      return trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.motionMapUrl, 512) || DEFAULT_RENDERER_CONFIG.assetPack.motionMapUrl;
+      return resolvePageUrl(
+        trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.motionMapUrl, 512)
+          || DEFAULT_RENDERER_CONFIG.assetPack.motionMapUrl
+      );
     }
 
     function getModelJsonUrl() {
-      return trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.modelJson, 512) || DEFAULT_RENDERER_CONFIG.assetPack.modelJson;
+      return resolvePageUrl(
+        trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.modelJson, 512)
+          || DEFAULT_RENDERER_CONFIG.assetPack.modelJson
+      );
     }
 
     function getFallbackPortraitUrl() {
-      return trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.fallbackPortrait, 512) || DEFAULT_RENDERER_CONFIG.assetPack.fallbackPortrait;
+      return resolvePageUrl(
+        trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.fallbackPortrait, 512)
+          || DEFAULT_RENDERER_CONFIG.assetPack.fallbackPortrait
+      );
     }
 
     function syncFallbackPortrait(url) {
