@@ -929,7 +929,7 @@
     }
 
     function syncFallbackPortrait(url) {
-      const portrait = trimText(url, 512) || getPresetThumbUrl();
+      const portrait = trimText(url, 512) || getFallbackPortraitUrl() || getPresetThumbUrl();
       if (portrait) {
         fallbackPortraitEl.src = portrait;
         return;
@@ -1077,6 +1077,8 @@
     let lastOnlineState = true;
     let lastStatusKey = '';
     let statePollingStarted = false;
+    let statePollingTimer = null;
+    let displaySleepPaused = false;
     let lastExternalStateAt = 0;
     let currentMotionIndex = 0;
     let viewState = { scale: 1, x: 0, y: 0 };
@@ -1462,6 +1464,16 @@
       if (!payload) {
         return;
       }
+      if (payload.type === 'kiosk-display-off') {
+        displaySleepPaused = true;
+        syncRuntimeActivity({ refreshState: false, reason: 'display off' });
+        return;
+      }
+      if (payload.type === 'kiosk-display-on') {
+        displaySleepPaused = false;
+        syncRuntimeActivity({ refreshState: true, reason: 'display on' });
+        return;
+      }
       if (payload.type === 'neiri-renderer-config') {
         rendererConfig = deepMergeConfig(DEFAULT_RENDERER_CONFIG, payload.config || {});
         applyRendererConfig();
@@ -1668,17 +1680,83 @@
       }
     }
 
+    function isRuntimeSuspended() {
+      return displaySleepPaused || document.hidden;
+    }
+
+    function stopStatePolling() {
+      if (statePollingTimer !== null) {
+        window.clearInterval(statePollingTimer);
+        statePollingTimer = null;
+      }
+    }
+
+    function destroyLive2DApp(reason = 'cleanup') {
+      if (app && app.ticker && typeof app.ticker.stop === 'function') {
+        try {
+          app.ticker.stop();
+        } catch (_) {}
+      }
+      if (model && app && app.stage && typeof app.stage.removeChild === 'function') {
+        try {
+          app.stage.removeChild(model);
+        } catch (_) {}
+      }
+      if (model && typeof model.destroy === 'function') {
+        try {
+          model.destroy({ children: true, texture: true, baseTexture: true });
+        } catch (error) {
+          console.warn('Failed to destroy Live2D model', reason, error);
+        }
+      }
+      model = null;
+      if (app && typeof app.destroy === 'function') {
+        try {
+          app.destroy(true, { children: true, texture: true, baseTexture: true });
+        } catch (error) {
+          console.warn('Failed to destroy Live2D renderer', reason, error);
+        }
+      }
+      app = null;
+      lipSyncTickerAttached = false;
+      while (stage.firstChild) {
+        stage.removeChild(stage.firstChild);
+      }
+    }
+
+    function syncRuntimeActivity({ refreshState = false, reason = 'sync' } = {}) {
+      const suspended = isRuntimeSuspended();
+      if (suspended) {
+        stopStatePolling();
+        resetInputs(reason);
+        if (app && app.ticker && typeof app.ticker.stop === 'function') {
+          app.ticker.stop();
+        }
+        return;
+      }
+      if (app && app.ticker && typeof app.ticker.start === 'function') {
+        app.ticker.start();
+      }
+      if (statePollingStarted && statePollingTimer === null) {
+        statePollingTimer = window.setInterval(refreshAvatarState, POLL_MS);
+      }
+      if (refreshState) {
+        void refreshAvatarState();
+      }
+    }
+
     function startStatePolling() {
       if (statePollingStarted) {
+        syncRuntimeActivity({ refreshState: false, reason: 'polling resumed' });
         return;
       }
       statePollingStarted = true;
-      refreshAvatarState();
-      window.setInterval(refreshAvatarState, POLL_MS);
+      syncRuntimeActivity({ refreshState: true, reason: 'polling started' });
     }
 
     function showStaticPortrait(reason) {
-      syncFallbackPortrait('');
+      destroyLive2DApp(reason || 'static portrait');
+      syncFallbackPortrait(getFallbackPortraitUrl());
       clearLoadingState();
       frameEl.classList.remove('is-ready');
       fallbackPortraitEl.classList.remove('hidden');
@@ -1929,6 +2007,9 @@
     }
 
     async function refreshAvatarState() {
+      if (isRuntimeSuspended()) {
+        return;
+      }
       if (IS_DISPLAY_MODE && Date.now() - lastExternalStateAt < POLL_MS * 4) {
         return;
       }
@@ -1987,6 +2068,12 @@
           backgroundAlpha: 0,
         });
         stage.appendChild(app.view);
+        app.view.addEventListener('webglcontextlost', (event) => {
+          event.preventDefault();
+          console.warn('Live2D WebGL context lost; switching to static portrait');
+          window.setTimeout(() => showStaticPortrait('Статичный портрет'), 0);
+        }, { once: true });
+        syncRuntimeActivity({ refreshState: false, reason: 'app mounted' });
 
         startLoadingState('Проверяю набор модели…');
         const modelCandidates = await resolveAvailableModelCandidates();
@@ -2208,6 +2295,7 @@
           if (document.hidden) {
             resetInputs('document hidden');
           }
+          syncRuntimeActivity({ refreshState: !document.hidden, reason: document.hidden ? 'document hidden' : 'document visible' });
         });
         if (!IS_DISPLAY_MODE) {
           stage.addEventListener('dblclick', openNeiri);
@@ -2243,6 +2331,14 @@
           resetView: () => resetView(),
           focus: (x, y) => { if (model) model.focus(Number(x) || 0, Number(y) || 0); },
           neutralFocus: (immediate = false) => setNeutralFocus(immediate),
+          displayOn: () => {
+            displaySleepPaused = false;
+            syncRuntimeActivity({ refreshState: true, reason: 'api display on' });
+          },
+          displayOff: () => {
+            displaySleepPaused = true;
+            syncRuntimeActivity({ refreshState: false, reason: 'api display off' });
+          },
           current: () => ({ index: currentMotionIndex, motion: getMotionDef(currentMotionIndex), preset: currentViewPreset, view: { ...viewState } }),
           listMotions: () => motionMap,
           __debugModel: () => model,
