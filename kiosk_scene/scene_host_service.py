@@ -53,7 +53,6 @@ HOME_ASSISTANT_API_URL = (
     os.environ.get("SCENE_HOME_ASSISTANT_API_URL", "http://supervisor/core/api").strip().rstrip("/")
     or "http://supervisor/core/api"
 )
-HOME_ASSISTANT_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "").strip()
 HOME_ASSISTANT_STATES_CACHE_TTL_MS = max(
     250,
     int(os.environ.get("SCENE_HA_STATES_CACHE_TTL_MS", "2000") or "2000"),
@@ -66,6 +65,10 @@ WEATHER_ENTITY_ID = (
 _ha_states_cache_lock = threading.Lock()
 _ha_states_cache_at = 0.0
 _ha_states_cache: list[dict[str, Any]] | None = None
+HOME_ASSISTANT_TOKEN_PATHS = (
+    Path("/run/s6/container_environment/SUPERVISOR_TOKEN"),
+    Path("/run/s6/container_environment/HASSIO_TOKEN"),
+)
 
 
 def load_active_pack_id() -> str:
@@ -276,13 +279,26 @@ def collect_pack_home_assistant_entity_ids(pack_id: str | None = None) -> list[s
 
 
 def fetch_home_assistant_states() -> list[dict[str, Any]]:
-    if not HOME_ASSISTANT_TOKEN:
+    token = (
+        os.environ.get("SUPERVISOR_TOKEN", "").strip()
+        or os.environ.get("HASSIO_TOKEN", "").strip()
+    )
+    if not token:
+        for path in HOME_ASSISTANT_TOKEN_PATHS:
+            try:
+                token = path.read_text(encoding="utf-8").strip()
+            except OSError:
+                token = ""
+            if token:
+                break
+
+    if not token:
         raise PermissionError("SUPERVISOR_TOKEN is not available; Home Assistant API access is disabled.")
 
     request = Request(
         f"{HOME_ASSISTANT_API_URL}/states",
         headers={
-            "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
+            "Authorization": f"Bearer {token}",
             "Accept": "application/json",
         },
     )
