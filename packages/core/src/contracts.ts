@@ -65,6 +65,13 @@ export interface SceneDisplaySafeAreaV1 {
   left?: number;
 }
 
+export interface SceneDisplaySafeAreaPxV1 {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface SceneDisplayV1 {
   safeArea?: SceneDisplaySafeAreaV1;
   layoutPaddingPx?: number;
@@ -98,6 +105,23 @@ export interface SceneConfigV1 {
   version: 1;
   rotation: SceneRotationV1;
   display?: SceneDisplayV1;
+  avatar?: SceneAvatarV1;
+  pages: ScenePageV1[];
+}
+
+export interface SceneDisplayConfigV1 {
+  version: 1;
+  kind: "scene.display";
+  rotation: {
+    order: string[];
+    defaultDwellMs: number;
+  };
+  display: {
+    safeAreaPx: SceneDisplaySafeAreaPxV1;
+    layoutPaddingPx: number;
+    layoutGapPx: number;
+    globalScale: number;
+  };
   avatar?: SceneAvatarV1;
   pages: ScenePageV1[];
 }

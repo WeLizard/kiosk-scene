@@ -36,6 +36,7 @@ ACTIVE_PACK_FILE = Path(
     os.environ.get("SCENE_ACTIVE_PACK_FILE", str(SCENE_ROOT / "active-pack.json"))
 )
 DEFAULT_PACK_ID = os.environ.get("SCENE_DEFAULT_PACK_ID", "neiri").strip() or "neiri"
+DISPLAY_SCENE_CONFIG_FILENAME = "scene.display.json"
 MAX_AVATAR_IMPORT_BYTES = int(
     os.environ.get("SCENE_AVATAR_IMPORT_MAX_BYTES", str(256 * 1024 * 1024))
 )
@@ -83,10 +84,18 @@ def load_active_pack_id() -> str:
     return DEFAULT_PACK_ID
 
 
+def resolve_runtime_scene_config_name(pack_dir: Path) -> str:
+    display_config_path = pack_dir / DISPLAY_SCENE_CONFIG_FILENAME
+    if display_config_path.exists():
+        return DISPLAY_SCENE_CONFIG_FILENAME
+    return "scene.default.json"
+
+
 def build_bootstrap() -> dict[str, Any]:
     pack_id = load_active_pack_id()
     pack_dir = PACKS_DIR / pack_id
     pack_base_url = f"/scene-packs/{quote(pack_id)}/"
+    runtime_scene_config_name = resolve_runtime_scene_config_name(pack_dir)
     return {
         "success": True,
         "packId": pack_id,
@@ -99,7 +108,7 @@ def build_bootstrap() -> dict[str, Any]:
         "sceneEditorApiUrl": "/scene-editor-form/api/config",
         "files": {
             "rendererConfigUrl": pack_base_url + "renderer.kiosk-scene.json",
-            "sceneConfigUrl": pack_base_url + "scene.default.json",
+            "sceneConfigUrl": pack_base_url + runtime_scene_config_name,
             "entityMapUrl": pack_base_url + "entity-map.json",
             "avatarManifestUrl": pack_base_url + "avatar.manifest.json",
             "haStatesUrl": f"{PATH_PREFIX}/ha-states",
@@ -112,6 +121,7 @@ def build_bootstrap() -> dict[str, Any]:
             "packDir": pack_dir.exists(),
             "rendererConfig": (pack_dir / "renderer.kiosk-scene.json").exists(),
             "sceneConfig": (pack_dir / "scene.default.json").exists(),
+            "sceneDisplayConfig": (pack_dir / DISPLAY_SCENE_CONFIG_FILENAME).exists(),
             "entityMap": (pack_dir / "entity-map.json").exists(),
             "avatarManifest": (pack_dir / "avatar.manifest.json").exists(),
             "avatarPacksDir": AVATAR_PACKS_DIR.exists(),

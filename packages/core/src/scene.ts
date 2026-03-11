@@ -1,4 +1,4 @@
-import type { SceneConfigV1, ScenePageV1 } from "./contracts.js";
+import type { SceneConfigV1, SceneDisplayConfigV1, ScenePageV1 } from "./contracts.js";
 import { isObjectRecord, normalizeStringList, trimText } from "./utils.js";
 
 export interface NormalizedSceneConfigV1 {
@@ -21,6 +21,8 @@ export interface NormalizedSceneConfigV1 {
   pages: ScenePageV1[];
 }
 
+export type SceneRuntimeConfigV1 = SceneDisplayConfigV1;
+
 function normalizeNonNegativeNumber(value: unknown, fallback: number): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
@@ -42,6 +44,14 @@ export function unwrapSceneConfigPayload(config: unknown): unknown {
     return config.config;
   }
   return config;
+}
+
+export function orderScenePages(pages: ScenePageV1[], order: string[]): ScenePageV1[] {
+  const ordered = order
+    .map((pageId) => pages.find((page) => page.id === pageId))
+    .filter(Boolean) as ScenePageV1[];
+  const extras = pages.filter((page) => !ordered.some((item) => item.id === page.id));
+  return ordered.concat(extras);
 }
 
 export function mergeScenePage(basePage: ScenePageV1, incomingPage: unknown): ScenePageV1 {
@@ -129,7 +139,104 @@ export function normalizeSceneConfig(config: unknown, defaults: SceneConfigV1): 
   };
 }
 
-export function getSceneSlides(scene: NormalizedSceneConfigV1): ScenePageV1[] {
+export function createSceneDisplayConfig(config: unknown, defaults: SceneConfigV1): SceneDisplayConfigV1 {
+  const normalized = normalizeSceneConfig(config, defaults);
+  const payload = unwrapSceneConfigPayload(config);
+  const avatar = isObjectRecord(payload) && isObjectRecord(payload.avatar)
+    ? {
+        packId: typeof payload.avatar.packId === "string"
+          ? trimText(payload.avatar.packId, 120) || null
+          : null,
+      }
+    : {
+        packId: typeof defaults.avatar?.packId === "string"
+          ? trimText(defaults.avatar.packId, 120) || null
+          : null,
+      };
+
+  return {
+    version: 1,
+    kind: "scene.display",
+    rotation: {
+      order: normalized.rotation.order.slice(),
+      defaultDwellMs: normalized.rotation.defaultDwellMs,
+    },
+    display: {
+      safeAreaPx: {
+        ...normalized.display.safeAreaPx,
+      },
+      layoutPaddingPx: normalized.display.layoutPaddingPx,
+      layoutGapPx: normalized.display.layoutGapPx,
+      globalScale: normalized.display.globalScale,
+    },
+    avatar,
+    pages: orderScenePages(normalized.pages, normalized.rotation.order),
+  };
+}
+
+export function isSceneDisplayConfig(config: unknown): config is SceneDisplayConfigV1 {
+  return isObjectRecord(config)
+    && config.kind === "scene.display"
+    && Number(config.version) === 1
+    && isObjectRecord(config.rotation)
+    && Array.isArray(config.pages)
+    && isObjectRecord(config.display)
+    && isObjectRecord(config.display.safeAreaPx);
+}
+
+function normalizeSceneDisplayConfig(config: SceneDisplayConfigV1): SceneDisplayConfigV1 {
+  const pages = Array.isArray(config.pages)
+    ? config.pages.filter((page) => isObjectRecord(page)) as ScenePageV1[]
+    : [];
+  const rawOrder = Array.isArray(config.rotation?.order) ? config.rotation.order : pages.map((page) => page.id);
+  const order = normalizeStringList(rawOrder).filter((item, index, list) => {
+    return pages.some((page) => page.id === item) && list.indexOf(item) === index;
+  });
+  const safeAreaPx = config.display.safeAreaPx;
+  const avatar = isObjectRecord(config.avatar)
+    ? {
+        packId: typeof config.avatar.packId === "string"
+          ? trimText(config.avatar.packId, 120) || null
+          : null,
+      }
+    : { packId: null };
+
+  return {
+    version: 1,
+    kind: "scene.display",
+    rotation: {
+      order: order.length ? order : pages.map((page) => page.id),
+      defaultDwellMs: Math.max(5_000, Number(config.rotation?.defaultDwellMs) || 18_000),
+    },
+    display: {
+      safeAreaPx: {
+        top: normalizeNonNegativeNumber(safeAreaPx.top, 0),
+        right: normalizeNonNegativeNumber(safeAreaPx.right, 0),
+        bottom: normalizeNonNegativeNumber(safeAreaPx.bottom, 0),
+        left: normalizeNonNegativeNumber(safeAreaPx.left, 0),
+      },
+      layoutPaddingPx: normalizeNonNegativeNumber(config.display.layoutPaddingPx, 16),
+      layoutGapPx: normalizeNonNegativeNumber(config.display.layoutGapPx, 16),
+      globalScale: normalizeDisplayScale(config.display.globalScale, 1),
+    },
+    avatar,
+    pages: orderScenePages(pages, order),
+  };
+}
+
+export function resolveSceneRuntimeConfig(config: unknown, defaults?: SceneConfigV1): SceneRuntimeConfigV1 {
+  if (isSceneDisplayConfig(config)) {
+    return normalizeSceneDisplayConfig(config);
+  }
+  const payload = unwrapSceneConfigPayload(config);
+  if (!isObjectRecord(payload)) {
+    throw new Error("Scene runtime config must be a JSON object.");
+  }
+  const baseline = defaults ?? (payload as unknown as SceneConfigV1);
+  return createSceneDisplayConfig(payload, baseline);
+}
+
+export function getSceneSlides(scene: Pick<SceneRuntimeConfigV1, "pages">): ScenePageV1[] {
   return scene.pages
     .filter((page) => page.kind !== "overview")
     .sort((left, right) => (Number(left.slot) || 0) - (Number(right.slot) || 0));

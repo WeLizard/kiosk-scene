@@ -22,6 +22,7 @@ ACTIVE_PACK_FILE = Path(
 )
 DEFAULT_PACK_ID = os.environ.get("SCENE_DEFAULT_PACK_ID", "neiri").strip() or "neiri"
 EXPLICIT_SCENE_CONFIG_PATH = os.environ.get("SCENE_EDITOR_CONFIG_PATH", "").strip()
+DISPLAY_SCENE_CONFIG_FILENAME = "scene.display.json"
 LEGACY_SCENE_CONFIG_PATHS = (
     Path("/config/www/neiri-scene/scene.default.json"),
     Path("/config/www/live2d/neiri-slides.json"),
@@ -1598,6 +1599,166 @@ def normalize_scene_config(config: Any) -> dict[str, Any]:
     return config
 
 
+def trim_text(value: Any, fallback: str = "", limit: int = 120) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return fallback
+    return normalized[:limit]
+
+
+def normalize_non_negative_number(value: Any, fallback: int) -> int:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    if not numeric == numeric:
+        return fallback
+    return max(0, int(round(numeric)))
+
+
+def normalize_display_scale(value: Any, fallback: float = 1.0) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    if not numeric == numeric:
+        return fallback
+    return min(1.0, max(0.75, numeric))
+
+
+def clone_json(value: Any) -> Any:
+    return json.loads(json.dumps(value, ensure_ascii=False))
+
+
+def sanitize_page(page: Any, index: int, used_ids: set[str]) -> dict[str, Any]:
+    payload = clone_json(page) if isinstance(page, dict) else {}
+    raw_id = trim_text(payload.get("id"), f"page-{index + 1}", 40)
+    page_id = raw_id
+    suffix = 2
+    while page_id in used_ids:
+        page_id = f"{raw_id}-{suffix}"
+        suffix += 1
+    used_ids.add(page_id)
+
+    kind = trim_text(payload.get("kind"), "cards", 24)
+    if kind not in ("overview", "cards", "forecast+cards"):
+        kind = "cards"
+    card_style = trim_text(payload.get("cardStyle"), "full", 16)
+    if card_style not in ("mini", "full"):
+        card_style = "full"
+
+    normalized = payload
+    normalized["id"] = page_id
+    normalized["kind"] = kind
+    normalized["cardStyle"] = card_style
+    normalized["title"] = trim_text(payload.get("title"), page_id, 120)
+
+    subtitle = trim_text(payload.get("subtitle"), "", 240)
+    if subtitle:
+        normalized["subtitle"] = subtitle
+    else:
+        normalized.pop("subtitle", None)
+
+    stamp_caption = trim_text(payload.get("stampCaption"), "", 60)
+    if stamp_caption:
+        normalized["stampCaption"] = stamp_caption
+    else:
+        normalized.pop("stampCaption", None)
+
+    stamp_value = trim_text(payload.get("stampValue"), "", 120)
+    if stamp_value:
+        normalized["stampValue"] = stamp_value
+    else:
+        normalized.pop("stampValue", None)
+
+    if isinstance(payload.get("slot"), (int, float)) or str(payload.get("slot") or "").strip():
+        try:
+            normalized["slot"] = max(0, int(float(payload.get("slot"))))
+        except (TypeError, ValueError):
+            normalized.pop("slot", None)
+    else:
+        normalized.pop("slot", None)
+
+    cards = payload.get("cards")
+    if isinstance(cards, list):
+        normalized["cards"] = [clone_json(card) for card in cards if isinstance(card, dict)]
+    else:
+        normalized.pop("cards", None)
+    return normalized
+
+
+def order_pages(pages: list[dict[str, Any]], order: list[str]) -> list[dict[str, Any]]:
+    ordered: list[dict[str, Any]] = []
+    for page_id in order:
+        match = next((page for page in pages if page.get("id") == page_id), None)
+        if match and all(existing.get("id") != page_id for existing in ordered):
+            ordered.append(match)
+    ordered.extend(page for page in pages if all(existing.get("id") != page.get("id") for existing in ordered))
+    return ordered
+
+
+def compile_scene_display_config(config: dict[str, Any]) -> dict[str, Any]:
+    payload = normalize_scene_config(config)
+    rotation = payload.get("rotation") if isinstance(payload.get("rotation"), dict) else {}
+    display = payload.get("display") if isinstance(payload.get("display"), dict) else {}
+    safe_area = display.get("safeArea") if isinstance(display.get("safeArea"), dict) else {}
+    avatar = payload.get("avatar") if isinstance(payload.get("avatar"), dict) else {}
+
+    raw_pages = payload.get("pages") if isinstance(payload.get("pages"), list) else []
+    if not raw_pages:
+        raw_pages = DEFAULT_SCENE_CONFIG["pages"]
+
+    used_ids: set[str] = set()
+    pages = [sanitize_page(page, index, used_ids) for index, page in enumerate(raw_pages)]
+
+    raw_order = [
+        trim_text(item, "", 40)
+        for item in (rotation.get("order") if isinstance(rotation.get("order"), list) else [])
+        if trim_text(item, "", 40)
+    ]
+    order = [
+        page_id
+        for page_id in raw_order
+        if any(page.get("id") == page_id for page in pages)
+    ]
+    if not order:
+        order = [str(page.get("id") or "") for page in pages]
+    ordered_pages = order_pages(pages, order)
+
+    try:
+        dwell_seconds = float(rotation.get("defaultDwellSeconds", DEFAULT_SCENE_CONFIG["rotation"]["defaultDwellSeconds"]))
+    except (TypeError, ValueError):
+        dwell_seconds = float(DEFAULT_SCENE_CONFIG["rotation"]["defaultDwellSeconds"])
+    dwell_ms = max(5000, int(round(dwell_seconds * 1000)))
+
+    pack_id = avatar.get("packId")
+    normalized_pack_id = trim_text(pack_id, "", 120) if isinstance(pack_id, str) else ""
+
+    return {
+        "version": 1,
+        "kind": "scene.display",
+        "rotation": {
+            "order": [str(page.get("id") or "") for page in ordered_pages],
+            "defaultDwellMs": dwell_ms,
+        },
+        "display": {
+            "safeAreaPx": {
+                "top": normalize_non_negative_number(safe_area.get("top"), 0),
+                "right": normalize_non_negative_number(safe_area.get("right"), 0),
+                "bottom": normalize_non_negative_number(safe_area.get("bottom"), 0),
+                "left": normalize_non_negative_number(safe_area.get("left"), 0),
+            },
+            "layoutPaddingPx": normalize_non_negative_number(display.get("layoutPaddingPx"), 16),
+            "layoutGapPx": normalize_non_negative_number(display.get("layoutGapPx"), 16),
+            "globalScale": normalize_display_scale(display.get("globalScale"), 1.0),
+        },
+        "avatar": {
+            "packId": normalized_pack_id or None,
+        },
+        "pages": ordered_pages,
+    }
+
+
 def load_active_pack_id() -> str:
     if ACTIVE_PACK_FILE.exists():
         try:
@@ -1614,6 +1775,20 @@ def resolve_primary_scene_config_path() -> Path:
     if EXPLICIT_SCENE_CONFIG_PATH:
         return Path(EXPLICIT_SCENE_CONFIG_PATH)
     return PACKS_DIR / load_active_pack_id() / "scene.default.json"
+
+
+def resolve_display_scene_config_path(primary_path: Path) -> Path:
+    return primary_path.with_name(DISPLAY_SCENE_CONFIG_FILENAME)
+
+
+def write_json_atomic(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    temp_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temp_path, path)
 
 
 def resolve_legacy_scene_config_paths(primary_path: Path) -> tuple[Path, ...]:
@@ -1646,18 +1821,24 @@ def render_editor_html() -> bytes:
 def load_scene_config() -> tuple[dict[str, Any], Path, str | None]:
     primary_path = resolve_primary_scene_config_path()
     if primary_path.exists():
-        return normalize_scene_config(
+        config = normalize_scene_config(
             json.loads(primary_path.read_text(encoding="utf-8"))
-        ), primary_path, None
+        )
+        write_json_atomic(resolve_display_scene_config_path(primary_path), compile_scene_display_config(config))
+        return config, primary_path, None
 
     for legacy_path in resolve_legacy_scene_config_paths(primary_path):
         if legacy_path.exists():
-            return normalize_scene_config(
+            config = normalize_scene_config(
                 json.loads(legacy_path.read_text(encoding="utf-8"))
-            ), primary_path, str(legacy_path)
+            )
+            write_json_atomic(resolve_display_scene_config_path(primary_path), compile_scene_display_config(config))
+            return config, primary_path, str(legacy_path)
 
+    config = normalize_scene_config(json.loads(json.dumps(DEFAULT_SCENE_CONFIG)))
+    write_json_atomic(resolve_display_scene_config_path(primary_path), compile_scene_display_config(config))
     return (
-        normalize_scene_config(json.loads(json.dumps(DEFAULT_SCENE_CONFIG))),
+        config,
         primary_path,
         None,
     )
@@ -1666,13 +1847,8 @@ def load_scene_config() -> tuple[dict[str, Any], Path, str | None]:
 def save_scene_config(config: Any) -> tuple[dict[str, Any], Path]:
     normalized = normalize_scene_config(config)
     primary_path = resolve_primary_scene_config_path()
-    primary_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = primary_path.with_suffix(primary_path.suffix + ".tmp")
-    temp_path.write_text(
-        json.dumps(normalized, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    os.replace(temp_path, primary_path)
+    write_json_atomic(primary_path, normalized)
+    write_json_atomic(resolve_display_scene_config_path(primary_path), compile_scene_display_config(normalized))
     return normalized, primary_path
 
 

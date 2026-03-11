@@ -10,9 +10,9 @@ import {
   mergeControlV1,
   mergeControlCueIntoState,
   nextIdleDelayMs,
-  normalizeSceneConfig,
   pickIdleLine,
   resolveAdjacentSceneIndex,
+  resolveSceneRuntimeConfig,
   resolveSceneSelection,
   sanitizeAvatarManifestV1,
   sanitizeRendererConfigV1,
@@ -25,6 +25,7 @@ import {
   type ControlV1,
   type RendererConfigV1,
   type SceneConfigV1,
+  type SceneDisplayConfigV1,
   type ScenePageV1,
   type StateV1,
   type ViewPreset,
@@ -551,7 +552,8 @@ export class BrowserSceneShellApp {
 
   private rendererConfig!: RendererConfigV1;
   private avatarManifest!: AvatarManifestV1;
-  private sceneConfig!: SceneConfigV1;
+  private sceneConfig!: SceneConfigV1 | SceneDisplayConfigV1;
+  private sceneRuntimeConfig!: SceneDisplayConfigV1;
   private entityMap: HomeAssistantEntityMap | null = null;
   private controlEntityMap: HomeAssistantControlEntityMap | null = null;
   private haStatesReader: ReturnType<typeof createHomeAssistantStatesReader> | null = null;
@@ -676,6 +678,7 @@ export class BrowserSceneShellApp {
       manifestUrl,
     );
     this.sceneConfig = await this.readJson(this.rendererConfig.scene.configUrl);
+    this.sceneRuntimeConfig = resolveSceneRuntimeConfig(this.sceneConfig);
     this.entityMap = await this.readEntityMap();
     this.controlEntityMap = await this.readControlEntityMap();
     this.haStatesReader = this.createHaStatesReader();
@@ -834,12 +837,12 @@ export class BrowserSceneShellApp {
       copy: this.copy,
     });
 
-    const normalizedScene = normalizeSceneConfig(this.sceneConfig, this.sceneConfig);
-    this.applyDisplayConfig(normalizedScene);
-    const orderedPages = this.getOrderedPages(normalizedScene.pages, normalizedScene.rotation.order);
+    const runtimeScene = this.sceneRuntimeConfig;
+    this.applyDisplayConfig(runtimeScene);
+    const orderedPages = runtimeScene.pages;
     const selection = resolveSceneSelection({
       control: this.currentControl,
-      rotation: normalizedScene.rotation,
+      rotation: runtimeScene.rotation,
       activeIndex: this.activeIndex,
       lastAutoRotateAt: this.lastAutoRotateAt,
       force: false,
@@ -1057,7 +1060,7 @@ export class BrowserSceneShellApp {
     return `${base}${DEFAULT_ICON_FILENAMES[key]}`;
   }
 
-  private applyDisplayConfig(scene: ReturnType<typeof normalizeSceneConfig>): void {
+  private applyDisplayConfig(scene: SceneDisplayConfigV1): void {
     const { safeAreaPx, layoutPaddingPx, layoutGapPx, globalScale } = scene.display;
     this.root.style.setProperty("--scene-safe-top", `${safeAreaPx.top}px`);
     this.root.style.setProperty("--scene-safe-right", `${safeAreaPx.right}px`);
@@ -1066,14 +1069,6 @@ export class BrowserSceneShellApp {
     this.root.style.setProperty("--scene-layout-padding", `${layoutPaddingPx}px`);
     this.root.style.setProperty("--scene-layout-gap", `${layoutGapPx}px`);
     this.root.style.setProperty("--scene-global-scale", String(globalScale));
-  }
-
-  private getOrderedPages(pages: ScenePageV1[], order: string[]): ScenePageV1[] {
-    const ordered = order
-      .map((pageId) => pages.find((page) => page.id === pageId))
-      .filter(Boolean) as ScenePageV1[];
-    const extras = pages.filter((page) => !ordered.some((item) => item.id === page.id));
-    return ordered.concat(extras);
   }
 
   private updateCarouselPosition(options?: { instant?: boolean; dragOffsetPx?: number }): void {
@@ -1108,9 +1103,8 @@ export class BrowserSceneShellApp {
     if (this.orderedPages.length < 2) {
       return;
     }
-    const normalizedScene = normalizeSceneConfig(this.sceneConfig, this.sceneConfig);
     const nextIndex = resolveAdjacentSceneIndex(
-      normalizedScene.rotation,
+      this.sceneRuntimeConfig.rotation,
       this.activeIndex,
       direction,
       (pageId) => this.orderedPages.some((page) => page.id === pageId),
@@ -1121,13 +1115,12 @@ export class BrowserSceneShellApp {
   private pinPageByIndex(index: number): void {
     const orderedPages = this.orderedPages.length
       ? this.orderedPages
-      : this.getOrderedPages(this.sceneConfig.pages || [], this.sceneConfig.rotation?.order || []);
+      : this.sceneRuntimeConfig.pages;
     const target = orderedPages[index];
     if (!target) {
       return;
     }
-    const normalizedScene = normalizeSceneConfig(this.sceneConfig, this.sceneConfig);
-    const ttlMs = Math.max(18_000, normalizedScene.rotation.defaultDwellMs * 2);
+    const ttlMs = Math.max(18_000, this.sceneRuntimeConfig.rotation.defaultDwellMs * 2);
     this.uiControl = createPinnedPageControl(this.uiControl, target.id, ttlMs);
     this.activeIndex = index;
     this.lastAutoRotateAt = Date.now();

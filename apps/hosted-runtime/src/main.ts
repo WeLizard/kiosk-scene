@@ -661,6 +661,12 @@ async function resolveRuntimeRendererConfigUrl(
     await readJson<HostedRendererConfig>(rendererConfigUrl),
     rendererConfigUrl,
   );
+  if (sceneConfigUrl) {
+    rendererConfig.scene = {
+      ...(rendererConfig.scene || {}),
+      configUrl: sceneConfigUrl,
+    };
+  }
   const haStatesUrl = resolveHostedUrl(
     String(bootstrap.files?.haStatesUrl || "").trim(),
     bootstrapUrl,
