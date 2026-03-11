@@ -254,6 +254,10 @@ function resolveBootstrapUrl(): string {
 
 function resolveIngressRoot(bootstrapUrl: string): string | null {
   const resolved = new URL(bootstrapUrl, window.location.href);
+  const ingressMatch = resolved.pathname.match(/^\/api\/hassio_ingress\/[^/]+\//);
+  if (ingressMatch) {
+    return new URL(ingressMatch[0], resolved.origin).toString();
+  }
   for (const marker of ["/scene-api/", "/scene-runtime/", "/scene-editor/"]) {
     const index = resolved.pathname.indexOf(marker);
     if (index >= 0) {
