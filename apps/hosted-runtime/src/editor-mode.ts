@@ -1124,6 +1124,15 @@ function normalizeAvatarSummary(item: Partial<AvatarPackSummary>): AvatarPackSum
   };
 }
 
+function normalizeAvatarSummaryWithBase(item: Partial<AvatarPackSummary>, baseUrl: string): AvatarPackSummary {
+  const summary = normalizeAvatarSummary(item);
+  return {
+    ...summary,
+    manifestUrl: summary.manifestUrl ? resolveEditorUrl(summary.manifestUrl, baseUrl) : "",
+    previewUrl: summary.previewUrl ? resolveEditorUrl(summary.previewUrl, baseUrl) : "",
+  };
+}
+
 async function loadBundledAvatarSummary(manifestUrl: string, packId: string): Promise<AvatarPackSummary | null> {
   const target = String(manifestUrl || "").trim();
   if (!target) {
@@ -1183,7 +1192,7 @@ async function loadAvatarCatalog(url: string): Promise<AvatarPackSummary[]> {
   }
   return Array.isArray(payload.items)
     ? payload.items
-      .map((item) => normalizeAvatarSummary(item))
+      .map((item) => normalizeAvatarSummaryWithBase(item, target))
       .filter((item) => item.id && item.manifestUrl)
     : [];
 }
@@ -1203,7 +1212,7 @@ async function importAvatarPack(url: string, archive: File): Promise<AvatarPackS
   if (!response.ok || payload.success === false || !payload.item) {
     throw new Error(String(payload.error || `HTTP ${response.status}`));
   }
-  return normalizeAvatarSummary(payload.item);
+  return normalizeAvatarSummaryWithBase(payload.item, target);
 }
 
 async function loadAvatarPackDetails(url: string, packId: string): Promise<AvatarPackDetails> {
