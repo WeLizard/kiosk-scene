@@ -1014,12 +1014,31 @@ function filterHaEntityCatalog(catalog: HaEntitySummary[], query: string): HaEnt
     .slice(0, 48);
 }
 
+function resolveEditorIngressRoot(baseUrl: string): string | null {
+  const resolved = new URL(baseUrl, window.location.href);
+  const ingressMatch = resolved.pathname.match(/^\/api\/hassio_ingress\/[^/]+\//);
+  if (ingressMatch) {
+    return new URL(ingressMatch[0], resolved.origin).toString();
+  }
+  return null;
+}
+
 function resolveEditorUrl(value: string, baseUrl: string): string {
   const normalized = String(value || "").trim();
   if (!normalized) {
     return "";
   }
-  return new URL(normalized, baseUrl).toString();
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
+    return normalized;
+  }
+  const resolvedBase = new URL(baseUrl, window.location.href);
+  if (normalized.startsWith("/")) {
+    const ingressRoot = resolveEditorIngressRoot(baseUrl);
+    if (ingressRoot) {
+      return new URL(normalized.slice(1), ingressRoot).toString();
+    }
+  }
+  return new URL(normalized, resolvedBase).toString();
 }
 
 function remapLegacyHostedAssetUrl(value: string, baseUrl: string): string {
