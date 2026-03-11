@@ -11,14 +11,15 @@
     "build:demo": "pnpm --filter @kiosk-scene/demo-generic build",
     "build:hosted": "pnpm --filter @kiosk-scene/hosted-runtime build",
     "sync:kiosk-addon-runtime": "node ./tools/sync-kiosk-addon-runtime.mjs",
-    "release:kiosk-addon": "pnpm build:hosted && pnpm sync:kiosk-addon-runtime",
+    "validate:kiosk-addon-runtime": "node ./tools/validate-kiosk-addon-runtime.mjs",
+    "release:kiosk-addon": "pnpm build:hosted && pnpm sync:kiosk-addon-runtime && pnpm validate:kiosk-addon-runtime",
     "preview:demo": "pnpm --filter @kiosk-scene/demo-generic preview",
     "preview:hosted": "pnpm --filter @kiosk-scene/hosted-runtime preview",
     "validate:config": "node ./tools/validate-config.mjs",
     "validate:demo": "node ./tools/validate-demo.mjs",
     "typecheck:packages": "tsc -p tsconfig.base.json --noEmit",
     "typecheck": "pnpm typecheck:packages && pnpm --filter @kiosk-scene/demo-generic typecheck && pnpm --filter @kiosk-scene/hosted-runtime typecheck",
-    "verify": "pnpm typecheck && pnpm validate:demo && pnpm build:demo && pnpm build:hosted"
+    "verify": "pnpm typecheck && pnpm validate:demo && pnpm build:demo && pnpm release:kiosk-addon"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

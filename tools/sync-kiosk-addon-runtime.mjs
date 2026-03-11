@@ -15,6 +15,14 @@ const sharedDir = path.resolve(
   "kiosk_scene",
   "scene-runtime-shared",
 );
+const defaultWeatherSource = path.resolve(
+  repoRoot,
+  "apps",
+  "demo-generic",
+  "public",
+  "weather.json",
+);
+const defaultWeatherTarget = path.join(targetDir, "weather.json");
 
 if (!fs.existsSync(sourceDir)) {
   console.error(`Hosted runtime build is missing: ${sourceDir}`);
@@ -27,6 +35,9 @@ fs.mkdirSync(targetDir, { recursive: true });
 fs.cpSync(sourceDir, targetDir, { recursive: true });
 if (fs.existsSync(sharedDir)) {
   fs.cpSync(sharedDir, targetDir, { recursive: true, force: true });
+}
+if (fs.existsSync(defaultWeatherSource)) {
+  fs.cpSync(defaultWeatherSource, defaultWeatherTarget, { force: true });
 }
 
 console.log(`Synced hosted runtime bundle to ${targetDir}`);
