@@ -43,7 +43,6 @@ type EditorCopy = {
   avatarImportNotSelected: string;
   avatarImportSelected: (name: string) => string;
   avatarImportChooseButton: string;
-  avatarImportButton: string;
   avatarImporting: string;
   avatarImportSuccess: (name: string) => string;
   avatarImportError: string;
@@ -216,11 +215,11 @@ const COPY: Record<UiLang, EditorCopy> = {
     saving: "Сохраняю...",
     addPage: "+ Страница",
     avatar: "Аватар",
-    avatarSubtitle: "Здесь выбирается модель для текущей сцены. Можно оставить встроенную модель или добавить новую Live2D-модель из ZIP.",
+    avatarSubtitle: "Здесь выбирается модель для текущей сцены. Встроенный аватар остаётся доступен всегда, а новые модели добавляются ZIP-архивами и потом выбираются в этом списке.",
     avatarPack: "Набор аватара",
     avatarPackCurrent: "встроенная модель сцены",
-    avatarPackHint: "Выбранная модель применяется после сохранения. Встроенная модель доступна всегда, отдельные модели появляются после импорта ZIP.",
-    avatarPackEmpty: "Сейчас доступна только встроенная модель сцены. Новые модели можно добавить ZIP-архивом ниже.",
+    avatarPackHint: "Выбранная модель применяется после сохранения. После импорта ZIP новый аватар появляется в каталоге ниже и его можно сразу выбрать.",
+    avatarPackEmpty: "Сейчас в каталоге только встроенный аватар сцены. Загрузите ZIP-архив ниже, чтобы добавить новый аватар.",
     avatarPackAppliedAfterSave: "Смена модели применяется после сохранения и перезагрузки превью.",
     avatarPackDefaultTile: "Встроенная модель сцены",
     avatarPackDefaultHint: "Использовать модель, которая уже лежит внутри текущего scene-pack.",
@@ -233,12 +232,11 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarCapabilityViewPresets: "Ракурсы",
     avatarCapabilityPointerFocus: "Фокус",
     avatarImport: "Импорт аватара",
-    avatarImportHint: "Импорт сразу создаёт отдельный avatar-pack, находит model3.json и подготавливает черновик motion-map.",
+    avatarImportHint: "После выбора ZIP импорт запускается сразу: архив распаковывается, находится model3.json, создаётся avatar-pack и черновик motion-map.",
     avatarImportSelect: "ZIP-архив Live2D-модели",
     avatarImportNotSelected: "Файл не выбран",
     avatarImportSelected: (name) => `Выбран архив: ${name}`,
     avatarImportChooseButton: "Выбрать ZIP",
-    avatarImportButton: "Выбрать ZIP и импортировать",
     avatarImporting: "Импортирую avatar-pack...",
     avatarImportSuccess: (name) => `Импортирован avatar-pack: ${name}`,
     avatarImportError: "Не удалось импортировать avatar-pack",
@@ -355,11 +353,11 @@ const COPY: Record<UiLang, EditorCopy> = {
     saving: "Saving...",
     addPage: "+ Page",
     avatar: "Avatar",
-    avatarSubtitle: "Choose the model for this scene. You can keep the bundled model or import a new Live2D model from a ZIP archive.",
+    avatarSubtitle: "Choose the model for this scene. The bundled avatar always stays available, and new avatars are added from ZIP archives and then selected from this list.",
     avatarPack: "Avatar pack",
     avatarPackCurrent: "bundled scene model",
-    avatarPackHint: "The selected model applies after saving. The bundled scene model is always available; imported models appear here after ZIP import.",
-    avatarPackEmpty: "Only the bundled scene model is available right now. Import a ZIP archive below to add more models.",
+    avatarPackHint: "The selected model applies after saving. After ZIP import, the new avatar appears here and can be selected immediately.",
+    avatarPackEmpty: "Only the bundled scene avatar is in the catalog right now. Upload a ZIP archive below to add another avatar.",
     avatarPackAppliedAfterSave: "Model switch applies after saving and reloading the preview.",
     avatarPackDefaultTile: "Bundled scene model",
     avatarPackDefaultHint: "Use the model that is already bundled with the active scene-pack.",
@@ -372,12 +370,11 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarCapabilityViewPresets: "View presets",
     avatarCapabilityPointerFocus: "Pointer focus",
     avatarImport: "Import avatar",
-    avatarImportHint: "Import creates a separate avatar pack, detects model3.json and prepares a draft motion map.",
+    avatarImportHint: "Import starts immediately after ZIP selection: the archive is unpacked, model3.json is detected, and a draft motion map is created.",
     avatarImportSelect: "Choose avatar ZIP",
     avatarImportNotSelected: "No file selected",
     avatarImportSelected: (name) => `Selected archive: ${name}`,
     avatarImportChooseButton: "Choose ZIP",
-    avatarImportButton: "Choose and import ZIP",
     avatarImporting: "Importing avatar pack...",
     avatarImportSuccess: (name) => `Imported avatar pack: ${name}`,
     avatarImportError: "Failed to import avatar pack",
@@ -2082,17 +2079,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         color: #4f6a7c;
       }
       #scene-editor-shell .avatar-import-input {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-        opacity: 0;
-        pointer-events: none;
+        display: none !important;
       }
       #scene-editor-shell .avatar-import-actions {
         display: flex;
@@ -2261,12 +2248,16 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     state.avatarImportStatus = "";
     state.avatarImportTone = "muted";
     render();
+    if (archive) {
+      void importAvatarArchive(archive);
+    }
   };
 
   const importAvatarArchive = async (archive: File): Promise<void> => {
     if (!state.config || !options.avatarImportUrl || state.avatarImporting) {
       return;
     }
+    state.pendingAvatarZip = null;
     state.avatarImporting = true;
     state.avatarImportStatus = copy.avatarImporting;
     state.avatarImportTone = "muted";
@@ -2386,16 +2377,23 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
             <div class="card-stack" style="margin-top:16px;">
               <div class="field is-wide">
-                <label for="avatar-pack-archive">${copy.avatarImportSelect}</label>
-                <input id="avatar-pack-archive" class="avatar-import-input" type="file" accept=".zip,application/zip" data-avatar-archive>
+                <label>${copy.avatarImportSelect}</label>
+                <input
+                  id="avatar-pack-archive"
+                  class="avatar-import-input"
+                  type="file"
+                  accept=".zip,application/zip"
+                  data-avatar-archive
+                  hidden
+                  aria-hidden="true"
+                  tabindex="-1"
+                >
               </div>
               <div class="avatar-import-actions">
                 <button class="scene-editor-button" type="button" data-action="import-avatar"${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}>
                   ${state.avatarImporting
                     ? copy.avatarImporting
-                    : state.pendingAvatarZip
-                      ? copy.avatarImportButton
-                      : copy.avatarImportChooseButton}
+                    : copy.avatarImportChooseButton}
                 </button>
                 <div class="avatar-import-file">${escapeHtml(avatarArchiveLabel)}</div>
               </div>
@@ -2904,11 +2902,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       return;
     }
     if (action === "import-avatar") {
-      if (state.pendingAvatarZip) {
-        void importAvatarArchive(state.pendingAvatarZip);
-      } else {
-        openAvatarArchivePicker();
-      }
+      openAvatarArchivePicker();
       return;
     }
     if (action === "add-card-template" && state.selectedPageId) {
