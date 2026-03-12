@@ -2252,6 +2252,7 @@
           antialias: !IS_DISPLAY_MODE,
           resolution: IS_DISPLAY_MODE ? 1 : Math.min(window.devicePixelRatio || 1, 2),
           backgroundAlpha: 0,
+          preferWebGLVersion: IS_DISPLAY_MODE ? 1 : 2,
           powerPreference: IS_DISPLAY_MODE ? 'low-power' : undefined,
         });
         configureTickerBudget();
@@ -2542,7 +2543,6 @@
   </script>
 </body>
 </html>
-
 
 
 
