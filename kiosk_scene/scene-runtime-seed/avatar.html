@@ -1386,6 +1386,43 @@
       }
     }
 
+    function configurePixiDisplayRenderer() {
+      if (!window.PIXI || !PIXI.settings) {
+        return;
+      }
+      if (!IS_DISPLAY_MODE) {
+        return;
+      }
+      try {
+        if (PIXI.ENV && Object.prototype.hasOwnProperty.call(PIXI.ENV, 'WEBGL_LEGACY')) {
+          PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL_LEGACY;
+        } else if (PIXI.ENV && Object.prototype.hasOwnProperty.call(PIXI.ENV, 'WEBGL')) {
+          PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL;
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        if (PIXI.MIPMAP_MODES && Object.prototype.hasOwnProperty.call(PIXI.MIPMAP_MODES, 'OFF')) {
+          PIXI.settings.MIPMAP_TEXTURES = PIXI.MIPMAP_MODES.OFF;
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        if (PIXI.SCALE_MODES && Object.prototype.hasOwnProperty.call(PIXI.SCALE_MODES, 'LINEAR')) {
+          PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.LINEAR;
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        PIXI.settings.ANISOTROPIC_LEVEL = 0;
+      } catch {
+        // ignore
+      }
+    }
+
     function classifyPhoneme(ch, index) {
       if (!ch) {
         return { open: 0, form: 0, hold: 40 };
@@ -2194,6 +2231,7 @@
           }, true);
         }
         await loadMotionMap();
+        configurePixiDisplayRenderer();
 
         const webglSupported = Boolean(
           window.PIXI &&
@@ -2214,6 +2252,7 @@
           antialias: !IS_DISPLAY_MODE,
           resolution: IS_DISPLAY_MODE ? 1 : Math.min(window.devicePixelRatio || 1, 2),
           backgroundAlpha: 0,
+          powerPreference: IS_DISPLAY_MODE ? 'low-power' : undefined,
         });
         configureTickerBudget();
         stage.appendChild(app.view);
@@ -2503,7 +2542,6 @@
   </script>
 </body>
 </html>
-
 
 
 
