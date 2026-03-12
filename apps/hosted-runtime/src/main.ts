@@ -378,6 +378,11 @@ function isEditorMode(): boolean {
   return params.get("editor") === "1";
 }
 
+function applyRuntimeSurfaceClass(): void {
+  document.body.classList.toggle("ks-display-runtime", !isEditorMode());
+  document.body.classList.toggle("ks-editor-runtime", isEditorMode());
+}
+
 function prepareEditorViewport(): void {
   if (!isEditorMode()) {
     return;
@@ -717,6 +722,7 @@ if (!root) {
 
 const copy = COPY[resolveUiLang()];
 
+applyRuntimeSurfaceClass();
 prepareEditorViewport();
 renderStatus(root, copy.startingTitle, copy.startingBody);
 

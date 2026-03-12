@@ -578,6 +578,7 @@ export class BrowserSceneShellApp {
   private orderedPages: ScenePageV1[] = [];
   private carouselDragState: CarouselDragState | null = null;
   private lastPageStructureKey = "";
+  private lastCarouselRenderKey = "";
   private slideMarkupCache = new Map<string, string>();
   private lastDotsMarkup = "";
   private lastAvatarStateKey = "";
@@ -1058,10 +1059,19 @@ export class BrowserSceneShellApp {
               upEntity: trimText(card.upEntity, 255),
               caption: trimText(card.caption, 48),
               hint: trimText(card.hint, 72),
-            }))
+        }))
           : [],
       })),
     );
+    const carouselRenderKey = this.buildCarouselRenderKey(pages, presentation);
+    if (
+      structureKey === this.lastPageStructureKey
+      && carouselRenderKey === this.lastCarouselRenderKey
+    ) {
+      this.updateCarouselPosition();
+      this.updateDotState();
+      return;
+    }
     const slideMarkup = pages.map((page, index) => {
       if (page.kind === "overview") {
         return this.renderOverviewSlide(page, presentation, index);
@@ -1082,6 +1092,7 @@ export class BrowserSceneShellApp {
       this.carouselTrackEl.innerHTML = slideMarkup.join("");
       this.dotsEl.innerHTML = dotsMarkup;
       this.lastPageStructureKey = structureKey;
+      this.lastCarouselRenderKey = carouselRenderKey;
       this.lastDotsMarkup = dotsMarkup;
       this.slideMarkupCache = new Map(
         pages.map((page, index) => [page.id, slideMarkup[index]]),
@@ -1121,10 +1132,64 @@ export class BrowserSceneShellApp {
           });
         }
       }
+      this.lastCarouselRenderKey = carouselRenderKey;
     }
 
     this.updateCarouselPosition();
     this.updateDotState();
+  }
+
+  private buildCarouselRenderKey(pages: ScenePageV1[], presentation: AssistantPresentationModel): string {
+    const weather = this.weatherData || DEFAULT_WEATHER_OVERVIEW;
+    const locale = this.rendererConfig.assistant.locale || "en-US";
+    return JSON.stringify({
+      presentation: {
+        caption: trimText(presentation.caption, 64),
+        label: trimText(presentation.label, 96),
+        body: trimText(presentation.body, 280),
+      },
+      weather: {
+        title: trimText(weather.title, 64),
+        location: trimText(weather.location, 96),
+        todayCaption: trimText(weather.todayCaption, 48),
+        todayValue: trimText(weather.todayValue, 48),
+        todayLabel: trimText(weather.todayLabel, 48),
+        updatedCaption: trimText(weather.updatedCaption, 48),
+        updatedAt: trimText(weather.updatedAt, 48),
+        temperature: trimText(weather.temperature, 24),
+        unit: trimText(weather.unit, 8),
+        condition: trimText(weather.condition, 96),
+        feelsLike: trimText(weather.feelsLike, 140),
+        badgeSummary: trimText(weather.badgeSummary, 96),
+        badgeRange: trimText(weather.badgeRange, 96),
+        metrics: weather.metrics,
+        forecastTitle: trimText(weather.forecastTitle, 64),
+        forecast: weather.forecast.map((day) => ({
+          name: trimText(day.name, 24),
+          dayNumber: trimText(day.dayNumber, 8),
+          monthShort: trimText(day.monthShort, 16),
+          note: trimText(day.note, 48),
+          max: trimText(day.max, 16),
+          min: trimText(day.min, 24),
+          icon: trimText(day.icon, 255),
+        })),
+      },
+      pages: pages.map((page, index) => ({
+        id: trimText(page.id, 64),
+        kind: trimText(page.kind, 32),
+        title: trimText(page.title, 96),
+        subtitle: trimText(page.subtitle, 160),
+        stampCaption: trimText(page.stampCaption, 48),
+        stampValue: trimText(page.stampValue, 48),
+        cardStyle: trimText(page.cardStyle, 16),
+        index,
+        cards: resolveSceneCards(page.cards || [], this.hassStates, locale).map((card) => ({
+          caption: trimText(card.caption, 64),
+          value: trimText(card.value, 96),
+          hint: trimText(card.hint, 160),
+        })),
+      })),
+    });
   }
 
   private renderOverviewSlide(page: ScenePageV1, presentation: AssistantPresentationModel, index: number): string {

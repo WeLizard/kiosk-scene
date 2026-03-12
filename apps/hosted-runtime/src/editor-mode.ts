@@ -494,6 +494,7 @@ type EditorState = {
   avatarImporting: boolean;
   avatarImportStatus: string;
   avatarImportTone: "muted" | "ok" | "bad";
+  avatarInspectorPackId: string | null;
   avatarPackDetails: AvatarPackDetails | null;
   avatarPackLoading: boolean;
   avatarPackDirty: boolean;
@@ -2249,6 +2250,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     avatarImporting: false,
     avatarImportStatus: "",
     avatarImportTone: "muted",
+    avatarInspectorPackId: null,
     avatarPackDetails: null,
     avatarPackLoading: false,
     avatarPackDirty: false,
@@ -2326,14 +2328,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.avatarCatalog = options.avatarCatalogUrl
         ? await loadAvatarCatalog(options.avatarCatalogUrl)
         : [importedPack];
-      ensureAvatarConfig(state.config).packId = importedPack.id;
+      state.avatarInspectorPackId = importedPack.id;
       await loadSelectedAvatarPackDetails(importedPack.id);
       state.pendingAvatarZip = null;
       state.pendingAvatarZipName = "";
       state.avatarImporting = false;
       state.avatarImportStatus = copy.avatarImportSuccess(importedPack.name || importedPack.id);
       state.avatarImportTone = "ok";
-      markDirty();
       render();
     } catch (error) {
       state.avatarImporting = false;
@@ -2393,6 +2394,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         )
       : copy.entityBindingEmpty;
     const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
+    const inspectedAvatarPackId = state.avatarInspectorPackId || selectedAvatarPackId;
     const avatarImportStatus = state.avatarImportStatus
       ? `<div class="scene-editor-status" data-tone="${state.avatarImportTone}">${escapeHtml(state.avatarImportStatus)}</div>`
       : "";
@@ -2463,7 +2465,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               <div class="meta">${copy.avatarImportHint}</div>
               ${avatarImportStatus}
             </div>
-            ${selectedAvatarPackId
+            ${inspectedAvatarPackId
               ? state.avatarPackLoading
                 ? `<div class="meta" style="margin-top:16px;">${copy.avatarMappingLoading}</div>`
                 : state.avatarPackDetails
@@ -3115,8 +3117,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       return;
     }
     if (target.dataset.avatarSemantic !== undefined) {
-      const selectedPackId = readAvatarPackId(state.config);
-      if (!state.avatarPackDetails || !selectedPackId || state.avatarPackDetails.packId !== selectedPackId) {
+      const inspectedPackId = String(state.avatarInspectorPackId || "").trim() || readAvatarPackId(state.config);
+      if (!state.avatarPackDetails || !inspectedPackId || state.avatarPackDetails.packId !== inspectedPackId) {
         return;
       }
       const selectedValue = target.value.trim();
@@ -3159,6 +3161,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     }
     const packId = String(actionEl.dataset.packId || "").trim();
     ensureAvatarConfig(state.config).packId = packId || null;
+    state.avatarInspectorPackId = packId || null;
     markDirty();
     void loadSelectedAvatarPackDetails(packId || null).finally(() => render());
     render();
@@ -3243,7 +3246,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     state.selectedCardIndex = 0;
     state.status = copy.statusSaved;
     state.statusTone = "ok";
-    await loadSelectedAvatarPackDetails(readAvatarPackId(state.config));
+    state.avatarInspectorPackId = readAvatarPackId(state.config) || null;
+    await loadSelectedAvatarPackDetails(state.avatarInspectorPackId);
     syncSelection();
   } catch (error) {
     state.status = `${copy.loadError}: ${String(error)}`;

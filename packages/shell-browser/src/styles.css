@@ -843,6 +843,67 @@ body::after {
   outline-offset: 2px;
 }
 
+body.ks-display-runtime {
+  background: linear-gradient(180deg, #edf4fa 0%, #dde9f1 100%);
+}
+
+body.ks-display-runtime::before,
+body.ks-display-runtime::after {
+  display: none;
+}
+
+body.ks-display-runtime .scene-viewport {
+  contain: layout paint size;
+}
+
+body.ks-display-runtime .panel,
+body.ks-display-runtime .stamp,
+body.ks-display-runtime .hero,
+body.ks-display-runtime .neiri-card,
+body.ks-display-runtime .metric,
+body.ks-display-runtime .day,
+body.ks-display-runtime .mini-card,
+body.ks-display-runtime .home-card,
+body.ks-display-runtime .carousel-dots,
+body.ks-display-runtime .avatar-preset,
+body.ks-display-runtime .day .icon,
+body.ks-display-runtime .hero-badge,
+body.ks-display-runtime .neiri-meta {
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body.ks-display-runtime .panel {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+body.ks-display-runtime .avatar-shell,
+body.ks-display-runtime .stamp,
+body.ks-display-runtime .metric,
+body.ks-display-runtime .day,
+body.ks-display-runtime .mini-card,
+body.ks-display-runtime .home-card,
+body.ks-display-runtime .carousel-dots,
+body.ks-display-runtime .hero-badge,
+body.ks-display-runtime .day .icon,
+body.ks-display-runtime .neiri-meta {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+body.ks-display-runtime .hero,
+body.ks-display-runtime .neiri-mark {
+  background: linear-gradient(180deg, #eef5fb 0%, #dce9f2 100%);
+}
+
+body.ks-display-runtime .avatar-preset,
+body.ks-display-runtime .carousel-dot {
+  transition: none;
+}
+
+body.ks-display-runtime .carousel-track {
+  transition: transform 0.18s ease-out;
+}
+
 @container (max-width: 1180px) {
   .layout {
     grid-template-columns: clamp(190px, 29%, 320px) minmax(0, 1fr);
