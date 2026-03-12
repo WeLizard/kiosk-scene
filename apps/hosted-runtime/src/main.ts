@@ -30,6 +30,18 @@ interface SceneHostBootstrap {
     avatarImportUrl?: string;
     avatarPackApiUrl?: string;
   };
+  publication?: {
+    packId?: string;
+    source?: string;
+    sceneConfigName?: string;
+    usesDisplayArtifact?: boolean;
+    directScheme?: string;
+    directPort?: number;
+    directPath?: string;
+    runtimePath?: string;
+    editorPath?: string;
+    localDisplayUrl?: string;
+  };
   availability?: Record<string, boolean>;
 }
 
@@ -255,6 +267,41 @@ function resolveUiLang(): UiLang {
 function resolveBootstrapUrl(): string {
   const params = new URLSearchParams(window.location.search);
   return params.get("bootstrap") || DEFAULT_BOOTSTRAP_URL;
+}
+
+function normalizePathname(value: string | null | undefined, fallback: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
+
+function buildPublishedSceneUrls(bootstrap: SceneHostBootstrap): {
+  localDisplayUrl: string;
+  externalDisplayUrl: string;
+  directPath: string;
+  sceneConfigName: string;
+  usesDisplayArtifact: boolean;
+  source: string;
+} {
+  const publication = bootstrap.publication || {};
+  const directScheme = String(publication.directScheme || "").trim() || "http";
+  const directPort = Number(publication.directPort);
+  const normalizedPort = Number.isFinite(directPort) && directPort > 0 ? directPort : 48123;
+  const directPath = normalizePathname(publication.directPath, "/scene/");
+  const localDisplayUrl = String(publication.localDisplayUrl || "").trim()
+    || `${directScheme}://localhost:${normalizedPort}${directPath}`;
+  const hostname = String(window.location.hostname || "").trim() || "homeassistant.local";
+  const externalDisplayUrl = `${directScheme}://${hostname}:${normalizedPort}${directPath}`;
+  return {
+    localDisplayUrl,
+    externalDisplayUrl,
+    directPath,
+    sceneConfigName: String(publication.sceneConfigName || "").trim() || "scene.default.json",
+    usesDisplayArtifact: Boolean(publication.usesDisplayArtifact),
+    source: String(publication.source || "").trim() || "editor-config-fallback",
+  };
 }
 
 function resolveIngressRoot(bootstrapUrl: string): string | null {
@@ -776,6 +823,7 @@ void (async () => {
     });
 
     if (isEditorMode()) {
+      const publishedScene = buildPublishedSceneUrls(bootstrap);
       await mountNativeEditorShell({
         packId,
         sceneApiUrl: resolveHostedUrl(
@@ -802,6 +850,7 @@ void (async () => {
           String(bootstrap.entryUrl || bootstrap.runtimeBaseUrl || "./").trim(),
           bootstrapUrl,
         ),
+        publishedScene,
       });
     }
   } catch (error) {

@@ -38,6 +38,8 @@ except Exception:
 HOST = os.environ.get("SCENE_HOST_BIND", "127.0.0.1")
 PORT = int(os.environ.get("SCENE_HOST_PORT", "48097"))
 PATH_PREFIX = os.environ.get("SCENE_API_PREFIX", "/scene-api").rstrip("/")
+DIRECT_PORT = int(os.environ.get("SCENE_DIRECT_PORT", "48123"))
+DIRECT_SCHEME = os.environ.get("SCENE_DIRECT_SCHEME", "http").strip() or "http"
 SCENE_ROOT = Path(os.environ.get("SCENE_ROOT", "/config/kiosk-scene"))
 RUNTIME_DIR = Path(
     os.environ.get("SCENE_RUNTIME_DIR", str(SCENE_ROOT / "scene-runtime"))
@@ -166,14 +168,19 @@ def build_bootstrap() -> dict[str, Any]:
     pack_dir = PACKS_DIR / pack_id
     pack_base_url = f"/scene-packs/{quote(pack_id)}/"
     runtime_scene_config_name = resolve_runtime_scene_config_name(pack_dir)
+    entry_path = "/scene/"
+    runtime_path = "/scene-runtime/"
+    editor_path = "/scene-editor/"
+    local_display_url = f"{DIRECT_SCHEME}://localhost:{DIRECT_PORT}{entry_path}"
+    uses_display_artifact = runtime_scene_config_name == DISPLAY_SCENE_CONFIG_FILENAME
     return {
         "success": True,
         "packId": pack_id,
-        "entryUrl": "/scene-runtime/",
-        "runtimeBaseUrl": "/scene-runtime/",
+        "entryUrl": runtime_path,
+        "runtimeBaseUrl": runtime_path,
         "packBaseUrl": pack_base_url,
         "apiBaseUrl": f"{PATH_PREFIX}/",
-        "sceneEditorUrl": "/scene-editor/",
+        "sceneEditorUrl": editor_path,
         "sceneEditorFormUrl": "/scene-editor-form/",
         "sceneEditorApiUrl": "/scene-editor-form/api/config",
         "files": {
@@ -186,6 +193,18 @@ def build_bootstrap() -> dict[str, Any]:
             "avatarCatalogUrl": f"{PATH_PREFIX}/avatar-catalog",
             "avatarImportUrl": f"{PATH_PREFIX}/avatar-import",
             "avatarPackApiUrl": f"{PATH_PREFIX}/avatar-pack",
+        },
+        "publication": {
+            "packId": pack_id,
+            "source": "display-artifact" if uses_display_artifact else "editor-config-fallback",
+            "sceneConfigName": runtime_scene_config_name,
+            "usesDisplayArtifact": uses_display_artifact,
+            "directScheme": DIRECT_SCHEME,
+            "directPort": DIRECT_PORT,
+            "directPath": entry_path,
+            "runtimePath": runtime_path,
+            "editorPath": editor_path,
+            "localDisplayUrl": local_display_url,
         },
         "availability": {
             "runtimeIndex": (RUNTIME_DIR / "index.html").exists(),
