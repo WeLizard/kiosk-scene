@@ -964,14 +964,18 @@
     }
 
     function getFallbackPortraitUrl() {
-      return resolvePageUrl(
+      const fallbackPortrait = resolvePageUrl(
         trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.fallbackPortrait, 512)
           || DEFAULT_RENDERER_CONFIG.assetPack.fallbackPortrait
       );
+      return looksLikeTextureAtlasUrl(fallbackPortrait) ? getPresetThumbUrl() || fallbackPortrait : fallbackPortrait;
     }
 
     function syncFallbackPortrait(url) {
-      const portrait = trimText(url, 512) || getFallbackPortraitUrl() || getPresetThumbUrl();
+      const explicitPortrait = trimText(url, 512);
+      const portrait = resolveEffectivePortraitUrl(explicitPortrait, getPresetThumbUrl())
+        || getFallbackPortraitUrl()
+        || getPresetThumbUrl();
       if (portrait) {
         fallbackPortraitEl.src = portrait;
         return;
@@ -985,6 +989,20 @@
         presetThumbs && (presetThumbs[currentViewPreset] || presetThumbs.full),
         512,
       );
+    }
+
+    function looksLikeTextureAtlasUrl(url) {
+      const normalized = trimText(url, 512).toLowerCase();
+      return Boolean(normalized && (/\/texture_\d+\.png(?:$|\?)/.test(normalized) || normalized.endsWith('texture_00.png')));
+    }
+
+    function resolveEffectivePortraitUrl(candidate, presetThumb) {
+      const explicit = trimText(candidate, 512);
+      const fallbackThumb = trimText(presetThumb, 512);
+      if (explicit && !looksLikeTextureAtlasUrl(explicit)) {
+        return explicit;
+      }
+      return fallbackThumb || explicit;
     }
 
     function uniqueAssetCandidates(items) {
@@ -2146,8 +2164,8 @@
           resizeTo: stage,
           transparent: true,
           autoDensity: true,
-          antialias: true,
-          resolution: Math.min(window.devicePixelRatio || 1, 2),
+          antialias: !IS_DISPLAY_MODE,
+          resolution: IS_DISPLAY_MODE ? 1 : Math.min(window.devicePixelRatio || 1, 2),
           backgroundAlpha: 0,
         });
         configureTickerBudget();
@@ -2438,7 +2456,6 @@
   </script>
 </body>
 </html>
-
 
 
 

@@ -102,6 +102,8 @@ _ha_states_condition = threading.Condition(_ha_states_cache_lock)
 _ha_ws_listener_started = False
 _ha_ws_snapshot_ready = False
 _ha_all_states_by_entity: dict[str, dict[str, Any]] = {}
+_ha_relevant_pack_id = ""
+_ha_relevant_entity_ids: set[str] = set()
 HOME_ASSISTANT_TOKEN_PATHS = (
     Path("/run/s6/container_environment/SUPERVISOR_TOKEN"),
     Path("/run/s6/container_environment/HASSIO_TOKEN"),
@@ -398,16 +400,15 @@ def update_home_assistant_states_snapshot(states: list[dict[str, Any]]) -> list[
     with _ha_states_condition:
         _ha_all_states_by_entity.clear()
         _ha_all_states_by_entity.update(state_map)
-        _ha_states_cache = normalized
+        _ha_states_cache = None
         _ha_states_cache_at = now_ms
         _ha_states_generation += 1
         _ha_ws_snapshot_ready = True
         _ha_states_condition.notify_all()
-        return list(_ha_states_cache)
+        return normalized
 
 
 def apply_home_assistant_state_event(state: dict[str, Any] | None) -> None:
-    global _ha_states_cache
     global _ha_states_cache_at
     global _ha_states_generation
 
@@ -417,15 +418,16 @@ def apply_home_assistant_state_event(state: dict[str, Any] | None) -> None:
 
     now_ms = time.monotonic() * 1000
     with _ha_states_condition:
+        relevant_change = not _ha_relevant_entity_ids or entity_id in _ha_relevant_entity_ids
         _ha_all_states_by_entity[entity_id] = dict(state)
-        _ha_states_cache = list(_ha_all_states_by_entity.values())
+        _ha_states_cache = None
         _ha_states_cache_at = now_ms
-        _ha_states_generation += 1
-        _ha_states_condition.notify_all()
+        if relevant_change:
+            _ha_states_generation += 1
+            _ha_states_condition.notify_all()
 
 
 def remove_home_assistant_state(entity_id: str) -> None:
-    global _ha_states_cache
     global _ha_states_cache_at
     global _ha_states_generation
 
@@ -436,11 +438,13 @@ def remove_home_assistant_state(entity_id: str) -> None:
     with _ha_states_condition:
         if normalized not in _ha_all_states_by_entity:
             return
+        relevant_change = not _ha_relevant_entity_ids or normalized in _ha_relevant_entity_ids
         _ha_all_states_by_entity.pop(normalized, None)
-        _ha_states_cache = list(_ha_all_states_by_entity.values())
+        _ha_states_cache = None
         _ha_states_cache_at = now_ms
-        _ha_states_generation += 1
-        _ha_states_condition.notify_all()
+        if relevant_change:
+            _ha_states_generation += 1
+            _ha_states_condition.notify_all()
 
 
 def collect_pack_home_assistant_entity_ids(pack_id: str | None = None) -> list[str]:
@@ -471,7 +475,13 @@ def collect_pack_home_assistant_entity_ids(pack_id: str | None = None) -> list[s
                     add_entity(card.get(field))
 
     add_entity(WEATHER_ENTITY_ID)
-    return sorted(entity_ids)
+    resolved_entity_ids = sorted(entity_ids)
+    with _ha_states_condition:
+        global _ha_relevant_pack_id
+        global _ha_relevant_entity_ids
+        _ha_relevant_pack_id = resolved_pack_id
+        _ha_relevant_entity_ids = set(resolved_entity_ids)
+    return resolved_entity_ids
 
 
 def fetch_home_assistant_states() -> list[dict[str, Any]]:
@@ -745,24 +755,27 @@ def load_filtered_home_assistant_states(pack_id: str | None = None) -> list[dict
 
     ensure_home_assistant_state_listener()
     with _ha_states_condition:
-        snapshot = list(_ha_states_cache) if _ha_states_cache is not None else []
+        snapshot_map = dict(_ha_all_states_by_entity)
         snapshot_ready = _ha_ws_snapshot_ready
 
-    if not snapshot:
+    if not snapshot_map:
         fallback_snapshot = update_home_assistant_states_snapshot(fetch_home_assistant_states())
-        snapshot = fallback_snapshot
+        snapshot_map = {
+            str(item.get("entity_id") or "").strip(): dict(item)
+            for item in fallback_snapshot
+            if isinstance(item, dict) and str(item.get("entity_id") or "").strip()
+        }
         snapshot_ready = True
 
     if not snapshot_ready:
         with _ha_states_condition:
             _ha_states_condition.wait(timeout=1.5)
-            if _ha_states_cache is not None:
-                snapshot = list(_ha_states_cache)
+            snapshot_map = dict(_ha_all_states_by_entity)
 
     return [
-        state
-        for state in snapshot
-        if str(state.get("entity_id") or "").strip() in entity_ids
+        dict(snapshot_map[entity_id])
+        for entity_id in sorted(entity_ids)
+        if entity_id in snapshot_map
     ]
 
 
@@ -925,17 +938,44 @@ def detect_expression_support(model_dir: Path) -> bool:
 
 
 def resolve_preview_asset(model_dir: Path, model_payload: dict[str, Any]) -> str:
-    textures = model_payload.get("FileReferences", {}).get("Textures", [])
-    if isinstance(textures, list) and textures:
-        candidate = str(textures[0] or "").strip()
-        if candidate:
-            texture_path = model_dir.joinpath(*PurePosixPath(candidate).parts)
-            if texture_path.exists():
-                return candidate
-    for pattern in ("**/texture_00.png", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"):
+    def is_texture_atlas(path_value: str) -> bool:
+        normalized = str(path_value or "").replace("\\", "/").lower()
+        return "/texture_" in normalized or normalized.endswith("texture_00.png")
+
+    for pattern in (
+        "**/*preview*.png",
+        "**/*preview*.jpg",
+        "**/*preview*.jpeg",
+        "**/*portrait*.png",
+        "**/*portrait*.jpg",
+        "**/*portrait*.jpeg",
+        "**/*thumb*.png",
+        "**/*thumb*.jpg",
+        "**/*thumb*.jpeg",
+        "**/*cover*.png",
+        "**/*cover*.jpg",
+        "**/*cover*.jpeg",
+        "**/*keyvisual*.png",
+        "**/*keyvisual*.jpg",
+        "**/*keyvisual*.jpeg",
+    ):
         candidate = next(iter(sorted(model_dir.glob(pattern))), None)
         if candidate:
             return candidate.relative_to(model_dir).as_posix()
+
+    textures = model_payload.get("FileReferences", {}).get("Textures", [])
+    if isinstance(textures, list) and textures:
+        candidate = str(textures[0] or "").strip()
+        if candidate and not is_texture_atlas(candidate):
+            texture_path = model_dir.joinpath(*PurePosixPath(candidate).parts)
+            if texture_path.exists():
+                return candidate
+    for pattern in ("**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"):
+        candidate = next(iter(sorted(model_dir.glob(pattern))), None)
+        if candidate:
+            relative = candidate.relative_to(model_dir).as_posix()
+            if not is_texture_atlas(relative):
+                return relative
     return ""
 
 
@@ -1023,6 +1063,23 @@ def write_avatar_pack(
         "displayName": display_name,
         "motionCount": int(model_info["motion_count"]),
     }
+
+
+def resolve_manifest_preview_url(pack_id: str, manifest: dict[str, Any], asset_root: str) -> str:
+    preset_thumbs = manifest.get("presetThumbs")
+    if isinstance(preset_thumbs, dict):
+        preset_full = _resolve_avatar_asset_url(
+            pack_id,
+            str(preset_thumbs.get("full") or ""),
+            asset_root,
+        )
+        if preset_full:
+            return preset_full
+    return _resolve_avatar_asset_url(
+        pack_id,
+        str(manifest.get("fallbackPortrait") or ""),
+        asset_root,
+    )
 
 
 def import_avatar_archive_from_path(
@@ -1194,17 +1251,15 @@ def load_avatar_catalog() -> dict[str, Any]:
                     motion_count = len(motions)
             except Exception as exc:
                 logging.warning("Failed to read avatar pack motion-map %s: %s", motion_map_path, exc)
-        fallback_portrait = _resolve_avatar_asset_url(
-            pack_id, str(manifest.get("fallbackPortrait", "")), asset_root
-        )
+        preview_url = resolve_manifest_preview_url(pack_id, manifest, asset_root)
         packs.append(
             {
                 "id": pack_id,
                 "name": str(manifest.get("name") or pack_id),
                 "adapter": str(manifest.get("adapter") or ""),
                 "manifestUrl": f"/avatar-packs/{quote(pack_id)}/avatar.manifest.json",
-                "previewUrl": fallback_portrait,
-                "fallbackPortrait": fallback_portrait,
+                "previewUrl": preview_url,
+                "fallbackPortrait": preview_url,
                 "motionCount": motion_count,
                 "capabilities": manifest.get("capabilities") if isinstance(manifest.get("capabilities"), dict) else {},
             }
@@ -1254,11 +1309,7 @@ def load_avatar_pack_details(pack_id: str) -> dict[str, Any]:
     if motion_map_path and motion_map_path.exists():
         motion_map = read_json_file(motion_map_path)
 
-    preview_url = _resolve_avatar_asset_url(
-        pack_id,
-        str(manifest.get("fallbackPortrait") or ""),
-        asset_root,
-    )
+    preview_url = resolve_manifest_preview_url(pack_id, manifest, asset_root)
 
     return {
         "success": True,
@@ -1530,7 +1581,15 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         try:
             while True:
                 payload = build_filtered_home_assistant_states_payload()
-                serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+                serialized = json.dumps(
+                    {
+                        "packId": payload.get("packId"),
+                        "states": payload.get("states"),
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
                 now = time.monotonic()
                 if serialized != last_payload:
                     self.send_event_stream_message(payload)

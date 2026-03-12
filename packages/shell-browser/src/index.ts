@@ -575,6 +575,8 @@ export class BrowserSceneShellApp {
   private avatarAdapter: AvatarAdapter | null = null;
   private refreshIntervalHandle: number | null = null;
   private stateStream: EventSource | null = null;
+  private streamRefreshHandle: number | null = null;
+  private pendingStreamStates: HomeAssistantStates | null = null;
   private orderedPages: ScenePageV1[] = [];
   private carouselDragState: CarouselDragState | null = null;
   private lastPageStructureKey = "";
@@ -729,6 +731,10 @@ export class BrowserSceneShellApp {
     if (this.refreshIntervalHandle) {
       window.clearInterval(this.refreshIntervalHandle);
       this.refreshIntervalHandle = null;
+    }
+    if (this.streamRefreshHandle) {
+      window.clearTimeout(this.streamRefreshHandle);
+      this.streamRefreshHandle = null;
     }
     if (this.idleTimer) {
       window.clearTimeout(this.idleTimer);
@@ -984,7 +990,17 @@ export class BrowserSceneShellApp {
         if (!normalizedStates) {
           return;
         }
-        void this.refresh(normalizedStates);
+        this.pendingStreamStates = normalizedStates;
+        if (this.streamRefreshHandle !== null) {
+          return;
+        }
+        const debounceMs = document.body.classList.contains("ks-display-runtime") ? 80 : 16;
+        this.streamRefreshHandle = window.setTimeout(() => {
+          this.streamRefreshHandle = null;
+          const nextSnapshot = this.pendingStreamStates;
+          this.pendingStreamStates = null;
+          void this.refresh(nextSnapshot);
+        }, debounceMs);
       } catch (error) {
         console.warn("Failed to parse state stream payload", error);
       }
