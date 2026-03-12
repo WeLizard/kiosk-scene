@@ -253,15 +253,43 @@ function resolveBaseUrl(candidate: string): string {
   }
 }
 
+function normalizeLegacyAvatarPath(candidate: string, manifestBaseUrl: string): string {
+  const normalized = trimText(candidate, 1024);
+  if (!normalized) {
+    return "";
+  }
+  if (normalized === "/local/neiri-scene/avatar.html") {
+    return "./avatar.html";
+  }
+  if (normalized.startsWith("/local/live2d/")) {
+    return normalized.replace("/local/live2d/", "/scene-legacy/live2d/");
+  }
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
+    try {
+      const parsed = new URL(normalized, manifestBaseUrl || window.location.href);
+      if (parsed.pathname.startsWith("/local/live2d/")) {
+        parsed.pathname = parsed.pathname.replace("/local/live2d/", "/scene-legacy/live2d/");
+        return parsed.toString();
+      }
+      if (parsed.pathname === "/local/neiri-scene/avatar.html") {
+        return resolveUrlAgainst(manifestBaseUrl, "./avatar.html");
+      }
+    } catch {
+      return normalized;
+    }
+  }
+  return normalized;
+}
+
 function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: string): AvatarManifestV1 {
   const manifestBaseUrl = resolveBaseUrl(manifestUrl);
   const assetRoot = resolveUrlAgainst(
     manifestBaseUrl,
-    trimText(manifest.assetRoot, 1024) || "./assets",
+    normalizeLegacyAvatarPath(trimText(manifest.assetRoot, 1024) || "./assets", manifestBaseUrl),
   );
   const assetBaseUrl = assetRoot ? withTrailingSlash(assetRoot) : manifestBaseUrl;
   const resolveAvatarAssetUrl = (value: string): string => {
-    const normalized = trimText(value, 1024);
+    const normalized = normalizeLegacyAvatarPath(value, manifestBaseUrl);
     if (!normalized) {
       return "";
     }
@@ -270,7 +298,7 @@ function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: stri
   return {
     ...manifest,
     assetRoot,
-    runtimeUrl: resolveUrlAgainst(manifestBaseUrl, manifest.runtimeUrl || ""),
+    runtimeUrl: resolveUrlAgainst(manifestBaseUrl, normalizeLegacyAvatarPath(manifest.runtimeUrl || "", manifestBaseUrl)),
     entry: resolveAvatarAssetUrl(manifest.entry || ""),
     modelUrl: resolveAvatarAssetUrl(manifest.modelUrl || ""),
     fallbackPortrait: resolveAvatarAssetUrl(manifest.fallbackPortrait || ""),
@@ -278,7 +306,7 @@ function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: stri
     expressionMapUrl: resolveAvatarAssetUrl(manifest.expressionMapUrl || ""),
     presetThumbs: Object.fromEntries(
       Object.entries(manifest.presetThumbs || {})
-        .map(([key, value]) => [key, resolveUrlAgainst(manifestBaseUrl, value)])
+        .map(([key, value]) => [key, resolveUrlAgainst(manifestBaseUrl, normalizeLegacyAvatarPath(value, manifestBaseUrl))])
         .filter(([, value]) => Boolean(value)),
     ),
   };

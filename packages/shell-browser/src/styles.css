@@ -844,7 +844,7 @@ body::after {
 }
 
 body.ks-display-runtime {
-  background: linear-gradient(180deg, #edf4fa 0%, #dde9f1 100%);
+  background: #e9eff4;
 }
 
 body.ks-display-runtime::before,
@@ -854,6 +854,10 @@ body.ks-display-runtime::after {
 
 body.ks-display-runtime .scene-viewport {
   contain: layout paint size;
+}
+
+body.ks-display-runtime .layout {
+  gap: max(10px, var(--scene-layout-gap));
 }
 
 body.ks-display-runtime .panel,
@@ -874,7 +878,8 @@ body.ks-display-runtime .neiri-meta {
 }
 
 body.ks-display-runtime .panel {
-  background: rgba(255, 255, 255, 0.92);
+  border-radius: 20px;
+  background: #f8fbfd;
 }
 
 body.ks-display-runtime .avatar-shell,
@@ -887,12 +892,31 @@ body.ks-display-runtime .carousel-dots,
 body.ks-display-runtime .hero-badge,
 body.ks-display-runtime .day .icon,
 body.ks-display-runtime .neiri-meta {
-  background: rgba(255, 255, 255, 0.94);
+  border-radius: 16px;
+  background: #ffffff;
+  background-image: none;
 }
 
 body.ks-display-runtime .hero,
-body.ks-display-runtime .neiri-mark {
-  background: linear-gradient(180deg, #eef5fb 0%, #dce9f2 100%);
+body.ks-display-runtime .neiri-mark,
+body.ks-display-runtime .day,
+body.ks-display-runtime .mini-card,
+body.ks-display-runtime .home-card {
+  background: #ffffff;
+  background-image: none;
+}
+
+body.ks-display-runtime .slide {
+  padding: 18px 18px 34px;
+}
+
+body.ks-display-runtime .avatar-panel {
+  padding: 10px;
+}
+
+body.ks-display-runtime .weather-panel {
+  padding: 16px;
+  gap: 10px;
 }
 
 body.ks-display-runtime .avatar-preset,
