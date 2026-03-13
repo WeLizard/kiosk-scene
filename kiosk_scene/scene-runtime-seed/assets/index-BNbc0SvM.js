@@ -576,8 +576,8 @@ var Bt=Object.defineProperty;var Ft=(t,e,a)=>e in t?Bt(t,e,{enumerable:!0,config
         border: 1px solid rgba(32,48,65,0.1);
         background: rgba(255,255,255,0.92);
         padding: 10px;
-        min-width: 110px;
-        max-width: 110px;
+        min-width: 140px;
+        max-width: 140px;
         flex-shrink: 0;
         scroll-snap-align: start;
       }
