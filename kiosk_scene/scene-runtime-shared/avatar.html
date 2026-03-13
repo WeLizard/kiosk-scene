@@ -931,10 +931,7 @@
     }
 
     function shouldUseAntialias() {
-      if (!IS_DISPLAY_MODE) {
-        return true;
-      }
-      return getRenderResolution() > 1;
+      return true;
     }
 
     function getStateUrl() {
