@@ -25,22 +25,9 @@ interface SceneHostBootstrap {
     entityMapUrl?: string;
     avatarManifestUrl?: string;
     haStatesUrl?: string;
-    haStatesStreamUrl?: string;
     avatarCatalogUrl?: string;
     avatarImportUrl?: string;
     avatarPackApiUrl?: string;
-  };
-  publication?: {
-    packId?: string;
-    source?: string;
-    sceneConfigName?: string;
-    usesDisplayArtifact?: boolean;
-    directScheme?: string;
-    directPort?: number;
-    directPath?: string;
-    runtimePath?: string;
-    editorPath?: string;
-    localDisplayUrl?: string;
   };
   availability?: Record<string, boolean>;
 }
@@ -206,6 +193,14 @@ const NEIRI_DEFAULT_WEATHER_RU: Partial<WeatherOverviewPayload> = {
 };
 
 type UiLang = "ru" | "en";
+type DisplayPowerMessageType = "kiosk-display-off" | "kiosk-display-on";
+
+interface DisplayPowerMessage {
+  type: DisplayPowerMessageType;
+  displayOn?: boolean;
+  source?: string;
+  timestamp?: number;
+}
 
 type HostedRuntimeCopy = {
   startingTitle: string;
@@ -264,44 +259,29 @@ function resolveUiLang(): UiLang {
   return locale.startsWith("ru") ? "ru" : "en";
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseDisplayPowerMessage(value: unknown): DisplayPowerMessage | null {
+  if (!isObjectRecord(value)) {
+    return null;
+  }
+  const type = String(value.type || "").trim();
+  if (type !== "kiosk-display-off" && type !== "kiosk-display-on") {
+    return null;
+  }
+  return {
+    type,
+    displayOn: value.displayOn === undefined ? type === "kiosk-display-on" : value.displayOn === true,
+    source: String(value.source || "").trim() || undefined,
+    timestamp: Number.isFinite(Number(value.timestamp)) ? Number(value.timestamp) : undefined,
+  };
+}
+
 function resolveBootstrapUrl(): string {
   const params = new URLSearchParams(window.location.search);
   return params.get("bootstrap") || DEFAULT_BOOTSTRAP_URL;
-}
-
-function normalizePathname(value: string | null | undefined, fallback: string): string {
-  const normalized = String(value || "").trim();
-  if (!normalized) {
-    return fallback;
-  }
-  return normalized.startsWith("/") ? normalized : `/${normalized}`;
-}
-
-function buildPublishedSceneUrls(bootstrap: SceneHostBootstrap): {
-  localDisplayUrl: string;
-  externalDisplayUrl: string;
-  directPath: string;
-  sceneConfigName: string;
-  usesDisplayArtifact: boolean;
-  source: string;
-} {
-  const publication = bootstrap.publication || {};
-  const directScheme = String(publication.directScheme || "").trim() || "http";
-  const directPort = Number(publication.directPort);
-  const normalizedPort = Number.isFinite(directPort) && directPort > 0 ? directPort : 48123;
-  const directPath = normalizePathname(publication.directPath, "/scene/");
-  const localDisplayUrl = String(publication.localDisplayUrl || "").trim()
-    || `${directScheme}://localhost:${normalizedPort}${directPath}`;
-  const hostname = String(window.location.hostname || "").trim() || "homeassistant.local";
-  const externalDisplayUrl = `${directScheme}://${hostname}:${normalizedPort}${directPath}`;
-  return {
-    localDisplayUrl,
-    externalDisplayUrl,
-    directPath,
-    sceneConfigName: String(publication.sceneConfigName || "").trim() || "scene.default.json",
-    usesDisplayArtifact: Boolean(publication.usesDisplayArtifact),
-    source: String(publication.source || "").trim() || "editor-config-fallback",
-  };
 }
 
 function resolveIngressRoot(bootstrapUrl: string): string | null {
@@ -420,14 +400,50 @@ function renderStatus(root: HTMLElement, title: string, body: string, details?: 
   `;
 }
 
+let lastDisplayPowerMessage: DisplayPowerMessage | null = null;
+let displayPowerReplayTimer: number | null = null;
+
+function postDisplayPowerMessageToAvatarFrames(message: DisplayPowerMessage): boolean {
+  const frames = Array.from(document.querySelectorAll<HTMLIFrameElement>("iframe.ks-live2d-iframe"));
+  let delivered = false;
+  for (const frame of frames) {
+    if (!frame.contentWindow) {
+      continue;
+    }
+    frame.contentWindow.postMessage(message, "*");
+    delivered = true;
+  }
+  return delivered;
+}
+
+function scheduleDisplayPowerReplay(attemptsRemaining = 24): void {
+  if (displayPowerReplayTimer !== null) {
+    window.clearTimeout(displayPowerReplayTimer);
+    displayPowerReplayTimer = null;
+  }
+  if (!lastDisplayPowerMessage) {
+    return;
+  }
+  if (postDisplayPowerMessageToAvatarFrames(lastDisplayPowerMessage) || attemptsRemaining <= 0) {
+    return;
+  }
+  displayPowerReplayTimer = window.setTimeout(() => {
+    scheduleDisplayPowerReplay(attemptsRemaining - 1);
+  }, 120);
+}
+
+window.addEventListener("message", (event) => {
+  const message = parseDisplayPowerMessage(event.data);
+  if (!message) {
+    return;
+  }
+  lastDisplayPowerMessage = message;
+  scheduleDisplayPowerReplay();
+});
+
 function isEditorMode(): boolean {
   const params = new URLSearchParams(window.location.search);
   return params.get("editor") === "1";
-}
-
-function applyRuntimeSurfaceClass(): void {
-  document.body.classList.toggle("ks-display-runtime", !isEditorMode());
-  document.body.classList.toggle("ks-editor-runtime", isEditorMode());
 }
 
 function prepareEditorViewport(): void {
@@ -769,7 +785,6 @@ if (!root) {
 
 const copy = COPY[resolveUiLang()];
 
-applyRuntimeSurfaceClass();
 prepareEditorViewport();
 renderStatus(root, copy.startingTitle, copy.startingBody);
 
@@ -800,10 +815,6 @@ void (async () => {
 
     await bootstrapSceneShellApp(root, {
       rendererConfigUrl,
-      stateStreamUrl: resolveHostedUrl(
-        String(bootstrap.files?.haStatesStreamUrl || "").trim(),
-        bootstrapUrl,
-      ) || undefined,
       weatherUrl: isNeiriPack ? "./weather.json" : undefined,
       weatherReader: isNeiriPack
         ? createHomeAssistantWeatherReader({
@@ -821,9 +832,9 @@ void (async () => {
       presetLabels: isNeiriPack ? NEIRI_PRESET_LABELS_RU : undefined,
       defaultWeather: isNeiriPack ? NEIRI_DEFAULT_WEATHER_RU : undefined,
     });
+    scheduleDisplayPowerReplay();
 
     if (isEditorMode()) {
-      const publishedScene = buildPublishedSceneUrls(bootstrap);
       await mountNativeEditorShell({
         packId,
         sceneApiUrl: resolveHostedUrl(
@@ -850,8 +861,8 @@ void (async () => {
           String(bootstrap.entryUrl || bootstrap.runtimeBaseUrl || "./").trim(),
           bootstrapUrl,
         ),
-        publishedScene,
       });
+      scheduleDisplayPowerReplay();
     }
   } catch (error) {
     renderStatus(

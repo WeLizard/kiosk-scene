@@ -12,17 +12,6 @@ type EditorCopy = {
   previewResolution: string;
   dashboardTitle: string;
   dashboardSubtitle: string;
-  publication: string;
-  publicationSubtitle: string;
-  publicationTargetLabel: string;
-  publicationSourceReady: string;
-  publicationSourceFallback: string;
-  publicationLocalUrl: string;
-  publicationExternalUrl: string;
-  publicationOpen: string;
-  publicationCopy: string;
-  publicationCopied: string;
-  publicationCopyError: string;
   statusLoading: string;
   statusSaved: string;
   statusDirty: string;
@@ -163,14 +152,6 @@ export interface NativeEditorShellOptions {
   avatarImportUrl?: string;
   avatarPackApiUrl?: string;
   sceneUrl: string;
-  publishedScene: {
-    localDisplayUrl: string;
-    externalDisplayUrl: string;
-    directPath: string;
-    sceneConfigName: string;
-    usesDisplayArtifact: boolean;
-    source: string;
-  };
 }
 
 const PAGE_KIND_OPTIONS = ["overview", "cards", "forecast+cards"] as const;
@@ -227,17 +208,6 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewResolution: "Разрешение",
     dashboardTitle: "Панель настройки сцены",
     dashboardSubtitle: "Вся настройка расположена ниже превью как длинная редакторская страница.",
-    publication: "Публикация на дисплей",
-    publicationSubtitle: "Здесь видно, что именно Kiosk Scene сейчас отдаёт наружу. Эти URL можно дать HAOS Kiosk Display или любому внешнему дисплей-хосту.",
-    publicationTargetLabel: "Активный pack и опубликованный runtime config",
-    publicationSourceReady: "Готовый display artefact",
-    publicationSourceFallback: "Fallback на editor-config",
-    publicationLocalUrl: "URL для локального display host на этой же машине",
-    publicationExternalUrl: "URL для внешнего дисплея или обычного браузера",
-    publicationOpen: "Открыть",
-    publicationCopy: "Копировать",
-    publicationCopied: "URL скопирован",
-    publicationCopyError: "Не удалось скопировать URL",
     statusLoading: "Загружаю конфигурацию сцены...",
     statusSaved: "Сохранено",
     statusDirty: "Есть несохранённые изменения",
@@ -378,17 +348,6 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewResolution: "Resolution",
     dashboardTitle: "Scene Settings Dashboard",
     dashboardSubtitle: "All configuration lives below the preview as a normal scrollable page.",
-    publication: "Display publication",
-    publicationSubtitle: "This shows what Kiosk Scene currently serves to display hosts. Use these URLs in HAOS Kiosk Display or any other external display runtime.",
-    publicationTargetLabel: "Active pack and published runtime config",
-    publicationSourceReady: "Compiled display artifact",
-    publicationSourceFallback: "Fallback to editor config",
-    publicationLocalUrl: "URL for a local display host on the same machine",
-    publicationExternalUrl: "URL for an external display or regular browser",
-    publicationOpen: "Open",
-    publicationCopy: "Copy",
-    publicationCopied: "URL copied",
-    publicationCopyError: "Failed to copy URL",
     statusLoading: "Loading scene config...",
     statusSaved: "Saved",
     statusDirty: "Unsaved changes",
@@ -541,7 +500,6 @@ type EditorState = {
   avatarImporting: boolean;
   avatarImportStatus: string;
   avatarImportTone: "muted" | "ok" | "bad";
-  avatarInspectorPackId: string | null;
   avatarPackDetails: AvatarPackDetails | null;
   avatarPackLoading: boolean;
   avatarPackDirty: boolean;
@@ -1915,30 +1873,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         display: grid;
         gap: 10px;
       }
-      #scene-editor-shell .scene-publication-grid {
-        display: grid;
-        gap: 12px;
-      }
-      #scene-editor-shell .scene-publication-target {
-        padding: 12px 14px;
-        border-radius: 16px;
-        border: 1px solid rgba(32,48,65,0.08);
-        background: rgba(246,249,252,0.82);
-      }
-      #scene-editor-shell .scene-publication-target strong {
-        display: block;
-        font: 700 14px/1.15 "Aptos","Segoe UI",sans-serif;
-        color: #203041;
-      }
-      #scene-editor-shell .scene-publication-url {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto;
-        gap: 8px;
-        align-items: center;
-      }
-      #scene-editor-shell .scene-publication-url input[readonly] {
-        cursor: text;
-      }
       #scene-editor-shell .page-list {
         display: grid;
         grid-auto-flow: column;
@@ -2289,9 +2223,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         #scene-editor-shell .field-binding-row {
           grid-template-columns: 1fr;
         }
-        #scene-editor-shell .scene-publication-url {
-          grid-template-columns: 1fr;
-        }
         #scene-editor-shell .page-list {
           grid-auto-columns: minmax(220px, 84vw);
         }
@@ -2367,7 +2298,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     avatarImporting: false,
     avatarImportStatus: "",
     avatarImportTone: "muted",
-    avatarInspectorPackId: null,
     avatarPackDetails: null,
     avatarPackLoading: false,
     avatarPackDirty: false,
@@ -2445,13 +2375,14 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.avatarCatalog = options.avatarCatalogUrl
         ? await loadAvatarCatalog(options.avatarCatalogUrl)
         : [importedPack];
-      state.avatarInspectorPackId = importedPack.id;
+      ensureAvatarConfig(state.config).packId = importedPack.id;
       await loadSelectedAvatarPackDetails(importedPack.id);
       state.pendingAvatarZip = null;
       state.pendingAvatarZipName = "";
       state.avatarImporting = false;
       state.avatarImportStatus = copy.avatarImportSuccess(importedPack.name || importedPack.id);
       state.avatarImportTone = "ok";
+      markDirty();
       render();
     } catch (error) {
       state.avatarImporting = false;
@@ -2511,10 +2442,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         )
       : copy.entityBindingEmpty;
     const selectedAvatarPackId = config ? readAvatarPackId(config) : "";
-    const inspectedAvatarPackId = state.avatarInspectorPackId || selectedAvatarPackId;
-    const publicationSourceLabel = options.publishedScene.usesDisplayArtifact
-      ? `${copy.publicationSourceReady} · ${options.publishedScene.sceneConfigName}`
-      : `${copy.publicationSourceFallback} · ${options.publishedScene.sceneConfigName}`;
     const avatarImportStatus = state.avatarImportStatus
       ? `<div class="scene-editor-status" data-tone="${state.avatarImportTone}">${escapeHtml(state.avatarImportStatus)}</div>`
       : "";
@@ -2539,35 +2466,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       </div>
       <div class="scene-dashboard-body">
         <div class="scene-settings-stack">
-          <section class="scene-settings-card">
-            <div class="scene-settings-head">
-              <h2>${copy.publication}</h2>
-              <div class="meta">${copy.publicationSubtitle}</div>
-            </div>
-            <div class="scene-publication-grid">
-              <div class="scene-publication-target">
-                <div class="meta">${copy.publicationTargetLabel}</div>
-                <strong><code>${escapeHtml(options.packId || "default")}</code> · <code>${escapeHtml(options.publishedScene.sceneConfigName)}</code></strong>
-                <div class="meta" style="margin-top:6px;">${escapeHtml(publicationSourceLabel)}</div>
-              </div>
-              <div class="field is-wide">
-                <label for="scene-publication-local-url">${copy.publicationLocalUrl}</label>
-                <div class="scene-publication-url">
-                  <input id="scene-publication-local-url" type="text" readonly data-publication-url-input value="${escapeHtml(options.publishedScene.localDisplayUrl)}">
-                  <a class="tiny-btn" href="${escapeHtml(options.publishedScene.localDisplayUrl)}" target="_blank" rel="noreferrer">${copy.publicationOpen}</a>
-                  <button class="tiny-btn" type="button" data-action="copy-publication-url" data-url="${escapeHtml(options.publishedScene.localDisplayUrl)}">${copy.publicationCopy}</button>
-                </div>
-              </div>
-              <div class="field is-wide">
-                <label for="scene-publication-external-url">${copy.publicationExternalUrl}</label>
-                <div class="scene-publication-url">
-                  <input id="scene-publication-external-url" type="text" readonly data-publication-url-input value="${escapeHtml(options.publishedScene.externalDisplayUrl)}">
-                  <a class="tiny-btn" href="${escapeHtml(options.publishedScene.externalDisplayUrl)}" target="_blank" rel="noreferrer">${copy.publicationOpen}</a>
-                  <button class="tiny-btn" type="button" data-action="copy-publication-url" data-url="${escapeHtml(options.publishedScene.externalDisplayUrl)}">${copy.publicationCopy}</button>
-                </div>
-              </div>
-            </div>
-          </section>
           <section class="scene-settings-card">
             <div class="scene-settings-head">
               <h2>${copy.avatar}</h2>
@@ -2614,7 +2512,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               <div class="meta">${copy.avatarImportHint}</div>
               ${avatarImportStatus}
             </div>
-            ${inspectedAvatarPackId
+            ${selectedAvatarPackId
               ? state.avatarPackLoading
                 ? `<div class="meta" style="margin-top:16px;">${copy.avatarMappingLoading}</div>`
                 : state.avatarPackDetails
@@ -2766,28 +2664,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       handleAvatarArchiveSelection(archive);
       liveAvatarArchiveInput.value = "";
     });
-    for (const publicationUrlInput of Array.from(dashboardHost.querySelectorAll<HTMLInputElement>("[data-publication-url-input]"))) {
-      publicationUrlInput.addEventListener("click", () => {
-        publicationUrlInput.select();
-      });
-      publicationUrlInput.addEventListener("focus", () => {
-        publicationUrlInput.select();
-      });
-    }
-    for (const copyButton of Array.from(dashboardHost.querySelectorAll<HTMLButtonElement>("[data-action='copy-publication-url']"))) {
-      copyButton.addEventListener("click", async () => {
-        const url = String(copyButton.dataset.url || "").trim();
-        if (!url) {
-          return;
-        }
-        try {
-          await navigator.clipboard.writeText(url);
-          setStatus(copy.publicationCopied, "ok");
-        } catch {
-          setStatus(copy.publicationCopyError, "bad");
-        }
-      });
-    }
 
     for (const pageChip of Array.from(dashboardHost.querySelectorAll<HTMLElement>(".page-chip[data-page-id]"))) {
       pageChip.draggable = true;
@@ -3288,8 +3164,8 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       return;
     }
     if (target.dataset.avatarSemantic !== undefined) {
-      const inspectedPackId = String(state.avatarInspectorPackId || "").trim() || readAvatarPackId(state.config);
-      if (!state.avatarPackDetails || !inspectedPackId || state.avatarPackDetails.packId !== inspectedPackId) {
+      const selectedPackId = readAvatarPackId(state.config);
+      if (!state.avatarPackDetails || !selectedPackId || state.avatarPackDetails.packId !== selectedPackId) {
         return;
       }
       const selectedValue = target.value.trim();
@@ -3362,7 +3238,6 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     }
     const packId = String(actionEl.dataset.packId || "").trim();
     ensureAvatarConfig(state.config).packId = packId || null;
-    state.avatarInspectorPackId = packId || null;
     markDirty();
     void loadSelectedAvatarPackDetails(packId || null).finally(() => render());
     render();
@@ -3447,8 +3322,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     state.selectedCardIndex = 0;
     state.status = copy.statusSaved;
     state.statusTone = "ok";
-    state.avatarInspectorPackId = readAvatarPackId(state.config) || null;
-    await loadSelectedAvatarPackDetails(state.avatarInspectorPackId);
+    await loadSelectedAvatarPackDetails(readAvatarPackId(state.config));
     syncSelection();
   } catch (error) {
     state.status = `${copy.loadError}: ${String(error)}`;

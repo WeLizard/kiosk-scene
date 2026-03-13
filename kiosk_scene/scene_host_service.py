@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import base64
 import email.policy
-import hashlib
 import json
 import logging
 import os
 import shutil
-import socket
 import stat
 import tempfile
 import threading
@@ -20,26 +17,13 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import parse_qs, quote, urlsplit, urlunsplit
+from urllib.parse import parse_qs, quote, urlsplit
 from urllib.request import Request, urlopen
-
-try:
-    from scene_config_service import (
-        compile_scene_display_config as compile_editor_scene_display_config,
-        normalize_scene_config as normalize_editor_scene_config,
-        write_json_atomic as write_editor_scene_json_atomic,
-    )
-except Exception:
-    compile_editor_scene_display_config = None
-    normalize_editor_scene_config = None
-    write_editor_scene_json_atomic = None
 
 
 HOST = os.environ.get("SCENE_HOST_BIND", "127.0.0.1")
 PORT = int(os.environ.get("SCENE_HOST_PORT", "48097"))
 PATH_PREFIX = os.environ.get("SCENE_API_PREFIX", "/scene-api").rstrip("/")
-DIRECT_PORT = int(os.environ.get("SCENE_DIRECT_PORT", "48123"))
-DIRECT_SCHEME = os.environ.get("SCENE_DIRECT_SCHEME", "http").strip() or "http"
 SCENE_ROOT = Path(os.environ.get("SCENE_ROOT", "/config/kiosk-scene"))
 RUNTIME_DIR = Path(
     os.environ.get("SCENE_RUNTIME_DIR", str(SCENE_ROOT / "scene-runtime"))
@@ -70,9 +54,6 @@ HOME_ASSISTANT_API_URL = (
     os.environ.get("SCENE_HOME_ASSISTANT_API_URL", "http://supervisor/core/api").strip().rstrip("/")
     or "http://supervisor/core/api"
 )
-HOME_ASSISTANT_WS_URL = (
-    os.environ.get("SCENE_HOME_ASSISTANT_WS_URL", "").strip()
-)
 HOME_ASSISTANT_STATES_CACHE_TTL_MS = max(
     250,
     int(os.environ.get("SCENE_HA_STATES_CACHE_TTL_MS", "2000") or "2000"),
@@ -81,29 +62,10 @@ WEATHER_ENTITY_ID = (
     os.environ.get("SCENE_WEATHER_ENTITY_ID", "weather.forecast_home_assistant").strip()
     or "weather.forecast_home_assistant"
 )
-HOME_ASSISTANT_STREAM_POLL_SEC = max(
-    0.5,
-    float(os.environ.get("SCENE_HA_STATES_STREAM_POLL_SEC", "1.0") or "1.0"),
-)
-HOME_ASSISTANT_STREAM_KEEPALIVE_SEC = max(
-    5.0,
-    float(os.environ.get("SCENE_HA_STATES_STREAM_KEEPALIVE_SEC", "15.0") or "15.0"),
-)
-HOME_ASSISTANT_WS_RETRY_SEC = max(
-    2.0,
-    float(os.environ.get("SCENE_HA_WS_RETRY_SEC", "5.0") or "5.0"),
-)
 
 _ha_states_cache_lock = threading.Lock()
 _ha_states_cache_at = 0.0
 _ha_states_cache: list[dict[str, Any]] | None = None
-_ha_states_generation = 0
-_ha_states_condition = threading.Condition(_ha_states_cache_lock)
-_ha_ws_listener_started = False
-_ha_ws_snapshot_ready = False
-_ha_all_states_by_entity: dict[str, dict[str, Any]] = {}
-_ha_relevant_pack_id = ""
-_ha_relevant_entity_ids: set[str] = set()
 HOME_ASSISTANT_TOKEN_PATHS = (
     Path("/run/s6/container_environment/SUPERVISOR_TOKEN"),
     Path("/run/s6/container_environment/HASSIO_TOKEN"),
@@ -122,41 +84,6 @@ def load_active_pack_id() -> str:
     return DEFAULT_PACK_ID
 
 
-def ensure_display_scene_config(pack_id: str | None = None) -> None:
-    if (
-        compile_editor_scene_display_config is None
-        or normalize_editor_scene_config is None
-        or write_editor_scene_json_atomic is None
-    ):
-        return
-    resolved_pack_id = str(pack_id or load_active_pack_id()).strip() or DEFAULT_PACK_ID
-    pack_dir = PACKS_DIR / resolved_pack_id
-    primary_path = pack_dir / "scene.default.json"
-    display_path = pack_dir / DISPLAY_SCENE_CONFIG_FILENAME
-    if not primary_path.exists():
-        return
-    try:
-        payload = json.loads(primary_path.read_text(encoding="utf-8"))
-        normalized = normalize_editor_scene_config(payload)
-        compiled = compile_editor_scene_display_config(normalized)
-        serialized = json.dumps(compiled, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
-        current = ""
-        if display_path.exists():
-            try:
-                current = json.dumps(
-                    json.loads(display_path.read_text(encoding="utf-8")),
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                )
-            except Exception:
-                current = ""
-        if serialized != current:
-            write_editor_scene_json_atomic(display_path, compiled)
-    except Exception as exc:
-        logging.warning("Failed to refresh display scene config for %s: %s", resolved_pack_id, exc)
-
-
 def resolve_runtime_scene_config_name(pack_dir: Path) -> str:
     display_config_path = pack_dir / DISPLAY_SCENE_CONFIG_FILENAME
     if display_config_path.exists():
@@ -166,23 +93,17 @@ def resolve_runtime_scene_config_name(pack_dir: Path) -> str:
 
 def build_bootstrap() -> dict[str, Any]:
     pack_id = load_active_pack_id()
-    ensure_display_scene_config(pack_id)
     pack_dir = PACKS_DIR / pack_id
     pack_base_url = f"/scene-packs/{quote(pack_id)}/"
     runtime_scene_config_name = resolve_runtime_scene_config_name(pack_dir)
-    entry_path = "/scene/"
-    runtime_path = "/scene-runtime/"
-    editor_path = "/scene-editor/"
-    local_display_url = f"{DIRECT_SCHEME}://localhost:{DIRECT_PORT}{entry_path}"
-    uses_display_artifact = runtime_scene_config_name == DISPLAY_SCENE_CONFIG_FILENAME
     return {
         "success": True,
         "packId": pack_id,
-        "entryUrl": runtime_path,
-        "runtimeBaseUrl": runtime_path,
+        "entryUrl": "/scene-runtime/",
+        "runtimeBaseUrl": "/scene-runtime/",
         "packBaseUrl": pack_base_url,
         "apiBaseUrl": f"{PATH_PREFIX}/",
-        "sceneEditorUrl": editor_path,
+        "sceneEditorUrl": "/scene-editor/",
         "sceneEditorFormUrl": "/scene-editor-form/",
         "sceneEditorApiUrl": "/scene-editor-form/api/config",
         "files": {
@@ -191,22 +112,9 @@ def build_bootstrap() -> dict[str, Any]:
             "entityMapUrl": pack_base_url + "entity-map.json",
             "avatarManifestUrl": pack_base_url + "avatar.manifest.json",
             "haStatesUrl": f"{PATH_PREFIX}/ha-states",
-            "haStatesStreamUrl": f"{PATH_PREFIX}/ha-states-stream",
             "avatarCatalogUrl": f"{PATH_PREFIX}/avatar-catalog",
             "avatarImportUrl": f"{PATH_PREFIX}/avatar-import",
             "avatarPackApiUrl": f"{PATH_PREFIX}/avatar-pack",
-        },
-        "publication": {
-            "packId": pack_id,
-            "source": "display-artifact" if uses_display_artifact else "editor-config-fallback",
-            "sceneConfigName": runtime_scene_config_name,
-            "usesDisplayArtifact": uses_display_artifact,
-            "directScheme": DIRECT_SCHEME,
-            "directPort": DIRECT_PORT,
-            "directPath": entry_path,
-            "runtimePath": runtime_path,
-            "editorPath": editor_path,
-            "localDisplayUrl": local_display_url,
         },
         "availability": {
             "runtimeIndex": (RUNTIME_DIR / "index.html").exists(),
@@ -349,104 +257,6 @@ def is_home_assistant_entity_id(value: Any) -> bool:
     return bool(normalized and "." in normalized and " " not in normalized)
 
 
-def resolve_home_assistant_websocket_url() -> str:
-    explicit = HOME_ASSISTANT_WS_URL.strip()
-    if explicit:
-        return explicit
-    parsed = urlsplit(HOME_ASSISTANT_API_URL)
-    scheme = "wss" if parsed.scheme == "https" else "ws"
-    path = parsed.path.rstrip("/")
-    if path.endswith("/api"):
-        path = path[: -len("/api")]
-    return urlunsplit((scheme, parsed.netloc, f"{path}/websocket", "", ""))
-
-
-def load_home_assistant_token() -> str:
-    token = (
-        os.environ.get("SUPERVISOR_TOKEN", "").strip()
-        or os.environ.get("HASSIO_TOKEN", "").strip()
-    )
-    if token:
-        return token
-    for path in HOME_ASSISTANT_TOKEN_PATHS:
-        try:
-            token = path.read_text(encoding="utf-8").strip()
-        except OSError:
-            token = ""
-        if token:
-            return token
-    return ""
-
-
-def update_home_assistant_states_snapshot(states: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    global _ha_states_cache
-    global _ha_states_cache_at
-    global _ha_states_generation
-    global _ha_ws_snapshot_ready
-
-    normalized: list[dict[str, Any]] = []
-    state_map: dict[str, dict[str, Any]] = {}
-    for item in states:
-        if not isinstance(item, dict):
-            continue
-        entity_id = str(item.get("entity_id") or "").strip()
-        if not entity_id:
-            continue
-        snapshot = dict(item)
-        normalized.append(snapshot)
-        state_map[entity_id] = snapshot
-
-    now_ms = time.monotonic() * 1000
-    with _ha_states_condition:
-        _ha_all_states_by_entity.clear()
-        _ha_all_states_by_entity.update(state_map)
-        _ha_states_cache = None
-        _ha_states_cache_at = now_ms
-        _ha_states_generation += 1
-        _ha_ws_snapshot_ready = True
-        _ha_states_condition.notify_all()
-        return normalized
-
-
-def apply_home_assistant_state_event(state: dict[str, Any] | None) -> None:
-    global _ha_states_cache_at
-    global _ha_states_generation
-
-    entity_id = str((state or {}).get("entity_id") or "").strip()
-    if not entity_id:
-        return
-
-    now_ms = time.monotonic() * 1000
-    with _ha_states_condition:
-        relevant_change = not _ha_relevant_entity_ids or entity_id in _ha_relevant_entity_ids
-        _ha_all_states_by_entity[entity_id] = dict(state)
-        _ha_states_cache = None
-        _ha_states_cache_at = now_ms
-        if relevant_change:
-            _ha_states_generation += 1
-            _ha_states_condition.notify_all()
-
-
-def remove_home_assistant_state(entity_id: str) -> None:
-    global _ha_states_cache_at
-    global _ha_states_generation
-
-    normalized = str(entity_id or "").strip()
-    if not normalized:
-        return
-    now_ms = time.monotonic() * 1000
-    with _ha_states_condition:
-        if normalized not in _ha_all_states_by_entity:
-            return
-        relevant_change = not _ha_relevant_entity_ids or normalized in _ha_relevant_entity_ids
-        _ha_all_states_by_entity.pop(normalized, None)
-        _ha_states_cache = None
-        _ha_states_cache_at = now_ms
-        if relevant_change:
-            _ha_states_generation += 1
-            _ha_states_condition.notify_all()
-
-
 def collect_pack_home_assistant_entity_ids(pack_id: str | None = None) -> list[str]:
     resolved_pack_id = str(pack_id or load_active_pack_id()).strip() or DEFAULT_PACK_ID
     pack_dir = PACKS_DIR / resolved_pack_id
@@ -475,17 +285,23 @@ def collect_pack_home_assistant_entity_ids(pack_id: str | None = None) -> list[s
                     add_entity(card.get(field))
 
     add_entity(WEATHER_ENTITY_ID)
-    resolved_entity_ids = sorted(entity_ids)
-    with _ha_states_condition:
-        global _ha_relevant_pack_id
-        global _ha_relevant_entity_ids
-        _ha_relevant_pack_id = resolved_pack_id
-        _ha_relevant_entity_ids = set(resolved_entity_ids)
-    return resolved_entity_ids
+    return sorted(entity_ids)
 
 
 def fetch_home_assistant_states() -> list[dict[str, Any]]:
-    token = load_home_assistant_token()
+    token = (
+        os.environ.get("SUPERVISOR_TOKEN", "").strip()
+        or os.environ.get("HASSIO_TOKEN", "").strip()
+    )
+    if not token:
+        for path in HOME_ASSISTANT_TOKEN_PATHS:
+            try:
+                token = path.read_text(encoding="utf-8").strip()
+            except OSError:
+                token = ""
+            if token:
+                break
+
     if not token:
         raise PermissionError("SUPERVISOR_TOKEN is not available; Home Assistant API access is disabled.")
 
@@ -503,289 +319,29 @@ def fetch_home_assistant_states() -> list[dict[str, Any]]:
     return [item for item in payload if isinstance(item, dict)]
 
 
-class _HomeAssistantWebSocket:
-    def __init__(self, sock: socket.socket):
-        self.sock = sock
-        self.remainder = b""
-
-    def close(self) -> None:
-        self.sock.close()
-
-    def sendall(self, payload: bytes) -> None:
-        self.sock.sendall(payload)
-
-    def recv_http_headers(self) -> tuple[str, dict[str, str]]:
-        buffer = bytearray()
-        while b"\r\n\r\n" not in buffer:
-            chunk = self.sock.recv(4096)
-            if not chunk:
-                raise ConnectionError("Unexpected EOF during WebSocket handshake.")
-            buffer.extend(chunk)
-        header_bytes, self.remainder = bytes(buffer).split(b"\r\n\r\n", 1)
-        header_text = header_bytes.decode("utf-8", errors="replace")
-        lines = header_text.split("\r\n")
-        status_line = lines[0] if lines else ""
-        headers: dict[str, str] = {}
-        for line in lines[1:]:
-            if ":" not in line:
-                continue
-            key, value = line.split(":", 1)
-            headers[key.strip().lower()] = value.strip()
-        return status_line, headers
-
-    def recv_exact(self, size: int) -> bytes:
-        if self.remainder:
-            if len(self.remainder) >= size:
-                chunk = self.remainder[:size]
-                self.remainder = self.remainder[size:]
-                return chunk
-            chunks = [self.remainder]
-            remaining = size - len(self.remainder)
-            self.remainder = b""
-        else:
-            chunks = []
-            remaining = size
-        while remaining > 0:
-            chunk = self.sock.recv(remaining)
-            if not chunk:
-                raise ConnectionError("Unexpected EOF while reading WebSocket frame.")
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        return b"".join(chunks)
-
-
-def _encode_ws_frame(opcode: int, payload: bytes) -> bytes:
-    masked_payload = bytearray(payload)
-    mask_key = os.urandom(4)
-    for index in range(len(masked_payload)):
-        masked_payload[index] ^= mask_key[index % 4]
-
-    frame = bytearray()
-    frame.append(0x80 | (opcode & 0x0F))
-    payload_length = len(masked_payload)
-    if payload_length < 126:
-        frame.append(0x80 | payload_length)
-    elif payload_length < 65536:
-        frame.append(0x80 | 126)
-        frame.extend(payload_length.to_bytes(2, "big"))
-    else:
-        frame.append(0x80 | 127)
-        frame.extend(payload_length.to_bytes(8, "big"))
-    frame.extend(mask_key)
-    frame.extend(masked_payload)
-    return bytes(frame)
-
-
-def _send_ws_json(sock: _HomeAssistantWebSocket, payload: dict[str, Any]) -> None:
-    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    sock.sendall(_encode_ws_frame(0x1, body))
-
-
-def _recv_ws_frame(sock: _HomeAssistantWebSocket) -> tuple[int, bytes]:
-    header = sock.recv_exact(2)
-    first = header[0]
-    second = header[1]
-    opcode = first & 0x0F
-    masked = bool(second & 0x80)
-    payload_length = second & 0x7F
-    if payload_length == 126:
-        payload_length = int.from_bytes(sock.recv_exact(2), "big")
-    elif payload_length == 127:
-        payload_length = int.from_bytes(sock.recv_exact(8), "big")
-    mask_key = sock.recv_exact(4) if masked else b""
-    payload = bytearray(sock.recv_exact(payload_length))
-    if masked:
-        for index in range(payload_length):
-            payload[index] ^= mask_key[index % 4]
-    return opcode, bytes(payload)
-
-
-def _recv_ws_json(sock: _HomeAssistantWebSocket) -> dict[str, Any]:
-    while True:
-        opcode, payload = _recv_ws_frame(sock)
-        if opcode == 0x8:
-            raise ConnectionError("Home Assistant websocket closed the connection.")
-        if opcode == 0x9:
-            sock.sendall(_encode_ws_frame(0xA, payload))
-            continue
-        if opcode != 0x1:
-            continue
-        message = json.loads(payload.decode("utf-8"))
-        if isinstance(message, dict):
-            return message
-
-
-def _connect_home_assistant_websocket() -> _HomeAssistantWebSocket:
-    ws_url = resolve_home_assistant_websocket_url()
-    parsed = urlsplit(ws_url)
-    if parsed.scheme not in ("ws", "wss"):
-        raise ValueError(f"Unsupported Home Assistant websocket scheme: {ws_url}")
-    host = parsed.hostname or ""
-    if not host:
-        raise ValueError(f"Invalid Home Assistant websocket URL: {ws_url}")
-    port = parsed.port or (443 if parsed.scheme == "wss" else 80)
-    path = parsed.path or "/"
-    if parsed.query:
-        path = f"{path}?{parsed.query}"
-    raw_sock = socket.create_connection((host, port), timeout=10)
-    raw_sock.settimeout(30)
-    if parsed.scheme == "wss":
-        import ssl
-        raw_sock = ssl.create_default_context().wrap_socket(raw_sock, server_hostname=host)
-    sock = _HomeAssistantWebSocket(raw_sock)
-    websocket_key = base64.b64encode(os.urandom(16)).decode("ascii")
-    request_lines = [
-        f"GET {path} HTTP/1.1",
-        f"Host: {parsed.netloc}",
-        "Upgrade: websocket",
-        "Connection: Upgrade",
-        f"Sec-WebSocket-Key: {websocket_key}",
-        "Sec-WebSocket-Version: 13",
-        "\r\n",
-    ]
-    sock.sendall("\r\n".join(request_lines).encode("utf-8"))
-    status_line, headers = sock.recv_http_headers()
-    if "101" not in status_line:
-        raise ConnectionError(f"WebSocket handshake failed: {status_line or 'missing status line'}")
-    expected_accept = base64.b64encode(
-        hashlib.sha1(f"{websocket_key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11".encode("utf-8")).digest()
-    ).decode("ascii")
-    if headers.get("sec-websocket-accept") != expected_accept:
-        raise ConnectionError("Home Assistant websocket handshake returned an invalid accept header.")
-    return sock
-
-
-def _authenticate_home_assistant_websocket(sock: _HomeAssistantWebSocket) -> None:
-    token = load_home_assistant_token()
-    if not token:
-        raise PermissionError("SUPERVISOR_TOKEN is not available; Home Assistant websocket access is disabled.")
-    message = _recv_ws_json(sock)
-    if message.get("type") != "auth_required":
-        raise ConnectionError(f"Unexpected websocket pre-auth message: {message}")
-    _send_ws_json(sock, {"type": "auth", "access_token": token})
-    result = _recv_ws_json(sock)
-    if result.get("type") != "auth_ok":
-        raise PermissionError(f"Home Assistant websocket authentication failed: {result}")
-
-
-def _bootstrap_home_assistant_states_via_websocket(sock: _HomeAssistantWebSocket) -> None:
-    _send_ws_json(sock, {"id": 1, "type": "get_states"})
-    _send_ws_json(sock, {"id": 2, "type": "subscribe_events", "event_type": "state_changed"})
-
-    states_loaded = False
-    subscription_ready = False
-    while not (states_loaded and subscription_ready):
-        message = _recv_ws_json(sock)
-        if message.get("type") != "result":
-            continue
-        if message.get("id") == 1:
-            result = message.get("result")
-            if not isinstance(result, list):
-                raise ValueError("Home Assistant websocket get_states did not return a list.")
-            update_home_assistant_states_snapshot([item for item in result if isinstance(item, dict)])
-            states_loaded = True
-        elif message.get("id") == 2:
-            if message.get("success") is not True:
-                raise ValueError(f"Home Assistant websocket subscribe_events failed: {message}")
-            subscription_ready = True
-
-
-def _home_assistant_ws_listener() -> None:
-    while True:
-        sock: _HomeAssistantWebSocket | None = None
-        try:
-            sock = _connect_home_assistant_websocket()
-            _authenticate_home_assistant_websocket(sock)
-            _bootstrap_home_assistant_states_via_websocket(sock)
-            logging.info("Home Assistant websocket state listener connected")
-            while True:
-                message = _recv_ws_json(sock)
-                if message.get("type") != "event" or message.get("id") != 2:
-                    continue
-                event = message.get("event")
-                if not isinstance(event, dict):
-                    continue
-                if str(event.get("event_type") or "") != "state_changed":
-                    continue
-                event_data = event.get("data")
-                if not isinstance(event_data, dict):
-                    continue
-                entity_id = str(event_data.get("entity_id") or "").strip()
-                new_state = event_data.get("new_state")
-                if isinstance(new_state, dict):
-                    apply_home_assistant_state_event(new_state)
-                elif entity_id:
-                    remove_home_assistant_state(entity_id)
-        except Exception as exc:
-            logging.warning("Home Assistant websocket state listener disconnected: %s", exc)
-            try:
-                fallback_states = fetch_home_assistant_states()
-            except Exception as fallback_exc:
-                logging.warning("Failed to refresh Home Assistant state fallback snapshot: %s", fallback_exc)
-            else:
-                update_home_assistant_states_snapshot(fallback_states)
-        finally:
-            if sock is not None:
-                try:
-                    sock.close()
-                except OSError:
-                    pass
-        time.sleep(HOME_ASSISTANT_WS_RETRY_SEC)
-
-
-def ensure_home_assistant_state_listener() -> None:
-    global _ha_ws_listener_started
-
-    with _ha_states_condition:
-        if _ha_ws_listener_started:
-            return
-        _ha_ws_listener_started = True
-    thread = threading.Thread(
-        target=_home_assistant_ws_listener,
-        name="scene-ha-state-listener",
-        daemon=True,
-    )
-    thread.start()
-
-
 def load_filtered_home_assistant_states(pack_id: str | None = None) -> list[dict[str, Any]]:
+    global _ha_states_cache
+    global _ha_states_cache_at
+
     entity_ids = set(collect_pack_home_assistant_entity_ids(pack_id))
     if not entity_ids:
         return []
 
-    ensure_home_assistant_state_listener()
-    with _ha_states_condition:
-        snapshot_map = dict(_ha_all_states_by_entity)
-        snapshot_ready = _ha_ws_snapshot_ready
-
-    if not snapshot_map:
-        fallback_snapshot = update_home_assistant_states_snapshot(fetch_home_assistant_states())
-        snapshot_map = {
-            str(item.get("entity_id") or "").strip(): dict(item)
-            for item in fallback_snapshot
-            if isinstance(item, dict) and str(item.get("entity_id") or "").strip()
-        }
-        snapshot_ready = True
-
-    if not snapshot_ready:
-        with _ha_states_condition:
-            _ha_states_condition.wait(timeout=1.5)
-            snapshot_map = dict(_ha_all_states_by_entity)
+    now_ms = time.monotonic() * 1000
+    with _ha_states_cache_lock:
+        if (
+            _ha_states_cache is None
+            or now_ms - _ha_states_cache_at >= HOME_ASSISTANT_STATES_CACHE_TTL_MS
+        ):
+            _ha_states_cache = fetch_home_assistant_states()
+            _ha_states_cache_at = now_ms
+        snapshot = list(_ha_states_cache)
 
     return [
-        dict(snapshot_map[entity_id])
-        for entity_id in sorted(entity_ids)
-        if entity_id in snapshot_map
+        state
+        for state in snapshot
+        if str(state.get("entity_id") or "").strip() in entity_ids
     ]
-
-
-def build_filtered_home_assistant_states_payload(pack_id: str | None = None) -> dict[str, Any]:
-    return {
-        "success": True,
-        "packId": str(pack_id or load_active_pack_id()).strip() or DEFAULT_PACK_ID,
-        "states": load_filtered_home_assistant_states(pack_id),
-        "emittedAt": int(time.time() * 1000),
-    }
 
 
 def resolve_motion_id(path: Path, fallback_index: int) -> str:
@@ -938,44 +494,17 @@ def detect_expression_support(model_dir: Path) -> bool:
 
 
 def resolve_preview_asset(model_dir: Path, model_payload: dict[str, Any]) -> str:
-    def is_texture_atlas(path_value: str) -> bool:
-        normalized = str(path_value or "").replace("\\", "/").lower()
-        return "/texture_" in normalized or normalized.endswith("texture_00.png")
-
-    for pattern in (
-        "**/*preview*.png",
-        "**/*preview*.jpg",
-        "**/*preview*.jpeg",
-        "**/*portrait*.png",
-        "**/*portrait*.jpg",
-        "**/*portrait*.jpeg",
-        "**/*thumb*.png",
-        "**/*thumb*.jpg",
-        "**/*thumb*.jpeg",
-        "**/*cover*.png",
-        "**/*cover*.jpg",
-        "**/*cover*.jpeg",
-        "**/*keyvisual*.png",
-        "**/*keyvisual*.jpg",
-        "**/*keyvisual*.jpeg",
-    ):
-        candidate = next(iter(sorted(model_dir.glob(pattern))), None)
-        if candidate:
-            return candidate.relative_to(model_dir).as_posix()
-
     textures = model_payload.get("FileReferences", {}).get("Textures", [])
     if isinstance(textures, list) and textures:
         candidate = str(textures[0] or "").strip()
-        if candidate and not is_texture_atlas(candidate):
+        if candidate:
             texture_path = model_dir.joinpath(*PurePosixPath(candidate).parts)
             if texture_path.exists():
                 return candidate
-    for pattern in ("**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"):
+    for pattern in ("**/texture_00.png", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"):
         candidate = next(iter(sorted(model_dir.glob(pattern))), None)
         if candidate:
-            relative = candidate.relative_to(model_dir).as_posix()
-            if not is_texture_atlas(relative):
-                return relative
+            return candidate.relative_to(model_dir).as_posix()
     return ""
 
 
@@ -1041,7 +570,7 @@ def write_avatar_pack(
         "fallbackPortrait": dot_path(Path(model_info["preview_asset"])) if model_info["preview_asset"] else "",
         "motionMapUrl": "./motion-map.json",
         "presetThumbs": {
-            "full": f"{SHARED_PRESET_BASE_URL}/preset-full.svg",
+            "full": dot_path(Path(model_info["preview_asset"])) if model_info["preview_asset"] else f"{SHARED_PRESET_BASE_URL}/preset-full.svg",
             "torso": f"{SHARED_PRESET_BASE_URL}/preset-torso.svg",
             "head": f"{SHARED_PRESET_BASE_URL}/preset-head.svg",
         },
@@ -1063,23 +592,6 @@ def write_avatar_pack(
         "displayName": display_name,
         "motionCount": int(model_info["motion_count"]),
     }
-
-
-def resolve_manifest_preview_url(pack_id: str, manifest: dict[str, Any], asset_root: str) -> str:
-    preset_thumbs = manifest.get("presetThumbs")
-    if isinstance(preset_thumbs, dict):
-        preset_full = _resolve_avatar_asset_url(
-            pack_id,
-            str(preset_thumbs.get("full") or ""),
-            asset_root,
-        )
-        if preset_full:
-            return preset_full
-    return _resolve_avatar_asset_url(
-        pack_id,
-        str(manifest.get("fallbackPortrait") or ""),
-        asset_root,
-    )
 
 
 def import_avatar_archive_from_path(
@@ -1251,15 +763,17 @@ def load_avatar_catalog() -> dict[str, Any]:
                     motion_count = len(motions)
             except Exception as exc:
                 logging.warning("Failed to read avatar pack motion-map %s: %s", motion_map_path, exc)
-        preview_url = resolve_manifest_preview_url(pack_id, manifest, asset_root)
+        fallback_portrait = _resolve_avatar_asset_url(
+            pack_id, str(manifest.get("fallbackPortrait", "")), asset_root
+        )
         packs.append(
             {
                 "id": pack_id,
                 "name": str(manifest.get("name") or pack_id),
                 "adapter": str(manifest.get("adapter") or ""),
                 "manifestUrl": f"/avatar-packs/{quote(pack_id)}/avatar.manifest.json",
-                "previewUrl": preview_url,
-                "fallbackPortrait": preview_url,
+                "previewUrl": fallback_portrait,
+                "fallbackPortrait": fallback_portrait,
                 "motionCount": motion_count,
                 "capabilities": manifest.get("capabilities") if isinstance(manifest.get("capabilities"), dict) else {},
             }
@@ -1309,7 +823,11 @@ def load_avatar_pack_details(pack_id: str) -> dict[str, Any]:
     if motion_map_path and motion_map_path.exists():
         motion_map = read_json_file(motion_map_path)
 
-    preview_url = resolve_manifest_preview_url(pack_id, manifest, asset_root)
+    preview_url = _resolve_avatar_asset_url(
+        pack_id,
+        str(manifest.get("fallbackPortrait") or ""),
+        asset_root,
+    )
 
     return {
         "success": True,
@@ -1355,6 +873,18 @@ def save_avatar_pack_motion_map(pack_id: str, payload: dict[str, Any]) -> dict[s
     }
 
 
+def delete_avatar_pack(pack_id: str) -> dict[str, Any]:
+    normalized = slugify(pack_id)
+    if normalized != pack_id or not pack_id:
+        raise ValueError("Invalid packId.")
+    pack_dir = AVATAR_PACKS_DIR / pack_id
+    if not pack_dir.exists():
+        raise FileNotFoundError(f"Avatar pack not found: {pack_id}")
+    shutil.rmtree(pack_dir)
+    logging.info("Deleted avatar pack: %s (%s)", pack_id, pack_dir)
+    return {"success": True, "packId": pack_id}
+
+
 class SceneHostHandler(BaseHTTPRequestHandler):
     server_version = "KioskSceneHost/1.0"
 
@@ -1369,18 +899,6 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
-
-    def send_event_stream_message(self, payload: Any, event: str = "snapshot") -> None:
-        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        self.wfile.write(f"event: {event}\n".encode("utf-8"))
-        self.wfile.write(b"data: ")
-        self.wfile.write(body)
-        self.wfile.write(b"\n\n")
-        self.wfile.flush()
-
-    def send_event_stream_keepalive(self) -> None:
-        self.wfile.write(b": keepalive\n\n")
-        self.wfile.flush()
 
     def do_GET(self) -> None:
         parsed = urlsplit(self.path)
@@ -1419,15 +937,35 @@ class SceneHostHandler(BaseHTTPRequestHandler):
                     status=HTTPStatus.BAD_GATEWAY,
                 )
             return
-        if path == f"{PATH_PREFIX}/ha-states-stream":
-            self.handle_home_assistant_states_stream()
-            return
         if path == f"{PATH_PREFIX}/avatar-catalog":
             self.send_json(load_avatar_catalog())
             return
         if path == f"{PATH_PREFIX}/avatar-pack":
             try:
                 self.send_json(load_avatar_pack_details(resolve_pack_id(parsed.query)))
+            except FileNotFoundError as exc:
+                self.send_json(
+                    {"success": False, "error": str(exc)},
+                    status=HTTPStatus.NOT_FOUND,
+                )
+            except ValueError as exc:
+                self.send_json(
+                    {"success": False, "error": str(exc)},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+            return
+        self.send_json(
+            {"success": False, "error": f"Endpoint not found: {path}"},
+            status=HTTPStatus.NOT_FOUND,
+        )
+
+    def do_DELETE(self) -> None:
+        parsed = urlsplit(self.path)
+        path = parsed.path.rstrip("/") or "/"
+        if path == f"{PATH_PREFIX}/avatar-pack":
+            try:
+                pack_id = resolve_pack_id(parsed.query)
+                self.send_json(delete_avatar_pack(pack_id))
             except FileNotFoundError as exc:
                 self.send_json(
                     {"success": False, "error": str(exc)},
@@ -1565,49 +1103,6 @@ class SceneHostHandler(BaseHTTPRequestHandler):
                 {"success": False, "error": f"Avatar pack save failed: {exc}"},
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
-
-    def handle_home_assistant_states_stream(self) -> None:
-        ensure_home_assistant_state_listener()
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Connection", "keep-alive")
-        self.send_header("X-Accel-Buffering", "no")
-        self.end_headers()
-
-        last_payload = ""
-        last_generation = -1
-        last_keepalive_at = 0.0
-        try:
-            while True:
-                payload = build_filtered_home_assistant_states_payload()
-                serialized = json.dumps(
-                    {
-                        "packId": payload.get("packId"),
-                        "states": payload.get("states"),
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                )
-                now = time.monotonic()
-                if serialized != last_payload:
-                    self.send_event_stream_message(payload)
-                    last_payload = serialized
-                    last_keepalive_at = now
-                elif now - last_keepalive_at >= HOME_ASSISTANT_STREAM_KEEPALIVE_SEC:
-                    self.send_event_stream_keepalive()
-                    last_keepalive_at = now
-                with _ha_states_condition:
-                    if last_generation != _ha_states_generation:
-                        last_generation = _ha_states_generation
-                        continue
-                    timeout = max(0.25, HOME_ASSISTANT_STREAM_KEEPALIVE_SEC - (time.monotonic() - last_keepalive_at))
-                    _ha_states_condition.wait(timeout=timeout)
-        except (BrokenPipeError, ConnectionResetError, OSError):
-            logging.info("Home Assistant state stream client disconnected")
-        except Exception:
-            logging.exception("Home Assistant state stream failed")
 
 
 def main() -> None:

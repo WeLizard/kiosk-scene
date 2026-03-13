@@ -34,7 +34,6 @@ import {
   createHomeAssistantStatesReader,
   mapAssistantControlFromHomeAssistant,
   mapAssistantStateFromHomeAssistant,
-  normalizeHomeAssistantStates,
   type HomeAssistantControlEntityMap,
   type HomeAssistantEntityMap,
   type HomeAssistantStates,
@@ -113,7 +112,6 @@ export interface SceneShellPresetLabels {
 
 export interface SceneShellOptions {
   rendererConfigUrl?: string;
-  stateStreamUrl?: string;
   weatherUrl?: string;
   weatherReader?: () => Promise<WeatherOverviewPatch | null>;
   refreshIntervalMs?: number;
@@ -253,43 +251,15 @@ function resolveBaseUrl(candidate: string): string {
   }
 }
 
-function normalizeLegacyAvatarPath(candidate: string, manifestBaseUrl: string): string {
-  const normalized = trimText(candidate, 1024);
-  if (!normalized) {
-    return "";
-  }
-  if (normalized === "/local/neiri-scene/avatar.html") {
-    return "./avatar.html";
-  }
-  if (normalized.startsWith("/local/live2d/")) {
-    return normalized.replace("/local/live2d/", "/scene-legacy/live2d/");
-  }
-  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
-    try {
-      const parsed = new URL(normalized, manifestBaseUrl || window.location.href);
-      if (parsed.pathname.startsWith("/local/live2d/")) {
-        parsed.pathname = parsed.pathname.replace("/local/live2d/", "/scene-legacy/live2d/");
-        return parsed.toString();
-      }
-      if (parsed.pathname === "/local/neiri-scene/avatar.html") {
-        return resolveUrlAgainst(manifestBaseUrl, "./avatar.html");
-      }
-    } catch {
-      return normalized;
-    }
-  }
-  return normalized;
-}
-
 function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: string): AvatarManifestV1 {
   const manifestBaseUrl = resolveBaseUrl(manifestUrl);
   const assetRoot = resolveUrlAgainst(
     manifestBaseUrl,
-    normalizeLegacyAvatarPath(trimText(manifest.assetRoot, 1024) || "./assets", manifestBaseUrl),
+    trimText(manifest.assetRoot, 1024) || "./assets",
   );
   const assetBaseUrl = assetRoot ? withTrailingSlash(assetRoot) : manifestBaseUrl;
   const resolveAvatarAssetUrl = (value: string): string => {
-    const normalized = normalizeLegacyAvatarPath(value, manifestBaseUrl);
+    const normalized = trimText(value, 1024);
     if (!normalized) {
       return "";
     }
@@ -298,7 +268,7 @@ function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: stri
   return {
     ...manifest,
     assetRoot,
-    runtimeUrl: resolveUrlAgainst(manifestBaseUrl, normalizeLegacyAvatarPath(manifest.runtimeUrl || "", manifestBaseUrl)),
+    runtimeUrl: resolveUrlAgainst(manifestBaseUrl, manifest.runtimeUrl || ""),
     entry: resolveAvatarAssetUrl(manifest.entry || ""),
     modelUrl: resolveAvatarAssetUrl(manifest.modelUrl || ""),
     fallbackPortrait: resolveAvatarAssetUrl(manifest.fallbackPortrait || ""),
@@ -306,7 +276,7 @@ function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: stri
     expressionMapUrl: resolveAvatarAssetUrl(manifest.expressionMapUrl || ""),
     presetThumbs: Object.fromEntries(
       Object.entries(manifest.presetThumbs || {})
-        .map(([key, value]) => [key, resolveUrlAgainst(manifestBaseUrl, normalizeLegacyAvatarPath(value, manifestBaseUrl))])
+        .map(([key, value]) => [key, resolveUrlAgainst(manifestBaseUrl, value)])
         .filter(([, value]) => Boolean(value)),
     ),
   };
@@ -560,7 +530,7 @@ export function createHomeAssistantWeatherReader(options: HomeAssistantWeatherRe
 }
 
 interface CarouselDragState {
-  pointerId: number | string;
+  pointerId: number;
   startX: number;
   startY: number;
   deltaX: number;
@@ -602,19 +572,8 @@ export class BrowserSceneShellApp {
   private idleTimer: number | null = null;
   private avatarAdapter: AvatarAdapter | null = null;
   private refreshIntervalHandle: number | null = null;
-  private stateStream: EventSource | null = null;
-  private streamRefreshHandle: number | null = null;
-  private pendingStreamStates: HomeAssistantStates | null = null;
   private orderedPages: ScenePageV1[] = [];
   private carouselDragState: CarouselDragState | null = null;
-  private lastPageStructureKey = "";
-  private lastCarouselRenderKey = "";
-  private slideMarkupCache = new Map<string, string>();
-  private lastDotsMarkup = "";
-  private lastAvatarStateKey = "";
-  private lastAvatarCueKey = "";
-  private lastAvatarBubbleKey = "";
-  private lastAvatarPreset: ViewPreset | "" = "";
 
   constructor(root: HTMLElement, options: SceneShellOptions = {}) {
     this.root = root;
@@ -745,14 +704,12 @@ export class BrowserSceneShellApp {
     this.lastAutoRotateAt = Date.now();
     await this.refresh();
 
-    if (!this.connectStateStream()) {
-      if (this.refreshIntervalHandle) {
-        window.clearInterval(this.refreshIntervalHandle);
-      }
-      this.refreshIntervalHandle = window.setInterval(() => {
-        void this.refresh();
-      }, this.options.refreshIntervalMs ?? 10_000);
+    if (this.refreshIntervalHandle) {
+      window.clearInterval(this.refreshIntervalHandle);
     }
+    this.refreshIntervalHandle = window.setInterval(() => {
+      void this.refresh();
+    }, this.options.refreshIntervalMs ?? 3000);
   }
 
   async dispose(): Promise<void> {
@@ -760,18 +717,12 @@ export class BrowserSceneShellApp {
       window.clearInterval(this.refreshIntervalHandle);
       this.refreshIntervalHandle = null;
     }
-    if (this.streamRefreshHandle) {
-      window.clearTimeout(this.streamRefreshHandle);
-      this.streamRefreshHandle = null;
-    }
     if (this.idleTimer) {
       window.clearTimeout(this.idleTimer);
       this.idleTimer = null;
     }
     await this.avatarAdapter?.dispose();
     this.avatarAdapter = null;
-    this.stateStream?.close();
-    this.stateStream = null;
   }
 
   private getRendererConfigUrl(): string {
@@ -780,10 +731,6 @@ export class BrowserSceneShellApp {
 
   private getWeatherUrl(): string {
     return trimText(this.options.weatherUrl, 1024) || "./weather.json";
-  }
-
-  private getStateStreamUrl(): string {
-    return trimText(this.options.stateStreamUrl, 2048);
   }
 
   private bindPresetControls(): void {
@@ -797,80 +744,6 @@ export class BrowserSceneShellApp {
   }
 
   private bindCarouselControls(): void {
-    let lastPointerInputAt = 0;
-    let lastTouchInputAt = 0;
-    let lastMouseInputAt = 0;
-
-    const beginDrag = (pointerId: number | string, clientX: number, clientY: number, target: EventTarget | null): boolean => {
-      if (this.orderedPages.length < 2 || this.isCarouselInteractiveTarget(target)) {
-        return false;
-      }
-      this.carouselDragState = {
-        pointerId,
-        startX: clientX,
-        startY: clientY,
-        deltaX: 0,
-        deltaY: 0,
-        locked: false,
-      };
-      return true;
-    };
-
-    const moveDrag = (pointerId: number | string, clientX: number, clientY: number): boolean => {
-      if (!this.carouselDragState || pointerId !== this.carouselDragState.pointerId) {
-        return false;
-      }
-      this.carouselDragState.deltaX = clientX - this.carouselDragState.startX;
-      this.carouselDragState.deltaY = clientY - this.carouselDragState.startY;
-
-      if (!this.carouselDragState.locked) {
-        if (Math.abs(this.carouselDragState.deltaX) < 10) {
-          return false;
-        }
-        if (Math.abs(this.carouselDragState.deltaY) > Math.abs(this.carouselDragState.deltaX)) {
-          this.clearDragState(pointerId, false);
-          return false;
-        }
-        this.carouselDragState.locked = true;
-        this.carouselShellEl.classList.add("is-dragging");
-      }
-
-      this.updateCarouselPosition({
-        instant: true,
-        dragOffsetPx: this.carouselDragState.deltaX,
-      });
-      return true;
-    };
-
-    const finalizeDrag = (pointerId: number | string): void => {
-      if (!this.carouselDragState || pointerId !== this.carouselDragState.pointerId) {
-        return;
-      }
-
-      const { locked, deltaX } = this.carouselDragState;
-      const width = this.carouselShellEl.clientWidth || 1;
-      const shouldStep = locked && Math.abs(deltaX) >= width * 0.16;
-      const direction: 1 | -1 = deltaX < 0 ? 1 : -1;
-
-      this.clearDragState(pointerId, false);
-
-      if (shouldStep) {
-        this.stepPage(direction);
-        return;
-      }
-
-      this.updateCarouselPosition();
-    };
-
-    const shouldHandleTouchFallback = (): boolean => (
-      Date.now() - lastPointerInputAt > 500
-      && Date.now() - lastMouseInputAt > 500
-    );
-    const shouldHandleMouseFallback = (): boolean => (
-      Date.now() - lastPointerInputAt > 500
-      && Date.now() - lastTouchInputAt > 500
-    );
-
     this.carouselShellEl.addEventListener("keydown", (event) => {
       if (event.key === "ArrowLeft") {
         event.preventDefault();
@@ -884,14 +757,17 @@ export class BrowserSceneShellApp {
     });
 
     this.carouselShellEl.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || (event.pointerType === "mouse" && Date.now() - lastTouchInputAt < 500)) {
+      if (event.button !== 0 || this.orderedPages.length < 2 || this.isCarouselInteractiveTarget(event.target)) {
         return;
       }
-      lastPointerInputAt = Date.now();
-      if (!beginDrag(event.pointerId, event.clientX, event.clientY, event.target)) {
-        return;
-      }
-      event.preventDefault();
+      this.carouselDragState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        deltaX: 0,
+        deltaY: 0,
+        locked: false,
+      };
       this.carouselShellEl.setPointerCapture?.(event.pointerId);
     });
 
@@ -899,152 +775,57 @@ export class BrowserSceneShellApp {
       if (!this.carouselDragState || event.pointerId !== this.carouselDragState.pointerId) {
         return;
       }
-      lastPointerInputAt = Date.now();
-      if (moveDrag(event.pointerId, event.clientX, event.clientY)) {
-        event.preventDefault();
+      this.carouselDragState.deltaX = event.clientX - this.carouselDragState.startX;
+      this.carouselDragState.deltaY = event.clientY - this.carouselDragState.startY;
+
+      if (!this.carouselDragState.locked) {
+        if (Math.abs(this.carouselDragState.deltaX) < 10) {
+          return;
+        }
+        if (Math.abs(this.carouselDragState.deltaY) > Math.abs(this.carouselDragState.deltaX)) {
+          this.clearDragState(event.pointerId, false);
+          return;
+        }
+        this.carouselDragState.locked = true;
+        this.carouselShellEl.classList.add("is-dragging");
       }
+
+      event.preventDefault();
+      this.updateCarouselPosition({
+        instant: true,
+        dragOffsetPx: this.carouselDragState.deltaX,
+      });
     });
 
     const finalizePointer = (event: PointerEvent) => {
-      lastPointerInputAt = Date.now();
-      finalizeDrag(event.pointerId);
+      if (!this.carouselDragState || event.pointerId !== this.carouselDragState.pointerId) {
+        return;
+      }
+
+      const { locked, deltaX } = this.carouselDragState;
+      const width = this.carouselShellEl.clientWidth || 1;
+      const shouldStep = locked && Math.abs(deltaX) >= width * 0.16;
+      const direction: 1 | -1 = deltaX < 0 ? 1 : -1;
+
+      this.clearDragState(event.pointerId, false);
+
+      if (shouldStep) {
+        this.stepPage(direction);
+        return;
+      }
+
+      this.updateCarouselPosition();
     };
 
     this.carouselShellEl.addEventListener("pointerup", finalizePointer);
     this.carouselShellEl.addEventListener("pointercancel", finalizePointer);
     this.carouselShellEl.addEventListener("lostpointercapture", finalizePointer);
-
-    this.carouselShellEl.addEventListener("touchstart", (event) => {
-      if (!shouldHandleTouchFallback()) {
-        return;
-      }
-      const touch = event.changedTouches?.[0];
-      if (!touch) {
-        return;
-      }
-      if (!beginDrag(`touch-${touch.identifier}`, touch.clientX, touch.clientY, event.target)) {
-        return;
-      }
-      lastTouchInputAt = Date.now();
-      event.preventDefault();
-      event.stopPropagation();
-    }, { passive: false });
-
-    this.carouselShellEl.addEventListener("touchmove", (event) => {
-      if (!shouldHandleTouchFallback() || !this.carouselDragState) {
-        return;
-      }
-      const activeTouch = Array.from(event.changedTouches || []).find(
-        (touch) => `touch-${touch.identifier}` === this.carouselDragState?.pointerId,
-      );
-      if (!activeTouch) {
-        return;
-      }
-      lastTouchInputAt = Date.now();
-      if (moveDrag(`touch-${activeTouch.identifier}`, activeTouch.clientX, activeTouch.clientY)) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    }, { passive: false });
-
-    const finalizeTouch = (event: TouchEvent): void => {
-      if (!shouldHandleTouchFallback() || !this.carouselDragState) {
-        return;
-      }
-      const activeTouch = Array.from(event.changedTouches || []).find(
-        (touch) => `touch-${touch.identifier}` === this.carouselDragState?.pointerId,
-      );
-      if (!activeTouch) {
-        return;
-      }
-      lastTouchInputAt = Date.now();
-      event.preventDefault();
-      event.stopPropagation();
-      finalizeDrag(`touch-${activeTouch.identifier}`);
-    };
-
-    this.carouselShellEl.addEventListener("touchend", finalizeTouch, { passive: false });
-    this.carouselShellEl.addEventListener("touchcancel", finalizeTouch, { passive: false });
-
-    this.carouselShellEl.addEventListener("mousedown", (event) => {
-      if (event.button !== 0 || !shouldHandleMouseFallback()) {
-        return;
-      }
-      if (!beginDrag("mouse-fallback", event.clientX, event.clientY, event.target)) {
-        return;
-      }
-      lastMouseInputAt = Date.now();
-      event.preventDefault();
-    });
-
-    window.addEventListener("mousemove", (event) => {
-      if (!this.carouselDragState || this.carouselDragState.pointerId !== "mouse-fallback") {
-        return;
-      }
-      lastMouseInputAt = Date.now();
-      if (moveDrag("mouse-fallback", event.clientX, event.clientY)) {
-        event.preventDefault();
-      }
-    });
-
-    window.addEventListener("mouseup", (event) => {
-      if (!this.carouselDragState || this.carouselDragState.pointerId !== "mouse-fallback") {
-        return;
-      }
-      lastMouseInputAt = Date.now();
-      if (event.button === 0) {
-        event.preventDefault();
-      }
-      finalizeDrag("mouse-fallback");
-    });
   }
 
-  private connectStateStream(): boolean {
-    const streamUrl = this.getStateStreamUrl();
-    if (!streamUrl || typeof EventSource === "undefined") {
-      return false;
-    }
-
-    const resolvedStreamUrl = resolveUrlAgainst(window.location.href, streamUrl);
-    const stream = new EventSource(resolvedStreamUrl);
-    stream.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(String(event.data || "null")) as
-          | { states?: unknown }
-          | unknown[];
-        const normalizedStates = normalizeHomeAssistantStates(
-          Array.isArray(payload) ? payload : payload?.states,
-        );
-        if (!normalizedStates) {
-          return;
-        }
-        this.pendingStreamStates = normalizedStates;
-        if (this.streamRefreshHandle !== null) {
-          return;
-        }
-        const debounceMs = document.body.classList.contains("ks-display-runtime") ? 80 : 16;
-        this.streamRefreshHandle = window.setTimeout(() => {
-          this.streamRefreshHandle = null;
-          const nextSnapshot = this.pendingStreamStates;
-          this.pendingStreamStates = null;
-          void this.refresh(nextSnapshot);
-        }, debounceMs);
-      } catch (error) {
-        console.warn("Failed to parse state stream payload", error);
-      }
-    };
-    stream.onerror = () => {
-      console.warn("Scene state stream disconnected; keeping EventSource reconnect logic active.");
-    };
-    this.stateStream = stream;
-    return true;
-  }
-
-  private async refresh(externalStates?: HomeAssistantStates | null): Promise<void> {
-    const statesSnapshot = externalStates ?? await this.readSceneStates();
-    this.currentState = await this.readAssistantState(statesSnapshot);
-    this.hassStates = statesSnapshot;
-    this.remoteControl = await this.readRemoteControl(this.currentControl, statesSnapshot);
+  private async refresh(): Promise<void> {
+    this.currentState = await this.readAssistantState();
+    this.hassStates = await this.readSceneStates();
+    this.remoteControl = await this.readRemoteControl(this.currentControl);
     this.uiControl = mergeControlV1(DEFAULT_CONTROL_V1, this.uiControl);
     this.currentControl = mergeControlV1(this.remoteControl, this.uiControl);
 
@@ -1077,52 +858,30 @@ export class BrowserSceneShellApp {
       throw new Error("Avatar adapter is not initialized.");
     }
 
-    await this.syncAvatarPresentation(presentation);
+    await this.avatarAdapter.setState(presentation.state);
+    await this.avatarAdapter.setCue(this.currentControl.cue);
+    await this.avatarAdapter.setViewPreset(this.currentPreset);
+    await this.avatarAdapter.showBubble(presentation.body, {
+      ttlMs: 0,
+      speak: false,
+      typewriter: false,
+    });
 
     this.renderCarousel(orderedPages, presentation);
   }
 
   private renderCarousel(pages: ScenePageV1[], presentation: AssistantPresentationModel): void {
     this.orderedPages = pages.slice();
-    const structureKey = JSON.stringify(
-      pages.map((page) => ({
-        id: page.id,
-        kind: page.kind,
-        title: page.title,
-        subtitle: page.subtitle || "",
-        slot: page.slot ?? null,
-        cardStyle: page.cardStyle || "",
-        stampCaption: page.stampCaption || "",
-        stampValue: page.stampValue || "",
-        cards: Array.isArray(page.cards)
-          ? page.cards.map((card) => ({
-              type: trimText(card.type, 32),
-              entity: trimText(card.entity, 255),
-              stateEntity: trimText(card.stateEntity, 255),
-              downEntity: trimText(card.downEntity, 255),
-              upEntity: trimText(card.upEntity, 255),
-              caption: trimText(card.caption, 48),
-              hint: trimText(card.hint, 72),
-        }))
-          : [],
-      })),
-    );
-    const carouselRenderKey = this.buildCarouselRenderKey(pages, presentation);
-    if (
-      structureKey === this.lastPageStructureKey
-      && carouselRenderKey === this.lastCarouselRenderKey
-    ) {
-      this.updateCarouselPosition();
-      this.updateDotState();
-      return;
-    }
-    const slideMarkup = pages.map((page, index) => {
+    this.carouselTrackEl.innerHTML = pages.map((page, index) => {
       if (page.kind === "overview") {
         return this.renderOverviewSlide(page, presentation, index);
       }
       return this.renderDynamicSlide(page, index, pages.length);
-    });
-    const dotsMarkup = pages.map((page, index) => `
+    }).join("");
+
+    this.updateCarouselPosition();
+
+    this.dotsEl.innerHTML = pages.map((page, index) => `
       <button
         class="carousel-dot ${index === this.activeIndex ? "is-active" : ""}"
         type="button"
@@ -1132,108 +891,11 @@ export class BrowserSceneShellApp {
       ></button>
     `).join("");
 
-    if (structureKey !== this.lastPageStructureKey) {
-      this.carouselTrackEl.innerHTML = slideMarkup.join("");
-      this.dotsEl.innerHTML = dotsMarkup;
-      this.lastPageStructureKey = structureKey;
-      this.lastCarouselRenderKey = carouselRenderKey;
-      this.lastDotsMarkup = dotsMarkup;
-      this.slideMarkupCache = new Map(
-        pages.map((page, index) => [page.id, slideMarkup[index]]),
-      );
-      for (const dot of Array.from(this.dotsEl.querySelectorAll<HTMLButtonElement>("[data-slide-index]"))) {
-        dot.addEventListener("click", () => {
-          this.pinPageByIndex(Number(dot.dataset.slideIndex) || 0);
-        });
-      }
-    } else {
-      const currentSlides = Array.from(this.carouselTrackEl.children) as HTMLElement[];
-      slideMarkup.forEach((markup, index) => {
-        const page = pages[index];
-        if (this.slideMarkupCache.get(page.id) === markup) {
-          return;
-        }
-        const currentSlide = currentSlides[index];
-        if (!currentSlide) {
-          return;
-        }
-        const template = document.createElement("template");
-        template.innerHTML = markup.trim();
-        const nextSlide = template.content.firstElementChild;
-        if (!nextSlide) {
-          return;
-        }
-        currentSlide.replaceWith(nextSlide);
-        this.slideMarkupCache.set(page.id, markup);
-      });
-
-      if (this.lastDotsMarkup !== dotsMarkup) {
-        this.dotsEl.innerHTML = dotsMarkup;
-        this.lastDotsMarkup = dotsMarkup;
-        for (const dot of Array.from(this.dotsEl.querySelectorAll<HTMLButtonElement>("[data-slide-index]"))) {
-          dot.addEventListener("click", () => {
-            this.pinPageByIndex(Number(dot.dataset.slideIndex) || 0);
-          });
-        }
-      }
-      this.lastCarouselRenderKey = carouselRenderKey;
+    for (const dot of Array.from(this.dotsEl.querySelectorAll<HTMLButtonElement>("[data-slide-index]"))) {
+      dot.addEventListener("click", () => {
+        this.pinPageByIndex(Number(dot.dataset.slideIndex) || 0);
+      }, { once: true });
     }
-
-    this.updateCarouselPosition();
-    this.updateDotState();
-  }
-
-  private buildCarouselRenderKey(pages: ScenePageV1[], presentation: AssistantPresentationModel): string {
-    const weather = this.weatherData || DEFAULT_WEATHER_OVERVIEW;
-    const locale = this.rendererConfig.assistant.locale || "en-US";
-    return JSON.stringify({
-      presentation: {
-        caption: trimText(presentation.caption, 64),
-        label: trimText(presentation.label, 96),
-        body: trimText(presentation.body, 280),
-      },
-      weather: {
-        title: trimText(weather.title, 64),
-        location: trimText(weather.location, 96),
-        todayCaption: trimText(weather.todayCaption, 48),
-        todayValue: trimText(weather.todayValue, 48),
-        todayLabel: trimText(weather.todayLabel, 48),
-        updatedCaption: trimText(weather.updatedCaption, 48),
-        updatedAt: trimText(weather.updatedAt, 48),
-        temperature: trimText(weather.temperature, 24),
-        unit: trimText(weather.unit, 8),
-        condition: trimText(weather.condition, 96),
-        feelsLike: trimText(weather.feelsLike, 140),
-        badgeSummary: trimText(weather.badgeSummary, 96),
-        badgeRange: trimText(weather.badgeRange, 96),
-        metrics: weather.metrics,
-        forecastTitle: trimText(weather.forecastTitle, 64),
-        forecast: weather.forecast.map((day) => ({
-          name: trimText(day.name, 24),
-          dayNumber: trimText(day.dayNumber, 8),
-          monthShort: trimText(day.monthShort, 16),
-          note: trimText(day.note, 48),
-          max: trimText(day.max, 16),
-          min: trimText(day.min, 24),
-          icon: trimText(day.icon, 255),
-        })),
-      },
-      pages: pages.map((page, index) => ({
-        id: trimText(page.id, 64),
-        kind: trimText(page.kind, 32),
-        title: trimText(page.title, 96),
-        subtitle: trimText(page.subtitle, 160),
-        stampCaption: trimText(page.stampCaption, 48),
-        stampValue: trimText(page.stampValue, 48),
-        cardStyle: trimText(page.cardStyle, 16),
-        index,
-        cards: resolveSceneCards(page.cards || [], this.hassStates, locale).map((card) => ({
-          caption: trimText(card.caption, 64),
-          value: trimText(card.value, 96),
-          hint: trimText(card.hint, 160),
-        })),
-      })),
-    });
   }
 
   private renderOverviewSlide(page: ScenePageV1, presentation: AssistantPresentationModel, index: number): string {
@@ -1429,8 +1091,8 @@ export class BrowserSceneShellApp {
     return Boolean(target.closest("button, a, input, select, textarea, label"));
   }
 
-  private clearDragState(pointerId: number | string, keepCapture: boolean): void {
-    if (typeof pointerId === "number" && !keepCapture && this.carouselShellEl.hasPointerCapture?.(pointerId)) {
+  private clearDragState(pointerId: number, keepCapture: boolean): void {
+    if (!keepCapture && this.carouselShellEl.hasPointerCapture?.(pointerId)) {
       this.carouselShellEl.releasePointerCapture(pointerId);
     }
     this.carouselDragState = null;
@@ -1535,19 +1197,16 @@ export class BrowserSceneShellApp {
     });
   }
 
-  private async readAssistantState(statesSnapshot?: HomeAssistantStates | null): Promise<StateV1> {
+  private async readAssistantState(): Promise<StateV1> {
     const jsonFallback = async (): Promise<StateV1> => createJsonStateProvider({
       url: this.rendererConfig.state.stateUrl,
       defaultValue: this.currentState ?? DEFAULT_STATE_V1,
     }).read();
 
-    if (this.rendererConfig.state.provider !== "ha" || !this.entityMap) {
+    if (this.rendererConfig.state.provider !== "ha" || !this.entityMap || !this.haStatesReader) {
       return jsonFallback();
     }
-    const states = statesSnapshot ?? await this.haStatesReader?.read() ?? null;
-    if (!states) {
-      return jsonFallback();
-    }
+    const states = await this.haStatesReader.read();
     return mapAssistantStateFromHomeAssistant(
       states || {},
       this.entityMap,
@@ -1562,64 +1221,22 @@ export class BrowserSceneShellApp {
     return this.haStatesReader.read();
   }
 
-  private async readRemoteControl(
-    defaultValue = DEFAULT_CONTROL_V1,
-    statesSnapshot?: HomeAssistantStates | null,
-  ): Promise<ControlV1> {
+  private async readRemoteControl(defaultValue = DEFAULT_CONTROL_V1): Promise<ControlV1> {
     const jsonFallback = async (): Promise<ControlV1> => createJsonControlProvider({
       url: this.rendererConfig.control.controlUrl,
       defaultValue,
     }).read();
 
-    if (this.rendererConfig.control.provider !== "ha" || !this.controlEntityMap) {
+    if (this.rendererConfig.control.provider !== "ha" || !this.controlEntityMap || !this.haStatesReader) {
       return jsonFallback();
     }
-    const states = statesSnapshot ?? await this.haStatesReader?.read() ?? null;
-    if (!states) {
-      return jsonFallback();
-    }
+    const states = await this.haStatesReader.read();
     return mapAssistantControlFromHomeAssistant(states || {}, this.controlEntityMap) || jsonFallback();
   }
 
-  private async syncAvatarPresentation(presentation: AssistantPresentationModel): Promise<void> {
-    if (!this.avatarAdapter) {
-      return;
-    }
-
-    const avatarStateKey = JSON.stringify(presentation.state);
-    if (avatarStateKey !== this.lastAvatarStateKey) {
-      await this.avatarAdapter.setState(presentation.state);
-      this.lastAvatarStateKey = avatarStateKey;
-    }
-
-    const avatarCueKey = JSON.stringify(this.currentControl.cue || DEFAULT_CONTROL_V1.cue);
-    if (avatarCueKey !== this.lastAvatarCueKey) {
-      await this.avatarAdapter.setCue(this.currentControl.cue);
-      this.lastAvatarCueKey = avatarCueKey;
-    }
-
-    if (this.currentPreset !== this.lastAvatarPreset) {
-      await this.avatarAdapter.setViewPreset(this.currentPreset);
-      this.lastAvatarPreset = this.currentPreset;
-    }
-
-    const bubbleKey = presentation.body || "";
-    if (bubbleKey !== this.lastAvatarBubbleKey) {
-      await this.avatarAdapter.showBubble(presentation.body, {
-        ttlMs: 0,
-        speak: false,
-        typewriter: false,
-      });
-      this.lastAvatarBubbleKey = bubbleKey;
-    }
-  }
-
   private async readWeatherData(): Promise<WeatherOverviewPayload> {
-    const defaultPayload: WeatherOverviewPatch = {
-      ...(this.options.defaultWeather || {}),
-    };
     let payload: WeatherOverviewPatch = {
-      ...defaultPayload,
+      ...(this.options.defaultWeather || {}),
     };
 
     try {
@@ -1628,9 +1245,6 @@ export class BrowserSceneShellApp {
     } catch {
       // Fallback file is optional.
     }
-
-    // Canonical runtime copy comes from the hosted/default pack, not from stale seeded weather.json labels.
-    payload = mergeWeatherSource(payload, defaultPayload);
 
     if (this.options.weatherReader) {
       try {

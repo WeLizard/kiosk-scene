@@ -58,13 +58,6 @@
       background: rgba(123, 161, 185, 0.18);
       filter: blur(6px);
     }
-    body.display-mode {
-      background: #e9eff4;
-    }
-    body.display-mode::before,
-    body.display-mode::after {
-      display: none;
-    }
     .shell {
       position: relative;
       width: 100%;
@@ -95,28 +88,6 @@
       font-size: 12px;
       line-height: 1.32;
       pointer-events: none;
-    }
-    body.display-mode .shell {
-      padding: 10px;
-    }
-    body.display-mode .frame,
-    body.display-mode #message,
-    body.display-mode #status,
-    body.display-mode #loading-overlay,
-    body.display-mode .loading-panel {
-      box-shadow: none;
-      backdrop-filter: none;
-    }
-    body.display-mode .frame,
-    body.display-mode #message,
-    body.display-mode #status,
-    body.display-mode .loading-panel {
-      background: rgba(255,255,255,0.96);
-      background-image: none;
-    }
-    body.display-mode #fallback-portrait {
-      filter: none;
-      padding: 12px 8px 0;
     }
     #badge {
       position: absolute;
@@ -301,9 +272,9 @@
 <body class="is-loading">
   <div class="shell">
     <div class="frame" id="frame">
-      <div id="badge">Ассистент</div>
+      <div id="badge">Assistant</div>
       <div id="meta">режим совместимости</div>
-      <img id="fallback-portrait" src="" alt="Портрет аватара">
+      <img id="fallback-portrait" src="" alt="Avatar portrait">
       <div id="loading-overlay" aria-live="polite">
         <div class="loading-panel">
           <div class="loading-spinner" aria-hidden="true"></div>
@@ -333,20 +304,14 @@
     const loadingSubtitleEl = document.getElementById('loading-subtitle');
     const SEARCH_PARAMS = new URLSearchParams(window.location.search);
     const EXPLICIT_RENDERER_CONFIG_URL = SEARCH_PARAMS.get('rendererConfigUrl') || '';
-    const EXTERNAL_STATE_MODE = SEARCH_PARAMS.get('externalState') === '1';
     const RENDERER_CONFIG_URL = EXPLICIT_RENDERER_CONFIG_URL || './renderer.config.json';
     const AVATAR_MANIFEST_URL = './avatar.manifest.json';
-    const UI_LOCALE = String(navigator.language || 'ru-RU').toLowerCase();
-    const UI_TEXT = {
-      assistantName: UI_LOCALE.startsWith('ru') ? 'Ассистент' : 'Assistant',
-      portraitAlt: UI_LOCALE.startsWith('ru') ? 'Портрет аватара' : 'Avatar portrait'
-    };
     const DEFAULT_RENDERER_CONFIG = {
       version: 1,
-      assistant: { name: UI_TEXT.assistantName },
+      assistant: { name: 'Assistant' },
       links: { appUrl: '/app/openclaw_assistant' },
       state: {
-        stateUrl: '/scene-legacy/live2d/state.json'
+        stateUrl: '/local/live2d/state.json'
       },
       assetPack: {
         modelJson: '',
@@ -356,22 +321,19 @@
     };
     const COMPATIBLE_MODEL_FALLBACKS = [
       {
-        primaryModelJson: '/scene-legacy/live2d/haru-pro/haru_greeter_t05.model3.json',
-        fallbackModelJson: '/scene-legacy/live2d/haru/haru_greeter_t03.model3.json',
-        fallbackPortrait: '/scene-legacy/live2d/haru/haru_greeter_t03.2048/texture_00.png',
+        primaryModelJson: '/local/live2d/haru-pro/haru_greeter_t05.model3.json',
+        fallbackModelJson: '/local/live2d/haru/haru_greeter_t03.model3.json',
+        fallbackPortrait: '/local/live2d/haru/haru_greeter_t03.2048/texture_00.png',
         label: 'haru-t03'
       }
     ];
     const IS_DISPLAY_MODE = SEARCH_PARAMS.get('display') === '1';
     const TOUCH_DEBUG = SEARCH_PARAMS.get('debug') === 'touch';
     const TYPEWRITER_START_DELAY_MS = 220;
-    const DISPLAY_RENDER_MAX_FPS = 24;
-    const DISPLAY_RENDER_MIN_FPS = 12;
     const MOUTH_OPEN_PARAM = 'ParamMouthOpenY';
     const MOUTH_FORM_PARAM = 'ParamMouthForm';
     const STALE_MS = 15 * 60 * 1000;
     const POLL_MS = 2500;
-    const LIVE2D_MODEL_LOAD_TIMEOUT_MS = 12000;
     let rendererConfig = DEFAULT_RENDERER_CONFIG;
 
     const DEFAULT_MOTION_MAP = {
@@ -817,26 +779,9 @@
     }
 
     function resolvePageUrl(candidate, baseUrl = window.location.href) {
-      let normalized = trimText(candidate, 1024);
+      const normalized = trimText(candidate, 1024);
       if (!normalized) {
         return '';
-      }
-      if (normalized === '/local/neiri-scene/avatar.html') {
-        normalized = './avatar.html';
-      } else if (normalized.startsWith('/local/live2d/')) {
-        normalized = normalized.replace('/local/live2d/', '/scene-legacy/live2d/');
-      } else if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
-        try {
-          const parsed = new URL(normalized, baseUrl);
-          if (parsed.pathname === '/local/neiri-scene/avatar.html') {
-            normalized = './avatar.html';
-          } else if (parsed.pathname.startsWith('/local/live2d/')) {
-            parsed.pathname = parsed.pathname.replace('/local/live2d/', '/scene-legacy/live2d/');
-            normalized = parsed.toString();
-          }
-        } catch {
-          // keep original normalized value
-        }
       }
       if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
         return normalized;
@@ -950,10 +895,46 @@
     }
 
     function applyRendererConfig() {
-      const assistantName = trimText(rendererConfig && rendererConfig.assistant && rendererConfig.assistant.name, 40) || UI_TEXT.assistantName;
+      const assistantName = trimText(rendererConfig && rendererConfig.assistant && rendererConfig.assistant.name, 40) || 'Assistant';
       badgeEl.textContent = assistantName;
-      fallbackPortraitEl.alt = assistantName || UI_TEXT.portraitAlt;
-      document.title = `${assistantName} · Kiosk Scene`;
+      fallbackPortraitEl.alt = assistantName;
+    }
+
+    function applyPixiCompatibilitySettings() {
+      if (!window.PIXI || !PIXI.settings || !PIXI.ENV) {
+        return;
+      }
+      if (IS_DISPLAY_MODE) {
+        PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL_LEGACY;
+        if (PIXI.MIPMAP_MODES && Object.prototype.hasOwnProperty.call(PIXI.MIPMAP_MODES, 'OFF')) {
+          PIXI.settings.MIPMAP_TEXTURES = PIXI.MIPMAP_MODES.OFF;
+        }
+        if (PIXI.SCALE_MODES && Object.prototype.hasOwnProperty.call(PIXI.SCALE_MODES, 'LINEAR')) {
+          PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.LINEAR;
+        }
+        if (Object.prototype.hasOwnProperty.call(PIXI.settings, 'ANISOTROPIC_LEVEL')) {
+          PIXI.settings.ANISOTROPIC_LEVEL = 0;
+        }
+      }
+      PIXI.settings.FAIL_IF_MAJOR_PERFORMANCE_CAVEAT = false;
+    }
+
+    function getRenderResolution() {
+      const devicePixelRatio = Number(window.devicePixelRatio || 1);
+      if (!Number.isFinite(devicePixelRatio) || devicePixelRatio <= 1) {
+        return 1;
+      }
+      if (!IS_DISPLAY_MODE) {
+        return Math.min(devicePixelRatio, 2);
+      }
+      return Math.min(devicePixelRatio, 1.5);
+    }
+
+    function shouldUseAntialias() {
+      if (!IS_DISPLAY_MODE) {
+        return true;
+      }
+      return getRenderResolution() > 1;
     }
 
     function getStateUrl() {
@@ -963,43 +944,11 @@
       );
     }
 
-    function uniqueUrls(items) {
-      const seen = new Set();
-      return items.filter((item) => {
-        const normalized = trimText(item, 2048);
-        if (!normalized || seen.has(normalized)) {
-          return false;
-        }
-        seen.add(normalized);
-        return true;
-      });
-    }
-
-    function resolveSiblingAssetUrl(referenceUrl, candidate) {
-      const normalizedReference = trimText(referenceUrl, 2048);
-      const normalizedCandidate = trimText(candidate, 512);
-      if (!normalizedReference || !normalizedCandidate) {
-        return '';
-      }
-      try {
-        return new URL(normalizedCandidate, normalizedReference).toString();
-      } catch {
-        return '';
-      }
-    }
-
-    function getMotionMapUrls() {
-      const explicit = resolvePageUrl(
+    function getMotionMapUrl() {
+      return resolvePageUrl(
         trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.motionMapUrl, 512)
           || DEFAULT_RENDERER_CONFIG.assetPack.motionMapUrl
       );
-      const modelJsonUrl = getModelJsonUrl();
-      const portraitUrl = getFallbackPortraitUrl();
-      return uniqueUrls([
-        explicit,
-        resolveSiblingAssetUrl(modelJsonUrl, './motion-map.json'),
-        resolveSiblingAssetUrl(portraitUrl, '../motion-map.json')
-      ]);
     }
 
     function getModelJsonUrl() {
@@ -1010,18 +959,14 @@
     }
 
     function getFallbackPortraitUrl() {
-      const fallbackPortrait = resolvePageUrl(
+      return resolvePageUrl(
         trimText(rendererConfig && rendererConfig.assetPack && rendererConfig.assetPack.fallbackPortrait, 512)
           || DEFAULT_RENDERER_CONFIG.assetPack.fallbackPortrait
       );
-      return looksLikeTextureAtlasUrl(fallbackPortrait) ? getPresetThumbUrl() || fallbackPortrait : fallbackPortrait;
     }
 
     function syncFallbackPortrait(url) {
-      const explicitPortrait = trimText(url, 512);
-      const portrait = resolveEffectivePortraitUrl(explicitPortrait, getPresetThumbUrl())
-        || getFallbackPortraitUrl()
-        || getPresetThumbUrl();
+      const portrait = trimText(url, 512) || getFallbackPortraitUrl() || getPresetThumbUrl();
       if (portrait) {
         fallbackPortraitEl.src = portrait;
         return;
@@ -1035,20 +980,6 @@
         presetThumbs && (presetThumbs[currentViewPreset] || presetThumbs.full),
         512,
       );
-    }
-
-    function looksLikeTextureAtlasUrl(url) {
-      const normalized = trimText(url, 512).toLowerCase();
-      return Boolean(normalized && (/\/texture_\d+\.png(?:$|\?)/.test(normalized) || normalized.endsWith('texture_00.png')));
-    }
-
-    function resolveEffectivePortraitUrl(candidate, presetThumb) {
-      const explicit = trimText(candidate, 512);
-      const fallbackThumb = trimText(presetThumb, 512);
-      if (explicit && !looksLikeTextureAtlasUrl(explicit)) {
-        return explicit;
-      }
-      return fallbackThumb || explicit;
     }
 
     function uniqueAssetCandidates(items) {
@@ -1185,6 +1116,7 @@
     let statePollingStarted = false;
     let statePollingTimer = null;
     let displaySleepPaused = false;
+    let lastExternalStateAt = 0;
     let currentMotionIndex = 0;
     let viewState = { scale: 1, x: 0, y: 0 };
     let baseModelSize = null;
@@ -1358,18 +1290,6 @@
       lipSyncTickerAttached = true;
     }
 
-    function configureTickerBudget() {
-      if (!app || !app.ticker) {
-        return;
-      }
-      try {
-        app.ticker.maxFPS = IS_DISPLAY_MODE ? DISPLAY_RENDER_MAX_FPS : 60;
-      } catch (_) {}
-      try {
-        app.ticker.minFPS = IS_DISPLAY_MODE ? DISPLAY_RENDER_MIN_FPS : 10;
-      } catch (_) {}
-    }
-
     function stopLipSync({ decay = true } = {}) {
       window.clearTimeout(lipSyncTimer);
       window.clearTimeout(lipSyncDecayTimer);
@@ -1383,43 +1303,6 @@
         }, 120);
       } else {
         setLipSyncValue(0, 0);
-      }
-    }
-
-    function configurePixiDisplayRenderer() {
-      if (!window.PIXI || !PIXI.settings) {
-        return;
-      }
-      if (!IS_DISPLAY_MODE) {
-        return;
-      }
-      try {
-        if (PIXI.ENV && Object.prototype.hasOwnProperty.call(PIXI.ENV, 'WEBGL_LEGACY')) {
-          PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL_LEGACY;
-        } else if (PIXI.ENV && Object.prototype.hasOwnProperty.call(PIXI.ENV, 'WEBGL')) {
-          PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL;
-        }
-      } catch {
-        // ignore
-      }
-      try {
-        if (PIXI.MIPMAP_MODES && Object.prototype.hasOwnProperty.call(PIXI.MIPMAP_MODES, 'OFF')) {
-          PIXI.settings.MIPMAP_TEXTURES = PIXI.MIPMAP_MODES.OFF;
-        }
-      } catch {
-        // ignore
-      }
-      try {
-        if (PIXI.SCALE_MODES && Object.prototype.hasOwnProperty.call(PIXI.SCALE_MODES, 'LINEAR')) {
-          PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.LINEAR;
-        }
-      } catch {
-        // ignore
-      }
-      try {
-        PIXI.settings.ANISOTROPIC_LEVEL = 0;
-      } catch {
-        // ignore
       }
     }
 
@@ -1640,6 +1523,7 @@
       }
       if (payload.type === 'neiri-display-state') {
         if (payload.state && typeof payload.state === 'object') {
+          lastExternalStateAt = Date.now();
           applyState(payload.state);
         }
         return;
@@ -1819,39 +1703,17 @@
     }
 
     async function loadMotionMap() {
-      const urls = getMotionMapUrls();
-      for (const url of urls) {
-        try {
-          const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}ts=${Date.now()}`, { cache: 'no-store' });
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-          const payload = await response.json();
-          if (payload && Array.isArray(payload.motions) && payload.semantic) {
-            motionMap = payload;
-            return;
-          }
-        } catch (error) {
-          console.warn('Failed to load motion map candidate', url, error);
-        }
-      }
-    }
-
-    async function loadLive2DModelWithTimeout(candidate) {
-      let timeoutId = null;
       try {
-        return await Promise.race([
-          PIXI.live2d.Live2DModel.from(candidate.modelJson),
-          new Promise((_, reject) => {
-            timeoutId = window.setTimeout(() => {
-              reject(new Error(`Timed out loading Live2D model: ${candidate.label || candidate.modelJson}`));
-            }, LIVE2D_MODEL_LOAD_TIMEOUT_MS);
-          }),
-        ]);
-      } finally {
-        if (timeoutId !== null) {
-          window.clearTimeout(timeoutId);
+        const response = await fetch(`${getMotionMapUrl()}?ts=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
+        const payload = await response.json();
+        if (payload && Array.isArray(payload.motions) && payload.semantic) {
+          motionMap = payload;
+        }
+      } catch (error) {
+        console.warn('Failed to load motion map', error);
       }
     }
 
@@ -1899,10 +1761,6 @@
       }
     }
 
-    function canUseInternalStatePolling() {
-      return !IS_DISPLAY_MODE && !EXTERNAL_STATE_MODE;
-    }
-
     function syncRuntimeActivity({ refreshState = false, reason = 'sync' } = {}) {
       const suspended = isRuntimeSuspended();
       if (suspended) {
@@ -1916,20 +1774,15 @@
       if (app && app.ticker && typeof app.ticker.start === 'function') {
         app.ticker.start();
       }
-      if (canUseInternalStatePolling() && statePollingStarted && statePollingTimer === null) {
+      if (statePollingStarted && statePollingTimer === null) {
         statePollingTimer = window.setInterval(refreshAvatarState, POLL_MS);
       }
-      if (refreshState && canUseInternalStatePolling()) {
+      if (refreshState) {
         void refreshAvatarState();
       }
     }
 
     function startStatePolling() {
-      if (!canUseInternalStatePolling()) {
-        statePollingStarted = false;
-        stopStatePolling();
-        return;
-      }
       if (statePollingStarted) {
         syncRuntimeActivity({ refreshState: false, reason: 'polling resumed' });
         return;
@@ -2191,10 +2044,10 @@
     }
 
     async function refreshAvatarState() {
-      if (!canUseInternalStatePolling()) {
+      if (isRuntimeSuspended()) {
         return;
       }
-      if (isRuntimeSuspended()) {
+      if (IS_DISPLAY_MODE && Date.now() - lastExternalStateAt < POLL_MS * 4) {
         return;
       }
       try {
@@ -2214,8 +2067,8 @@
       try {
         startLoadingState('Поднимаю сцену…');
         await loadRendererConfig();
+        applyPixiCompatibilitySettings();
         if (IS_DISPLAY_MODE) {
-          document.body.classList.add('display-mode');
           frameEl.classList.add('display-mode');
           document.addEventListener('click', (event) => {
             event.preventDefault();
@@ -2231,7 +2084,6 @@
           }, true);
         }
         await loadMotionMap();
-        configurePixiDisplayRenderer();
 
         const webglSupported = Boolean(
           window.PIXI &&
@@ -2249,13 +2101,12 @@
           resizeTo: stage,
           transparent: true,
           autoDensity: true,
-          antialias: !IS_DISPLAY_MODE,
-          resolution: IS_DISPLAY_MODE ? 1 : Math.min(window.devicePixelRatio || 1, 2),
+          antialias: shouldUseAntialias(),
+          resolution: getRenderResolution(),
           backgroundAlpha: 0,
           preferWebGLVersion: IS_DISPLAY_MODE ? 1 : 2,
           powerPreference: IS_DISPLAY_MODE ? 'low-power' : undefined,
         });
-        configureTickerBudget();
         stage.appendChild(app.view);
         app.view.addEventListener('webglcontextlost', (event) => {
           event.preventDefault();
@@ -2279,7 +2130,7 @@
             startLoadingState('Загружаю модель…');
           }
           try {
-            model = await loadLive2DModelWithTimeout(candidate);
+            model = await PIXI.live2d.Live2DModel.from(candidate.modelJson);
             break;
           } catch (error) {
             lastModelError = error;
@@ -2543,6 +2394,18 @@
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

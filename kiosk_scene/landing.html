@@ -103,17 +103,13 @@
       <h2 id="runtime-title">Runtime</h2>
       <div id="runtime-root">Корневой каталог сцены: <code>/config/kiosk-scene</code></div>
       <div id="runtime-files">Runtime-файлы: <code>/config/kiosk-scene/scene-runtime</code></div>
-      <div id="pack-files">Активный pack: <code>loading...</code></div>
-      <div id="publication-source">Runtime config: <code>loading...</code></div>
-      <div id="local-display-url">URL для локального display host: <code>loading...</code></div>
-      <div id="direct-url">Прямой URL сцены: <code>loading...</code></div>
+      <div id="pack-files">Файлы pack: <code>/config/kiosk-scene/scene-packs/&lt;active-pack&gt;</code></div>
+      <div id="direct-url">Прямой URL сцены: <code>http://homeassistant.local:48123/scene/</code></div>
     </section>
   </main>
   <script>
     (function () {
       const lang = String(navigator.language || "").toLowerCase().startsWith("ru") ? "ru" : "en";
-      const directPort = 48123;
-      const directScheme = "http";
       const copy = {
         ru: {
           title: "Kiosk Scene",
@@ -124,10 +120,8 @@
           runtimeTitle: "Runtime",
           runtimeRoot: "Корневой каталог сцены: <code>/config/kiosk-scene</code>",
           runtimeFiles: "Runtime-файлы: <code>/config/kiosk-scene/scene-runtime</code>",
-          packFiles: "Активный pack: <code>{value}</code>",
-          publicationSource: "Runtime config: <code>{value}</code>",
-          localDisplayUrl: "URL для локального display host: <code>{value}</code>",
-          directUrl: "Прямой URL сцены: <code>{value}</code>",
+          packFiles: "Файлы pack: <code>/config/kiosk-scene/scene-packs/&lt;active-pack&gt;</code>",
+          directUrl: "Прямой URL сцены: <code>http://homeassistant.local:48123/scene/</code>",
         },
         en: {
           title: "Kiosk Scene",
@@ -138,24 +132,10 @@
           runtimeTitle: "Runtime",
           runtimeRoot: "Canonical scene root: <code>/config/kiosk-scene</code>",
           runtimeFiles: "Runtime files: <code>/config/kiosk-scene/scene-runtime</code>",
-          packFiles: "Active pack: <code>{value}</code>",
-          publicationSource: "Runtime config: <code>{value}</code>",
-          localDisplayUrl: "Local display host URL: <code>{value}</code>",
-          directUrl: "Direct scene URL: <code>{value}</code>",
+          packFiles: "Pack files: <code>/config/kiosk-scene/scene-packs/&lt;active-pack&gt;</code>",
+          directUrl: "Direct scene URL: <code>http://homeassistant.local:48123/scene/</code>",
         },
       }[lang];
-
-      function withValue(template, value) {
-        return template.replace("{value}", String(value || ""));
-      }
-
-      function normalizePath(value, fallback) {
-        const normalized = String(value || "").trim();
-        if (!normalized) {
-          return fallback;
-        }
-        return normalized.startsWith("/") ? normalized : `/${normalized}`;
-      }
 
       document.documentElement.lang = lang;
       document.getElementById("landing-title").textContent = copy.title;
@@ -166,31 +146,8 @@
       document.getElementById("runtime-title").textContent = copy.runtimeTitle;
       document.getElementById("runtime-root").innerHTML = copy.runtimeRoot;
       document.getElementById("runtime-files").innerHTML = copy.runtimeFiles;
-      fetch("./scene-api/bootstrap")
-        .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
-        .then((bootstrap) => {
-          const publication = bootstrap && typeof bootstrap === "object" ? (bootstrap.publication || {}) : {};
-          const packId = String(publication.packId || bootstrap.packId || "default");
-          const sceneConfigName = String(publication.sceneConfigName || "scene.default.json");
-          const directPath = normalizePath(publication.directPath, "/scene/");
-          const resolvedDirectScheme = String(publication.directScheme || "").trim() || directScheme;
-          const directPortValue = Number(publication.directPort);
-          const resolvedDirectPort = Number.isFinite(directPortValue) && directPortValue > 0 ? directPortValue : directPort;
-          const localDisplayUrl = String(publication.localDisplayUrl || "").trim()
-            || `${resolvedDirectScheme}://localhost:${resolvedDirectPort}${directPath}`;
-          const directUrl = `${resolvedDirectScheme}://${window.location.hostname || "homeassistant.local"}:${resolvedDirectPort}${directPath}`;
-          document.getElementById("pack-files").innerHTML = withValue(copy.packFiles, packId);
-          document.getElementById("publication-source").innerHTML = withValue(copy.publicationSource, sceneConfigName);
-          document.getElementById("local-display-url").innerHTML = withValue(copy.localDisplayUrl, localDisplayUrl);
-          document.getElementById("direct-url").innerHTML = withValue(copy.directUrl, directUrl);
-        })
-        .catch(() => {
-          const fallbackDirectUrl = `${directScheme}://${window.location.hostname || "homeassistant.local"}:${directPort}/scene/`;
-          document.getElementById("pack-files").innerHTML = withValue(copy.packFiles, "default");
-          document.getElementById("publication-source").innerHTML = withValue(copy.publicationSource, "scene.default.json");
-          document.getElementById("local-display-url").innerHTML = withValue(copy.localDisplayUrl, `http://localhost:${directPort}/scene/`);
-          document.getElementById("direct-url").innerHTML = withValue(copy.directUrl, fallbackDirectUrl);
-        });
+      document.getElementById("pack-files").innerHTML = copy.packFiles;
+      document.getElementById("direct-url").innerHTML = copy.directUrl;
     })();
   </script>
 </body>
