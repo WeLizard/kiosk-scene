@@ -42,6 +42,8 @@ type EditorCopy = {
   avatarPackDefaultHint: string;
   avatarPackSelect: string;
   avatarPackSelected: string;
+  avatarPackDelete: string;
+  avatarPackDeleteConfirm: (name: string) => string;
   avatarPackMotionCount: (count: number) => string;
   avatarCapabilityMotion: string;
   avatarCapabilityEmotion: string;
@@ -255,6 +257,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarPackDefaultHint: "Использовать модель, которая уже лежит внутри текущего scene-pack.",
     avatarPackSelect: "Использовать",
     avatarPackSelected: "Текущий выбор",
+    avatarPackDelete: "Удалить",
+    avatarPackDeleteConfirm: (name) => `Удалить аватар «${name}»? Это действие нельзя отменить.`,
     avatarPackMotionCount: (count) => `${count} анимац.`,
     avatarCapabilityMotion: "Анимации",
     avatarCapabilityEmotion: "Эмоции",
@@ -404,6 +408,8 @@ const COPY: Record<UiLang, EditorCopy> = {
     avatarPackDefaultHint: "Use the model that is already bundled with the active scene-pack.",
     avatarPackSelect: "Use avatar",
     avatarPackSelected: "Current selection",
+    avatarPackDelete: "Delete",
+    avatarPackDeleteConfirm: (name) => `Delete avatar "${name}"? This cannot be undone.`,
     avatarPackMotionCount: (count) => `${count} motions`,
     avatarCapabilityMotion: "Motion",
     avatarCapabilityEmotion: "Emotion",
@@ -1445,6 +1451,8 @@ function renderAvatarPackTile(
     : [copy.avatarPackDefaultHint];
   const metaTags = tags.length ? tags : [copy.avatarPackDefaultHint];
 
+  const isDeletable = item !== null;
+
   return `
     <article class="avatar-pack-card${isSelected ? " is-active" : ""}">
       <div class="avatar-pack-card-preview">
@@ -1458,9 +1466,14 @@ function renderAvatarPackTile(
         <div class="avatar-pack-card-meta">
           ${metaTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}
         </div>
-        <button class="scene-editor-button${isSelected ? " is-accent" : ""}" type="button" data-action="select-avatar-pack" data-pack-id="${escapeHtml(packId)}">
-          ${escapeHtml(isSelected ? copy.avatarPackSelected : copy.avatarPackSelect)}
-        </button>
+        <div class="avatar-pack-card-actions">
+          <button class="scene-editor-button${isSelected ? " is-accent" : ""}" type="button" data-action="select-avatar-pack" data-pack-id="${escapeHtml(packId)}">
+            ${escapeHtml(isSelected ? copy.avatarPackSelected : copy.avatarPackSelect)}
+          </button>
+          ${isDeletable ? `<button class="scene-editor-button is-danger" type="button" data-action="delete-avatar-pack" data-pack-id="${escapeHtml(packId)}" data-pack-name="${escapeHtml(title)}">
+            ${escapeHtml(copy.avatarPackDelete)}
+          </button>` : ""}
+        </div>
       </div>
     </article>
   `;
@@ -1981,25 +1994,40 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         gap: 14px;
       }
       #scene-editor-shell .avatar-pack-grid {
-        display: grid;
+        display: flex;
         gap: 12px;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 6px;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+      }
+      #scene-editor-shell .avatar-pack-grid::-webkit-scrollbar {
+        height: 6px;
+      }
+      #scene-editor-shell .avatar-pack-grid::-webkit-scrollbar-thumb {
+        border-radius: 3px;
+        background: rgba(32,48,65,0.18);
       }
       #scene-editor-shell .avatar-pack-card {
         display: grid;
-        gap: 12px;
-        border-radius: 20px;
+        gap: 8px;
+        border-radius: 16px;
         border: 1px solid rgba(32,48,65,0.1);
         background: rgba(255,255,255,0.92);
-        padding: 14px;
+        padding: 10px;
+        min-width: 110px;
+        max-width: 110px;
+        flex-shrink: 0;
+        scroll-snap-align: start;
       }
       #scene-editor-shell .avatar-pack-card.is-active {
         border-color: rgba(45,98,162,0.35);
         box-shadow: inset 0 0 0 1px rgba(45,98,162,0.18);
       }
       #scene-editor-shell .avatar-pack-card-preview {
-        min-height: 144px;
-        border-radius: 16px;
+        aspect-ratio: 3/4;
+        border-radius: 12px;
         background: linear-gradient(180deg, rgba(223,232,239,0.82), rgba(236,242,246,0.92));
         display: grid;
         place-items: center;
@@ -2007,31 +2035,52 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
       #scene-editor-shell .avatar-pack-card-preview img {
         display: block;
-        max-width: 100%;
-        max-height: 144px;
+        width: 100%;
+        height: 100%;
         object-fit: contain;
       }
       #scene-editor-shell .avatar-pack-card-preview span {
-        padding: 12px;
+        padding: 10px;
         text-align: center;
-        font: 12px/1.35 "Aptos","Segoe UI",sans-serif;
+        font: 11px/1.3 "Aptos","Segoe UI",sans-serif;
         color: rgba(32,48,65,0.62);
       }
       #scene-editor-shell .avatar-pack-card-body {
         display: grid;
-        gap: 8px;
+        gap: 6px;
+      }
+      #scene-editor-shell .avatar-pack-card-body strong {
+        font-size: 12px;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       #scene-editor-shell .avatar-pack-card-meta {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 4px;
       }
       #scene-editor-shell .avatar-pack-card-meta span {
         border-radius: 999px;
-        padding: 4px 8px;
+        padding: 2px 6px;
         background: rgba(214,225,237,0.72);
-        font-size: 11px;
+        font-size: 10px;
         color: #385268;
+      }
+      #scene-editor-shell .avatar-pack-card-actions {
+        display: grid;
+        gap: 4px;
+      }
+      #scene-editor-shell .scene-editor-button.is-danger {
+        color: #a83232;
+        border-color: rgba(168,50,50,0.25);
+        background: rgba(255,230,230,0.72);
+        font-size: 11px;
+        padding: 4px 8px;
+      }
+      #scene-editor-shell .scene-editor-button.is-danger:hover {
+        background: rgba(255,210,210,0.9);
       }
       #scene-editor-shell .page-chip,
       #scene-editor-shell .card-item,
@@ -3277,6 +3326,36 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   });
 
   wrapper.addEventListener("click", (event) => {
+    const deleteEl = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action='delete-avatar-pack']");
+    if (deleteEl && options.avatarPackApiUrl) {
+      const packId = String(deleteEl.dataset.packId || "").trim();
+      const packName = String(deleteEl.dataset.packName || packId).trim();
+      if (!packId) {
+        return;
+      }
+      if (!window.confirm(copy.avatarPackDeleteConfirm(packName))) {
+        return;
+      }
+      const deleteUrl = `${options.avatarPackApiUrl}?packId=${encodeURIComponent(packId)}`;
+      void fetch(deleteUrl, { method: "DELETE" }).then(async (resp) => {
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({})) as Record<string, unknown>;
+          console.warn("Failed to delete avatar pack", packId, body);
+          return;
+        }
+        if (state.config) {
+          const currentPackId = readAvatarPackId(state.config);
+          if (currentPackId === packId) {
+            ensureAvatarConfig(state.config).packId = null;
+            state.avatarPackDetails = null;
+            markDirty();
+          }
+        }
+        state.avatarCatalog = state.avatarCatalog.filter((item) => item.id !== packId);
+        render();
+      });
+      return;
+    }
     const actionEl = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action='select-avatar-pack']");
     if (!actionEl || !state.config) {
       return;
