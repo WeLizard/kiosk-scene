@@ -86,16 +86,22 @@ export interface SceneAvatarV1 {
 export interface SceneCardV1 {
   type?: string;
   entity?: string;
+  col?: number;
+  row?: number;
+  w?: number;
+  h?: number;
   [key: string]: unknown;
 }
 
 export interface ScenePageV1 {
   id: string;
-  kind: "overview" | "cards" | "forecast+cards";
+  kind: "overview" | "cards" | "forecast+cards" | "grid";
   title: string;
   subtitle?: string;
   slot?: number;
   cardStyle?: "mini" | "full";
+  gridColumns?: number;
+  gridRows?: number;
   stampCaption?: string;
   stampValue?: string;
   cards?: SceneCardV1[];

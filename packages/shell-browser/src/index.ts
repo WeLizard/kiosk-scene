@@ -876,6 +876,9 @@ export class BrowserSceneShellApp {
       if (page.kind === "overview") {
         return this.renderOverviewSlide(page, presentation, index);
       }
+      if (page.kind === "grid") {
+        return this.renderGridSlide(page, index, pages.length);
+      }
       return this.renderDynamicSlide(page, index, pages.length);
     }).join("");
 
@@ -1015,6 +1018,60 @@ export class BrowserSceneShellApp {
           </div>
           ${forecastMarkup}
           <div class="${cardGridClass}">
+            ${cardsHtml || `<div class="empty">${escapeHtml(this.labels.noCardsConfigured)}</div>`}
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  private renderGridSlide(page: ScenePageV1, index: number, pageCount: number): string {
+    const cards = resolveSceneCards(
+      page.cards || [],
+      this.hassStates,
+      this.rendererConfig.assistant.locale || "en-US",
+    );
+    const rawCards = page.cards || [];
+    const cols = page.gridColumns || 4;
+    const rows = page.gridRows || 3;
+    const stampCaption = trimText(page.stampCaption, 24) || this.labels.pageStamp;
+    const stampValue = trimText(page.stampValue, 32) || `${index + 1} / ${pageCount}`;
+    const title = trimText(page.title, 64) || trimText(page.id, 64) || `${this.labels.pageStamp} ${index + 1}`;
+    const subtitle = trimText(page.subtitle, 140);
+
+    const cardsHtml = cards.map((card, cardIndex) => {
+      const raw = rawCards[cardIndex] || {};
+      const col = Number(raw.col);
+      const row = Number(raw.row);
+      const w = Math.max(1, Number(raw.w) || 1);
+      const h = Math.max(1, Number(raw.h) || 1);
+      const hasPosition = Number.isFinite(col) && Number.isFinite(row);
+      const gridStyle = hasPosition
+        ? `grid-column: ${col + 1} / span ${w}; grid-row: ${row + 1} / span ${h};`
+        : "";
+      return `
+        <article class="grid-card" style="${gridStyle}" data-scene-card-index="${cardIndex}" data-scene-page-id="${escapeHtml(page.id)}">
+          <span class="caption">${escapeHtml(card.caption)}</span>
+          <strong>${escapeHtml(card.value)}</strong>
+          <small>${escapeHtml(card.hint)}</small>
+        </article>
+      `;
+    }).join("");
+
+    return `
+      <section class="slide slide-dynamic" data-slide-id="${escapeHtml(page.id)}" data-scene-page-id="${escapeHtml(page.id)}" data-slide-order="${index}">
+        <div class="dynamic-slide slide-body" data-dynamic-layout="grid">
+          <div class="slide-top">
+            <div>
+              <h1 class="headline">${escapeHtml(title)}</h1>
+              ${subtitle ? `<p class="subline">${escapeHtml(subtitle)}</p>` : ""}
+            </div>
+            <div class="stamp compact-stamp">
+              <span class="caption">${escapeHtml(stampCaption)}</span>
+              <span class="value">${escapeHtml(stampValue)}</span>
+            </div>
+          </div>
+          <div class="grid-cards-container" style="--grid-cols: ${cols}; --grid-rows: ${rows};">
             ${cardsHtml || `<div class="empty">${escapeHtml(this.labels.noCardsConfigured)}</div>`}
           </div>
         </div>

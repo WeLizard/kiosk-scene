@@ -66,7 +66,9 @@ export function mergeScenePage(basePage: ScenePageV1, incomingPage: unknown): Sc
   if (typeof incomingPage.kind === "string") {
     merged.kind = incomingPage.kind === "forecast+cards"
       ? "forecast+cards"
-      : (incomingPage.kind === "overview" ? "overview" : "cards");
+      : incomingPage.kind === "grid"
+        ? "grid"
+        : (incomingPage.kind === "overview" ? "overview" : "cards");
   }
   if (typeof incomingPage.layout === "string") {
     merged.kind = incomingPage.layout === "forecast+cards" ? "forecast+cards" : "cards";
@@ -88,6 +90,12 @@ export function mergeScenePage(basePage: ScenePageV1, incomingPage: unknown): Sc
   }
   if (Number.isFinite(Number(incomingPage.slot))) {
     merged.slot = Math.max(0, Number(incomingPage.slot));
+  }
+  if (Number.isFinite(Number(incomingPage.gridColumns))) {
+    merged.gridColumns = Math.max(1, Math.min(12, Math.round(Number(incomingPage.gridColumns))));
+  }
+  if (Number.isFinite(Number(incomingPage.gridRows))) {
+    merged.gridRows = Math.max(1, Math.min(12, Math.round(Number(incomingPage.gridRows))));
   }
   if (Array.isArray(incomingPage.cards)) {
     merged.cards = incomingPage.cards.filter((card) => isObjectRecord(card));

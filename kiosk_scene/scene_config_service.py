@@ -933,7 +933,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     function normalizeVisualPage(page, index) {
       const source = page && typeof page === 'object' && !Array.isArray(page) ? page : {};
       const kindSource = trimText(source.kind || source.layout, 'cards');
-      const kind = ['overview', 'cards', 'forecast+cards'].includes(kindSource) ? kindSource : 'cards';
+      const kind = ['overview', 'cards', 'forecast+cards', 'grid'].includes(kindSource) ? kindSource : 'cards';
       return {
         id: trimText(source.id, `page-${index + 1}`),
         kind,
@@ -1167,7 +1167,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
         const getValue = (name) => pageNode.querySelector(`[data-field="${name}"]`).value;
         const id = trimText(getValue('id'), `page-${index + 1}`);
         const kindValue = trimText(getValue('kind'), 'cards');
-        const kind = ['overview', 'cards', 'forecast+cards'].includes(kindValue) ? kindValue : 'cards';
+        const kind = ['overview', 'cards', 'forecast+cards', 'grid'].includes(kindValue) ? kindValue : 'cards';
         const slotRaw = trimText(getValue('slot'));
         const extras = parseJsonObject(getValue('extras'), `Extra page fields for ${id}`);
         const cards = Array.from(pageNode.querySelectorAll('[data-card-index]')).map((cardNode, cardIndex) => {
@@ -1641,7 +1641,7 @@ def sanitize_page(page: Any, index: int, used_ids: set[str]) -> dict[str, Any]:
     used_ids.add(page_id)
 
     kind = trim_text(payload.get("kind"), "cards", 24)
-    if kind not in ("overview", "cards", "forecast+cards"):
+    if kind not in ("overview", "cards", "forecast+cards", "grid"):
         kind = "cards"
     card_style = trim_text(payload.get("cardStyle"), "full", 16)
     if card_style not in ("mini", "full"):
@@ -1678,6 +1678,18 @@ def sanitize_page(page: Any, index: int, used_ids: set[str]) -> dict[str, Any]:
             normalized.pop("slot", None)
     else:
         normalized.pop("slot", None)
+
+    grid_cols = payload.get("gridColumns")
+    if isinstance(grid_cols, (int, float)):
+        normalized["gridColumns"] = max(1, min(12, int(grid_cols)))
+    else:
+        normalized.pop("gridColumns", None)
+
+    grid_rows = payload.get("gridRows")
+    if isinstance(grid_rows, (int, float)):
+        normalized["gridRows"] = max(1, min(12, int(grid_rows)))
+    else:
+        normalized.pop("gridRows", None)
 
     cards = payload.get("cards")
     if isinstance(cards, list):

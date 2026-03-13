@@ -94,6 +94,13 @@ type EditorCopy = {
   kindOverview: string;
   kindCards: string;
   kindForecastCards: string;
+  kindGrid: string;
+  fieldGridColumns: string;
+  fieldGridRows: string;
+  fieldCardCol: string;
+  fieldCardRow: string;
+  fieldCardW: string;
+  fieldCardH: string;
   fieldPageId: string;
   fieldTitle: string;
   fieldSubtitle: string;
@@ -154,7 +161,7 @@ export interface NativeEditorShellOptions {
   sceneUrl: string;
 }
 
-const PAGE_KIND_OPTIONS = ["overview", "cards", "forecast+cards"] as const;
+const PAGE_KIND_OPTIONS = ["overview", "cards", "forecast+cards", "grid"] as const;
 const CARD_STYLE_OPTIONS = ["full", "mini"] as const;
 const CARD_TYPE_OPTIONS = [
   "entity",
@@ -290,6 +297,13 @@ const COPY: Record<UiLang, EditorCopy> = {
     kindOverview: "Обзор",
     kindCards: "Карточки",
     kindForecastCards: "Прогноз + карточки",
+    kindGrid: "Сетка",
+    fieldGridColumns: "Столбцы",
+    fieldGridRows: "Строки",
+    fieldCardCol: "Столбец",
+    fieldCardRow: "Строка",
+    fieldCardW: "Ширина",
+    fieldCardH: "Высота",
     fieldPageId: "ID страницы",
     fieldTitle: "Заголовок",
     fieldSubtitle: "Подзаголовок",
@@ -430,6 +444,13 @@ const COPY: Record<UiLang, EditorCopy> = {
     kindOverview: "overview",
     kindCards: "cards",
     kindForecastCards: "forecast+cards",
+    kindGrid: "Grid",
+    fieldGridColumns: "Columns",
+    fieldGridRows: "Rows",
+    fieldCardCol: "Column",
+    fieldCardRow: "Row",
+    fieldCardW: "Width",
+    fieldCardH: "Height",
     fieldPageId: "Page ID",
     fieldTitle: "Title",
     fieldSubtitle: "Subtitle",
@@ -942,6 +963,9 @@ function pageKindLabel(copy: EditorCopy, kind: string): string {
   }
   if (kind === "forecast+cards") {
     return copy.kindForecastCards;
+  }
+  if (kind === "grid") {
+    return copy.kindGrid;
   }
   return copy.kindOverview;
 }
@@ -1519,14 +1543,100 @@ function renderPageSelect(
   `;
 }
 
+function isGridCellOccupied(
+  cards: SceneCardV1[],
+  col: number,
+  row: number,
+  excludeIndex?: number,
+): { occupied: boolean; cardIndex: number } {
+  for (let i = 0; i < cards.length; i++) {
+    if (i === excludeIndex) continue;
+    const card = cards[i] as Record<string, unknown>;
+    const cCol = Number(card.col) || 0;
+    const cRow = Number(card.row) || 0;
+    const cW = Math.max(1, Number(card.w) || 1);
+    const cH = Math.max(1, Number(card.h) || 1);
+    if (col >= cCol && col < cCol + cW && row >= cRow && row < cRow + cH) {
+      return { occupied: true, cardIndex: i };
+    }
+  }
+  return { occupied: false, cardIndex: -1 };
+}
+
+function renderGridPreview(page: ScenePageV1, selectedCardIndex: number | null): string {
+  const cols = page.gridColumns || 4;
+  const rows = page.gridRows || 3;
+  const cards = page.cards || [];
+
+  const rendered = new Set<string>();
+  let cellsHtml = "";
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cellKey = `${c},${r}`;
+      if (rendered.has(cellKey)) continue;
+
+      const result = isGridCellOccupied(cards, c, r);
+      if (result.occupied) {
+        const card = cards[result.cardIndex] as Record<string, unknown>;
+        const cCol = Number(card.col) || 0;
+        const cRow = Number(card.row) || 0;
+        const cW = Math.max(1, Number(card.w) || 1);
+        const cH = Math.max(1, Number(card.h) || 1);
+
+        if (c === cCol && r === cRow) {
+          for (let dr = 0; dr < cH; dr++) {
+            for (let dc = 0; dc < cW; dc++) {
+              rendered.add(`${cCol + dc},${cRow + dr}`);
+            }
+          }
+          const isSelected = result.cardIndex === selectedCardIndex;
+          const caption = fieldValue(card, "caption") || fieldValue(card, "type") || "entity";
+          cellsHtml += `<div class="grid-preview-cell is-occupied${isSelected ? " is-selected" : ""}"
+            style="grid-column: ${cCol + 1} / span ${cW}; grid-row: ${cRow + 1} / span ${cH};"
+            data-action="select-card" data-card-index="${result.cardIndex}"
+            title="#${result.cardIndex + 1} ${escapeHtml(caption)}"
+          ><span>${escapeHtml(caption)}</span></div>`;
+        }
+      } else {
+        cellsHtml += `<div class="grid-preview-cell"
+          style="grid-column: ${c + 1}; grid-row: ${r + 1};"
+          data-action="grid-add-card-at" data-col="${c}" data-row="${r}"
+          title="+">+</div>`;
+      }
+    }
+  }
+
+  return `<div class="grid-preview" style="--grid-cols: ${cols}; --grid-rows: ${rows};">${cellsHtml}</div>`;
+}
+
 function renderCard(
   copy: EditorCopy,
   card: SceneCardV1,
   index: number,
   focusedBinding: { cardIndex: number; field: string } | null,
+  isGridPage = false,
 ): string {
   const type = fieldValue(card as Record<string, unknown>, "type") || "entity";
   const fields = cardFieldsForType(type);
+  const gridFieldsHtml = isGridPage ? `
+    <div class="field">
+      <label>${escapeHtml(copy.fieldCardCol)}</label>
+      <input type="number" min="0" data-card-index="${index}" data-card-field="col" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "col"))}">
+    </div>
+    <div class="field">
+      <label>${escapeHtml(copy.fieldCardRow)}</label>
+      <input type="number" min="0" data-card-index="${index}" data-card-field="row" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "row"))}">
+    </div>
+    <div class="field">
+      <label>${escapeHtml(copy.fieldCardW)}</label>
+      <input type="number" min="1" data-card-index="${index}" data-card-field="w" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "w") || "1")}">
+    </div>
+    <div class="field">
+      <label>${escapeHtml(copy.fieldCardH)}</label>
+      <input type="number" min="1" data-card-index="${index}" data-card-field="h" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "h") || "1")}">
+    </div>
+  ` : "";
   return `
     <article class="card-item">
       <div class="card-item-head">
@@ -1537,6 +1647,7 @@ function renderCard(
         <div class="meta">#${index + 1}</div>
       </div>
       <div class="card-grid">
+        ${gridFieldsHtml}
         <div class="field is-wide">
           <label>${escapeHtml(copy.cardType)}</label>
           <select data-card-index="${index}" data-card-field="type">
@@ -1594,16 +1705,20 @@ function renderCardListItem(
   index: number,
   count: number,
   selected: boolean,
+  isGridPage = false,
 ): string {
   const type = fieldValue(card as Record<string, unknown>, "type") || "entity";
   const title = fieldValue(card as Record<string, unknown>, "caption") || cardTypeLabel(copy, type);
-  const secondary = fieldValue(card as Record<string, unknown>, "entity")
+  const gridPos = isGridPage
+    ? `[${fieldValue(card as Record<string, unknown>, "col") || "0"},${fieldValue(card as Record<string, unknown>, "row") || "0"} ${fieldValue(card as Record<string, unknown>, "w") || "1"}×${fieldValue(card as Record<string, unknown>, "h") || "1"}] `
+    : "";
+  const secondary = gridPos + (fieldValue(card as Record<string, unknown>, "entity")
     || fieldValue(card as Record<string, unknown>, "stateEntity")
     || fieldValue(card as Record<string, unknown>, "downEntity")
     || fieldValue(card as Record<string, unknown>, "upEntity")
     || fieldValue(card as Record<string, unknown>, "value")
     || fieldValue(card as Record<string, unknown>, "hint")
-    || cardTypeDescription(type);
+    || cardTypeDescription(type));
 
   return `
     <article class="card-list-item${selected ? " is-active" : ""}" draggable="true" data-drag-kind="card" data-card-index="${index}">
@@ -1902,6 +2017,47 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         display: grid;
         gap: 10px;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+      #scene-editor-shell .grid-preview {
+        display: grid;
+        grid-template-columns: repeat(var(--grid-cols, 4), minmax(0, 1fr));
+        grid-template-rows: repeat(var(--grid-rows, 3), minmax(44px, 1fr));
+        gap: 4px;
+        padding: 8px;
+        border-radius: 14px;
+        background: rgba(214,225,237,0.42);
+        border: 1px solid rgba(32,48,65,0.08);
+        margin-bottom: 12px;
+        max-height: 240px;
+      }
+      #scene-editor-shell .grid-preview-cell {
+        border-radius: 10px;
+        border: 1px dashed rgba(32,48,65,0.14);
+        display: grid;
+        place-items: center;
+        font-size: 10px;
+        color: rgba(32,48,65,0.4);
+        cursor: pointer;
+        min-height: 0;
+        overflow: hidden;
+        padding: 2px;
+        text-align: center;
+        word-break: break-all;
+      }
+      #scene-editor-shell .grid-preview-cell:hover {
+        background: rgba(32,48,65,0.06);
+      }
+      #scene-editor-shell .grid-preview-cell.is-occupied {
+        background: rgba(111,191,162,0.18);
+        border-style: solid;
+        border-color: rgba(77,147,121,0.24);
+        color: rgba(32,48,65,0.7);
+        font-weight: 500;
+      }
+      #scene-editor-shell .grid-preview-cell.is-selected {
+        background: rgba(45,98,162,0.18);
+        border-color: rgba(45,98,162,0.35);
+        color: rgba(45,98,162,0.9);
       }
       #scene-editor-shell .card-template-button {
         display: grid;
@@ -2555,7 +2711,12 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               ${renderPageField(copy.fieldTitle, "title", pageFieldValue(selectedPage, "title"), true)}
               ${renderPageField(copy.fieldSubtitle, "subtitle", pageFieldValue(selectedPage, "subtitle"), true)}
               ${renderPageField(copy.fieldSlot, "slot", pageFieldValue(selectedPage, "slot"))}
+              ${selectedPage.kind === "grid" ? `
+              ${renderPageField(copy.fieldGridColumns, "gridColumns", String(selectedPage.gridColumns || 4))}
+              ${renderPageField(copy.fieldGridRows, "gridRows", String(selectedPage.gridRows || 3))}
+              ` : `
               ${renderPageSelect(copy.fieldCardStyle, "cardStyle", pageFieldValue(selectedPage, "cardStyle") || "full", CARD_STYLE_OPTIONS.map((item) => ({ value: item, label: item === "mini" ? copy.styleMini : copy.styleFull })))}
+              `}
               ${renderPageField(copy.fieldStampCaption, "stampCaption", pageFieldValue(selectedPage, "stampCaption"))}
               ${renderPageField(copy.fieldStampValue, "stampValue", pageFieldValue(selectedPage, "stampValue"))}
             </div>
@@ -2569,6 +2730,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             </div>
           ${selectedPage ? `
             <div class="card-stack">
+              ${selectedPage.kind === "grid" ? renderGridPreview(selectedPage, state.selectedCardIndex) : ""}
               <div>
                 <div class="meta">${copy.cardTemplates}</div>
                 <div class="card-template-grid" style="margin-top:12px;">
@@ -2577,13 +2739,13 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
               </div>
               <div class="cards-list">
                 ${selectedCards.length
-                  ? selectedCards.map((card, index) => renderCardListItem(copy, card, index, selectedCards.length, index === state.selectedCardIndex)).join("")
+                  ? selectedCards.map((card, index) => renderCardListItem(copy, card, index, selectedCards.length, index === state.selectedCardIndex, selectedPage.kind === "grid")).join("")
                   : `<div class="meta">${copy.noCards}</div>`}
               </div>
               <div>
                 <h2>${copy.cardInspector}</h2>
                 ${selectedCard
-                  ? renderCard(copy, selectedCard, state.selectedCardIndex || 0, state.focusedBinding)
+                  ? renderCard(copy, selectedCard, state.selectedCardIndex || 0, state.focusedBinding, selectedPage.kind === "grid")
                   : `<div class="meta">${copy.cardInspectorEmpty}</div>`}
               </div>
             </div>
@@ -2817,6 +2979,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         page.kind = value as ScenePageV1["kind"];
       } else if (field === "cardStyle") {
         page.cardStyle = value as ScenePageV1["cardStyle"];
+      } else if (field === "gridColumns" || field === "gridRows") {
+        const numeric = value === "" ? undefined : Math.max(1, Math.min(12, Math.round(Number(value))));
+        page[field] = Number.isFinite(numeric) ? numeric : undefined;
       }
     }
     markDirty();
@@ -2876,6 +3041,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       }
     } else if (field === "digits") {
       (card as Record<string, unknown>)[field] = value === "" ? 0 : Number(value);
+    } else if (field === "col" || field === "row" || field === "w" || field === "h") {
+      const numericValue = value === "" ? undefined : Math.max(0, Number(value));
+      (card as Record<string, unknown>)[field] = Number.isFinite(numericValue) ? numericValue : undefined;
     } else {
       (card as Record<string, unknown>)[field] = value;
     }
@@ -3036,6 +3204,26 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
             searchInput?.focus();
           });
         }
+      }
+      return;
+    }
+    if (action === "grid-add-card-at" && state.selectedPageId) {
+      const page = state.config.pages.find((item) => item.id === state.selectedPageId);
+      const col = Number(actionEl?.dataset.col || "0");
+      const row = Number(actionEl?.dataset.row || "0");
+      if (page) {
+        if (!Array.isArray(page.cards)) {
+          page.cards = [];
+        }
+        const card = createCard("entity");
+        (card as Record<string, unknown>).col = col;
+        (card as Record<string, unknown>).row = row;
+        (card as Record<string, unknown>).w = 1;
+        (card as Record<string, unknown>).h = 1;
+        page.cards.push(card);
+        state.selectedCardIndex = page.cards.length - 1;
+        markDirty();
+        render();
       }
       return;
     }
