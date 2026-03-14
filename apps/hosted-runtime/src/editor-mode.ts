@@ -149,6 +149,10 @@ type EditorCopy = {
   previewSelectCard: string;
   noEntities: string;
   useEntity: string;
+  tabCards: string;
+  tabAvatar: string;
+  tabDisplay: string;
+  pageSettingsLabel: string;
 };
 
 export interface NativeEditorShellOptions {
@@ -352,6 +356,10 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewSelectCard: "Клик по карточке в превью выбирает её в инспекторе",
     noEntities: "Сущности Home Assistant пока недоступны",
     useEntity: "Использовать",
+    tabCards: "Карточки",
+    tabAvatar: "Аватар",
+    tabDisplay: "Дисплей",
+    pageSettingsLabel: "Настройки страницы",
   },
   en: {
     title: "Scene Editor",
@@ -499,6 +507,10 @@ const COPY: Record<UiLang, EditorCopy> = {
     previewSelectCard: "Click a card in the preview to inspect it",
     noEntities: "Home Assistant entities are not available yet",
     useEntity: "Use",
+    tabCards: "Cards",
+    tabAvatar: "Avatar",
+    tabDisplay: "Display",
+    pageSettingsLabel: "Page settings",
   },
 };
 
@@ -525,6 +537,7 @@ type EditorState = {
   avatarPackLoading: boolean;
   avatarPackDirty: boolean;
   avatarPackSaving: boolean;
+  activeSectionTab: "cards" | "avatar" | "display";
 };
 
 type HaEntitySummary = {
@@ -1792,8 +1805,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         color: #203041;
       }
       #scene-editor-shell .scene-editor-page {
-        display: grid;
-        gap: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
       }
       #scene-editor-shell .scene-preview-shell,
       #scene-editor-shell .scene-settings-card {
@@ -2361,6 +2375,95 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         clip: rect(0, 0, 0, 0);
         clip-path: inset(50%);
       }
+      #scene-editor-shell .page-tabs {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 4px 4px 8px;
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
+      }
+      #scene-editor-shell .page-tab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: 0 16px;
+        border-radius: 999px;
+        border: 1px solid rgba(32,48,65,0.1);
+        background: rgba(255,255,255,0.86);
+        color: #203041;
+        cursor: pointer;
+        white-space: nowrap;
+        font: 13px/1.2 "Aptos","Segoe UI",sans-serif;
+        flex-shrink: 0;
+      }
+      #scene-editor-shell .page-tab.is-active {
+        background: rgba(77,147,121,0.16);
+        border-color: rgba(77,147,121,0.34);
+        color: #1b5e3e;
+        font-weight: 700;
+      }
+      #scene-editor-shell .page-tab.is-add {
+        background: rgba(214,225,237,0.52);
+        border-color: rgba(32,48,65,0.08);
+        font-weight: 700;
+        min-width: 36px;
+        padding: 0 10px;
+      }
+      #scene-editor-shell .page-tab-actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding: 0 4px;
+      }
+      #scene-editor-shell .section-tabs {
+        display: flex;
+        gap: 0;
+        border-radius: 14px;
+        border: 1px solid rgba(32,48,65,0.1);
+        background: rgba(248,251,253,0.82);
+        overflow: hidden;
+      }
+      #scene-editor-shell .section-tab {
+        flex: 1 1 0;
+        min-height: 42px;
+        padding: 0 14px;
+        border: none;
+        border-right: 1px solid rgba(32,48,65,0.08);
+        background: transparent;
+        color: rgba(32,48,65,0.7);
+        cursor: pointer;
+        font: 600 13px/1.2 "Aptos","Segoe UI",sans-serif;
+        transition: background 0.15s, color 0.15s;
+      }
+      #scene-editor-shell .section-tab:last-child {
+        border-right: none;
+      }
+      #scene-editor-shell .section-tab:hover {
+        background: rgba(214,225,237,0.42);
+      }
+      #scene-editor-shell .section-tab.is-active {
+        background: rgba(45,98,162,0.12);
+        color: #1f4e87;
+      }
+      #scene-editor-shell .active-section {
+        display: grid;
+        gap: 16px;
+      }
+      #scene-editor-shell .preview-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      #scene-editor-shell .preview-topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
       @media (max-width: 980px) {
         #scene-editor-shell {
           padding: 12px 12px 42px;
@@ -2389,32 +2492,25 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     </style>
     <div class="scene-editor-page">
       <section class="scene-preview-shell">
-        <div class="scene-preview-head">
-          <div class="scene-preview-copy">
-            <strong>${copy.previewTitle}</strong>
-            <span>${copy.previewSubtitle}</span>
+        <div class="preview-topbar">
+          <div class="scene-editor-status" data-tone="muted" data-topbar-status></div>
+          <span data-preview-resolution style="font:12px/1.2 monospace;color:rgba(32,48,65,0.5);"></span>
+          <div class="preview-topbar-actions">
+            <select data-preview-display style="min-height:34px;border-radius:999px;border:1px solid rgba(32,48,65,0.1);background:rgba(255,255,255,0.86);padding:0 10px;font:12px/1.2 'Aptos','Segoe UI',sans-serif;">
+              ${PREVIEW_DISPLAY_PROFILES.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.label[resolveUiLang()])}</option>`).join("")}
+            </select>
+            <button class="scene-editor-button is-accent" type="button" data-action="save">${copy.save}</button>
+            <button class="scene-editor-button" type="button" data-action="add-page">${copy.addPage}</button>
           </div>
-          <div class="scene-preview-controls">
-            <div class="field">
-              <label for="scene-preview-display">${copy.previewDisplay}</label>
-              <select id="scene-preview-display" data-preview-display>
-                ${PREVIEW_DISPLAY_PROFILES.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.label[resolveUiLang()])}</option>`).join("")}
-              </select>
-            </div>
-            <div class="scene-preview-resolution">
-              <span>${copy.previewResolution}</span>
-              <strong data-preview-resolution>1920 × 1080</strong>
-            </div>
-          </div>
-        </div>
-        <div class="scene-preview-hint">
-          <span>${copy.previewSelectPage}</span>
-          <span>${copy.previewSelectCard}</span>
         </div>
         <div class="scene-preview-frame">
           <div class="scene-preview-stage" data-preview-stage>
             <div class="scene-preview-canvas" data-preview-canvas></div>
           </div>
+        </div>
+        <div class="scene-preview-hint">
+          <span>${copy.previewSelectPage}</span>
+          <span>${copy.previewSelectCard}</span>
         </div>
       </section>
       <section class="scene-dashboard" data-dashboard></section>
@@ -2458,6 +2554,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     avatarPackLoading: false,
     avatarPackDirty: false,
     avatarPackSaving: false,
+    activeSectionTab: "cards",
   };
 
   const loadSelectedAvatarPackDetails = async (packId: string | null | undefined): Promise<void> => {
@@ -2589,6 +2686,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     const selectedPage = ordered.find((page) => page.id === state.selectedPageId) || ordered[0] || null;
     const selectedCards = Array.isArray(selectedPage?.cards) ? selectedPage.cards : [];
     const selectedCard = state.selectedCardIndex !== null ? selectedCards[state.selectedCardIndex] || null : null;
+    const selectedPageIndex = selectedPage ? ordered.indexOf(selectedPage) : -1;
     const filteredEntities = filterHaEntityCatalog(state.haEntities, state.entitySearch);
     const bindingLabel = state.focusedBinding
       ? copy.entityBindingActive(
@@ -2617,187 +2715,188 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         <div class="scene-editor-actions">
           <a class="scene-editor-button" href="${escapeHtml(options.sceneUrl)}">${copy.viewOnly}</a>
           <button class="scene-editor-button is-accent" type="button" data-action="save"${state.saving || state.avatarPackSaving || !config ? " disabled" : ""}>${state.saving || state.avatarPackSaving ? copy.saving : copy.save}</button>
-          <button class="scene-editor-button" type="button" data-action="add-page"${!config ? " disabled" : ""}>${copy.addPage}</button>
         </div>
       </div>
-      <div class="scene-dashboard-body">
-        <div class="scene-settings-stack">
-          <section class="scene-settings-card">
-            <div class="scene-settings-head">
-              <h2>${copy.avatar}</h2>
-              <div class="meta">${copy.avatarSubtitle}</div>
-            </div>
-          ${config ? `
-            <div class="avatar-pack-box">
-              <div class="meta">${avatarPackMeta}</div>
-              <div class="meta">${copy.avatarPackAppliedAfterSave}</div>
-              <div class="avatar-pack-grid">
-                ${renderAvatarPackTile(copy, state.bundledAvatar, selectedAvatarPackId)}
-                ${state.avatarCatalog.map((item) => renderAvatarPackTile(copy, item, selectedAvatarPackId)).join("")}
-              </div>
-            </div>
-            <div class="card-stack" style="margin-top:16px;">
-              <div class="field is-wide">
-                <label>${copy.avatarImportSelect}</label>
-              </div>
-              <div class="avatar-import-actions">
-                <button
-                  class="scene-editor-button avatar-import-button${state.avatarImporting || !options.avatarImportUrl ? " is-disabled" : ""}"
-                  type="button"
-                  data-action="choose-avatar-archive"
-                  ${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}
-                >
-                  ${state.avatarImporting
-                    ? copy.avatarImporting
-                    : copy.avatarImportChooseButton}
-                </button>
-                <input
-                  id="avatar-pack-archive"
-                  class="avatar-import-input"
-                  type="file"
-                  accept=".zip,application/zip"
-                  data-avatar-archive
-                  tabindex="-1"
-                  aria-hidden="true"
-                  ${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}
-                >
-              </div>
-              ${state.pendingAvatarZipName
-                ? `<div class="meta">${escapeHtml(copy.avatarImportSelected(state.pendingAvatarZipName))}</div>`
-                : ""}
-              <div class="meta">${copy.avatarImportHint}</div>
-              ${avatarImportStatus}
-            </div>
-            ${selectedAvatarPackId
-              ? state.avatarPackLoading
-                ? `<div class="meta" style="margin-top:16px;">${copy.avatarMappingLoading}</div>`
-                : state.avatarPackDetails
-                  ? renderAvatarMapping(copy, state.avatarPackDetails)
-                  : ""
-              : ""}
-          ` : `<div class="meta">${copy.statusLoading}</div>`}
-          </section>
-          <section class="scene-settings-card" data-editor-section="pages">
-            <div class="scene-settings-head">
-              <h2>${copy.pages}</h2>
-              <div class="meta">${copy.subtitle(options.packId)}</div>
-              <div class="meta">${copy.pageOrderHint}</div>
-            </div>
-            <div class="page-list">
-            ${ordered.map((page, index) => `
-              <article class="page-chip ${page.id === (selectedPage?.id || "") ? "is-active" : ""}" draggable="true" data-drag-kind="page" data-page-id="${escapeHtml(page.id)}">
-                <div class="page-chip-header" data-action="select-page" data-page-id="${escapeHtml(page.id)}">
-                  <strong>${escapeHtml(page.title || page.id || (resolveUiLang() === "ru" ? `Страница ${index + 1}` : `Page ${index + 1}`))}</strong>
-                  <span class="meta">${escapeHtml(pageKindLabel(copy, page.kind))} · ${escapeHtml(copy.pageCards(Array.isArray(page.cards) ? page.cards.length : 0))}</span>
-                </div>
-                <div class="page-chip-actions">
-                  <button class="tiny-btn" type="button" data-action="page-up" data-page-id="${escapeHtml(page.id)}"${index === 0 ? " disabled" : ""}>${copy.up}</button>
-                  <button class="tiny-btn" type="button" data-action="page-down" data-page-id="${escapeHtml(page.id)}"${index === ordered.length - 1 ? " disabled" : ""}>${copy.down}</button>
-                  <button class="tiny-btn" type="button" data-action="page-remove" data-page-id="${escapeHtml(page.id)}"${ordered.length <= 1 ? " disabled" : ""}>${copy.remove}</button>
-                </div>
-              </article>
-            `).join("") || `<div class="meta">${copy.statusLoading}</div>`}
-            </div>
-          </section>
-          <section class="scene-settings-card">
-            <div class="scene-settings-head">
-              <h2>${copy.pageSettings}</h2>
-              <div class="meta">${escapeHtml(selectedPageMeta)}</div>
-            </div>
-          ${selectedPage ? `
-            <div class="inspector-grid">
-              ${renderPageField(copy.fieldPageId, "id", pageFieldValue(selectedPage, "id"), true)}
-              ${renderPageSelect(copy.fieldKind, "kind", pageFieldValue(selectedPage, "kind"), PAGE_KIND_OPTIONS.map((item) => ({ value: item, label: pageKindLabel(copy, item) })))}
-              ${renderPageField(copy.fieldTitle, "title", pageFieldValue(selectedPage, "title"), true)}
-              ${renderPageField(copy.fieldSubtitle, "subtitle", pageFieldValue(selectedPage, "subtitle"), true)}
-              ${renderPageField(copy.fieldSlot, "slot", pageFieldValue(selectedPage, "slot"))}
-              ${selectedPage.kind === "grid" ? `
-              ${renderPageField(copy.fieldGridColumns, "gridColumns", String(selectedPage.gridColumns || 4))}
-              ${renderPageField(copy.fieldGridRows, "gridRows", String(selectedPage.gridRows || 3))}
-              ` : `
-              ${renderPageSelect(copy.fieldCardStyle, "cardStyle", pageFieldValue(selectedPage, "cardStyle") || "full", CARD_STYLE_OPTIONS.map((item) => ({ value: item, label: item === "mini" ? copy.styleMini : copy.styleFull })))}
-              `}
-              ${renderPageField(copy.fieldStampCaption, "stampCaption", pageFieldValue(selectedPage, "stampCaption"))}
-              ${renderPageField(copy.fieldStampValue, "stampValue", pageFieldValue(selectedPage, "stampValue"))}
-            </div>
-          ` : `<div class="meta">${copy.statusLoading}</div>`}
-          </section>
-          <section class="scene-settings-card" data-editor-section="cards">
-            <div class="scene-settings-head">
-              <h2>${copy.cards}</h2>
-              <div class="meta">${copy.cardsSubtitle}</div>
-              <div class="meta">${copy.cardOrderHint}</div>
-            </div>
-          ${selectedPage ? `
-            <div class="card-stack">
-              ${selectedPage.kind === "grid" ? renderGridPreview(selectedPage, state.selectedCardIndex) : ""}
-              <div>
-                <div class="meta">${copy.cardTemplates}</div>
-                <div class="card-template-grid" style="margin-top:12px;">
-                  ${CARD_TYPE_OPTIONS.map((type) => renderCardTemplateTile(copy, type)).join("")}
-                </div>
-              </div>
-              <div class="cards-list">
-                ${selectedCards.length
-                  ? selectedCards.map((card, index) => renderCardListItem(copy, card, index, selectedCards.length, index === state.selectedCardIndex, selectedPage.kind === "grid")).join("")
-                  : `<div class="meta">${copy.noCards}</div>`}
-              </div>
-              <div>
-                <h2>${copy.cardInspector}</h2>
-                ${selectedCard
-                  ? renderCard(copy, selectedCard, state.selectedCardIndex || 0, state.focusedBinding, selectedPage.kind === "grid")
-                  : `<div class="meta">${copy.cardInspectorEmpty}</div>`}
-              </div>
-            </div>
-          ` : `<div class="meta">${copy.statusLoading}</div>`}
-          </section>
-          <section class="scene-settings-card">
-            <div class="scene-settings-head">
-              <h2>${copy.displaySettings}</h2>
-              <div class="meta">${copy.displaySubtitle}</div>
-            </div>
-          ${config ? `
-            <div class="inspector-grid">
-              ${renderDisplayField(copy.fieldDisplaySafeTop, "safeTop", readDisplayFieldValue(config, "safeTop"))}
-              ${renderDisplayField(copy.fieldDisplaySafeRight, "safeRight", readDisplayFieldValue(config, "safeRight"))}
-              ${renderDisplayField(copy.fieldDisplaySafeBottom, "safeBottom", readDisplayFieldValue(config, "safeBottom"))}
-              ${renderDisplayField(copy.fieldDisplaySafeLeft, "safeLeft", readDisplayFieldValue(config, "safeLeft"))}
-              ${renderDisplayField(copy.fieldDisplayPadding, "layoutPaddingPx", readDisplayFieldValue(config, "layoutPaddingPx"))}
-              ${renderDisplayField(copy.fieldDisplayGap, "layoutGapPx", readDisplayFieldValue(config, "layoutGapPx"))}
-              ${renderDisplayField(copy.fieldDisplayScale, "globalScale", readDisplayFieldValue(config, "globalScale"))}
-            </div>
-          ` : `<div class="meta">${copy.statusLoading}</div>`}
-          </section>
-          <section class="scene-settings-card">
-            <div class="scene-settings-head">
-              <h2>${copy.homeAssistant}</h2>
-              <div class="meta">${escapeHtml(bindingLabel)}</div>
-            </div>
-          <div>
-            <div class="meta">${copy.entityBindingTargets}</div>
-            ${renderBindingTargets(copy, selectedCard, state.selectedCardIndex, state.focusedBinding)}
+      <div class="page-tabs">
+        ${ordered.map((page, index) => `
+          <button class="page-tab${page.id === (selectedPage?.id || "") ? " is-active" : ""}" type="button" data-action="select-page" data-page-id="${escapeHtml(page.id)}" draggable="true" data-drag-kind="page">
+            ${escapeHtml(page.title || page.id || (resolveUiLang() === "ru" ? `Стр ${index + 1}` : `Page ${index + 1}`))}
+          </button>
+        `).join("")}
+        <button class="page-tab is-add" type="button" data-action="add-page"${!config ? " disabled" : ""}>+</button>
+      </div>
+      ${selectedPage ? `
+      <div class="page-tab-actions">
+        <span class="meta">${escapeHtml(selectedPageMeta)}</span>
+        <button class="tiny-btn" type="button" data-action="page-up" data-page-id="${escapeHtml(selectedPage.id)}"${selectedPageIndex === 0 ? " disabled" : ""}>${copy.up}</button>
+        <button class="tiny-btn" type="button" data-action="page-down" data-page-id="${escapeHtml(selectedPage.id)}"${selectedPageIndex === ordered.length - 1 ? " disabled" : ""}>${copy.down}</button>
+        <button class="tiny-btn" type="button" data-action="page-remove" data-page-id="${escapeHtml(selectedPage.id)}"${ordered.length <= 1 ? " disabled" : ""}>${copy.remove}</button>
+      </div>
+      ` : ""}
+      <div class="section-tabs">
+        <button class="section-tab${state.activeSectionTab === "cards" ? " is-active" : ""}" type="button" data-action="switch-section" data-section="cards">${copy.cards}</button>
+        <button class="section-tab${state.activeSectionTab === "avatar" ? " is-active" : ""}" type="button" data-action="switch-section" data-section="avatar">${copy.avatar}</button>
+        <button class="section-tab${state.activeSectionTab === "display" ? " is-active" : ""}" type="button" data-action="switch-section" data-section="display">${copy.displaySettings}</button>
+      </div>
+      <div class="active-section">
+      ${state.activeSectionTab === "cards" ? `
+        <section class="scene-settings-card">
+          <div class="scene-settings-head">
+            <h2>${copy.pageSettings}</h2>
           </div>
-          <div class="field ha-search" style="margin-top:12px;">
-            <label for="ha-entity-search">${copy.entitySearch}</label>
-            <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
+        ${selectedPage ? `
+          <div class="inspector-grid">
+            ${renderPageField(copy.fieldPageId, "id", pageFieldValue(selectedPage, "id"), true)}
+            ${renderPageSelect(copy.fieldKind, "kind", pageFieldValue(selectedPage, "kind"), PAGE_KIND_OPTIONS.map((item) => ({ value: item, label: pageKindLabel(copy, item) })))}
+            ${renderPageField(copy.fieldTitle, "title", pageFieldValue(selectedPage, "title"), true)}
+            ${renderPageField(copy.fieldSubtitle, "subtitle", pageFieldValue(selectedPage, "subtitle"), true)}
+            ${renderPageField(copy.fieldSlot, "slot", pageFieldValue(selectedPage, "slot"))}
+            ${selectedPage.kind === "grid" ? `
+            ${renderPageField(copy.fieldGridColumns, "gridColumns", String(selectedPage.gridColumns || 4))}
+            ${renderPageField(copy.fieldGridRows, "gridRows", String(selectedPage.gridRows || 3))}
+            ` : `
+            ${renderPageSelect(copy.fieldCardStyle, "cardStyle", pageFieldValue(selectedPage, "cardStyle") || "full", CARD_STYLE_OPTIONS.map((item) => ({ value: item, label: item === "mini" ? copy.styleMini : copy.styleFull })))}
+            `}
+            ${renderPageField(copy.fieldStampCaption, "stampCaption", pageFieldValue(selectedPage, "stampCaption"))}
+            ${renderPageField(copy.fieldStampValue, "stampValue", pageFieldValue(selectedPage, "stampValue"))}
           </div>
-          <div class="ha-list">
-            ${filteredEntities.length ? filteredEntities.map((entity) => `
-              <article class="ha-entity">
-                <div class="ha-entity-row">
-                  <div>
-                    <strong>${escapeHtml(entity.name)}</strong>
-                    <div class="meta">${escapeHtml(entity.domain)}</div>
-                  </div>
-                  <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}"${state.focusedBinding ? "" : " disabled"}>${copy.useEntity}</button>
-                </div>
-                <code>${escapeHtml(entity.entityId)}</code>
-                <div class="ha-state">${escapeHtml(entity.state)}${entity.unit ? ` · ${escapeHtml(entity.unit)}` : ""}</div>
-              </article>
-            `).join("") : `<div class="meta">${copy.noEntities}</div>`}
+        ` : `<div class="meta">${copy.statusLoading}</div>`}
+        </section>
+        <section class="scene-settings-card" data-editor-section="cards">
+          <div class="scene-settings-head">
+            <h2>${copy.cards}</h2>
+            <div class="meta">${copy.cardsSubtitle}</div>
+            <div class="meta">${copy.cardOrderHint}</div>
           </div>
-          </section>
+        ${selectedPage ? `
+          <div class="card-stack">
+            ${selectedPage.kind === "grid" ? renderGridPreview(selectedPage, state.selectedCardIndex) : ""}
+            <div>
+              <div class="meta">${copy.cardTemplates}</div>
+              <div class="card-template-grid" style="margin-top:12px;">
+                ${CARD_TYPE_OPTIONS.map((type) => renderCardTemplateTile(copy, type)).join("")}
+              </div>
+            </div>
+            <div class="cards-list">
+              ${selectedCards.length
+                ? selectedCards.map((card, index) => renderCardListItem(copy, card, index, selectedCards.length, index === state.selectedCardIndex, selectedPage.kind === "grid")).join("")
+                : `<div class="meta">${copy.noCards}</div>`}
+            </div>
+            <div>
+              <h2>${copy.cardInspector}</h2>
+              ${selectedCard
+                ? renderCard(copy, selectedCard, state.selectedCardIndex || 0, state.focusedBinding, selectedPage.kind === "grid")
+                : `<div class="meta">${copy.cardInspectorEmpty}</div>`}
+            </div>
+          </div>
+        ` : `<div class="meta">${copy.statusLoading}</div>`}
+        </section>
+        <section class="scene-settings-card">
+          <div class="scene-settings-head">
+            <h2>${copy.homeAssistant}</h2>
+            <div class="meta">${escapeHtml(bindingLabel)}</div>
+          </div>
+        <div>
+          <div class="meta">${copy.entityBindingTargets}</div>
+          ${renderBindingTargets(copy, selectedCard, state.selectedCardIndex, state.focusedBinding)}
         </div>
+        <div class="field ha-search" style="margin-top:12px;">
+          <label for="ha-entity-search">${copy.entitySearch}</label>
+          <input id="ha-entity-search" type="text" data-ha-search value="${escapeHtml(state.entitySearch)}">
+        </div>
+        <div class="ha-list">
+          ${filteredEntities.length ? filteredEntities.map((entity) => `
+            <article class="ha-entity">
+              <div class="ha-entity-row">
+                <div>
+                  <strong>${escapeHtml(entity.name)}</strong>
+                  <div class="meta">${escapeHtml(entity.domain)}</div>
+                </div>
+                <button class="tiny-btn" type="button" data-action="bind-entity" data-entity-id="${escapeHtml(entity.entityId)}"${state.focusedBinding ? "" : " disabled"}>${copy.useEntity}</button>
+              </div>
+              <code>${escapeHtml(entity.entityId)}</code>
+              <div class="ha-state">${escapeHtml(entity.state)}${entity.unit ? ` · ${escapeHtml(entity.unit)}` : ""}</div>
+            </article>
+          `).join("") : `<div class="meta">${copy.noEntities}</div>`}
+        </div>
+        </section>
+      ` : ""}
+      ${state.activeSectionTab === "avatar" ? `
+        <section class="scene-settings-card">
+          <div class="scene-settings-head">
+            <h2>${copy.avatar}</h2>
+            <div class="meta">${copy.avatarSubtitle}</div>
+          </div>
+        ${config ? `
+          <div class="avatar-pack-box">
+            <div class="meta">${avatarPackMeta}</div>
+            <div class="meta">${copy.avatarPackAppliedAfterSave}</div>
+            <div class="avatar-pack-grid">
+              ${renderAvatarPackTile(copy, state.bundledAvatar, selectedAvatarPackId)}
+              ${state.avatarCatalog.map((item) => renderAvatarPackTile(copy, item, selectedAvatarPackId)).join("")}
+            </div>
+          </div>
+          <div class="card-stack" style="margin-top:16px;">
+            <div class="field is-wide">
+              <label>${copy.avatarImportSelect}</label>
+            </div>
+            <div class="avatar-import-actions">
+              <button
+                class="scene-editor-button avatar-import-button${state.avatarImporting || !options.avatarImportUrl ? " is-disabled" : ""}"
+                type="button"
+                data-action="choose-avatar-archive"
+                ${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}
+              >
+                ${state.avatarImporting
+                  ? copy.avatarImporting
+                  : copy.avatarImportChooseButton}
+              </button>
+              <input
+                id="avatar-pack-archive"
+                class="avatar-import-input"
+                type="file"
+                accept=".zip,application/zip"
+                data-avatar-archive
+                tabindex="-1"
+                aria-hidden="true"
+                ${state.avatarImporting || !options.avatarImportUrl ? " disabled" : ""}
+              >
+            </div>
+            ${state.pendingAvatarZipName
+              ? `<div class="meta">${escapeHtml(copy.avatarImportSelected(state.pendingAvatarZipName))}</div>`
+              : ""}
+            <div class="meta">${copy.avatarImportHint}</div>
+            ${avatarImportStatus}
+          </div>
+          ${selectedAvatarPackId
+            ? state.avatarPackLoading
+              ? `<div class="meta" style="margin-top:16px;">${copy.avatarMappingLoading}</div>`
+              : state.avatarPackDetails
+                ? renderAvatarMapping(copy, state.avatarPackDetails)
+                : ""
+            : ""}
+        ` : `<div class="meta">${copy.statusLoading}</div>`}
+        </section>
+      ` : ""}
+      ${state.activeSectionTab === "display" ? `
+        <section class="scene-settings-card">
+          <div class="scene-settings-head">
+            <h2>${copy.displaySettings}</h2>
+            <div class="meta">${copy.displaySubtitle}</div>
+          </div>
+        ${config ? `
+          <div class="inspector-grid">
+            ${renderDisplayField(copy.fieldDisplaySafeTop, "safeTop", readDisplayFieldValue(config, "safeTop"))}
+            ${renderDisplayField(copy.fieldDisplaySafeRight, "safeRight", readDisplayFieldValue(config, "safeRight"))}
+            ${renderDisplayField(copy.fieldDisplaySafeBottom, "safeBottom", readDisplayFieldValue(config, "safeBottom"))}
+            ${renderDisplayField(copy.fieldDisplaySafeLeft, "safeLeft", readDisplayFieldValue(config, "safeLeft"))}
+            ${renderDisplayField(copy.fieldDisplayPadding, "layoutPaddingPx", readDisplayFieldValue(config, "layoutPaddingPx"))}
+            ${renderDisplayField(copy.fieldDisplayGap, "layoutGapPx", readDisplayFieldValue(config, "layoutGapPx"))}
+            ${renderDisplayField(copy.fieldDisplayScale, "globalScale", readDisplayFieldValue(config, "globalScale"))}
+          </div>
+        ` : `<div class="meta">${copy.statusLoading}</div>`}
+        </section>
+      ` : ""}
       </div>
     `;
     const liveAvatarArchiveInput = dashboardHost.querySelector<HTMLInputElement>("[data-avatar-archive]");
@@ -2827,7 +2926,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       liveAvatarArchiveInput.value = "";
     });
 
-    for (const pageChip of Array.from(dashboardHost.querySelectorAll<HTMLElement>(".page-chip[data-page-id]"))) {
+    for (const pageChip of Array.from(dashboardHost.querySelectorAll<HTMLElement>(".page-tab[data-page-id]"))) {
       pageChip.draggable = true;
       pageChip.addEventListener("dragstart", (event) => {
         const pageId = String(pageChip.dataset.pageId || "").trim();
@@ -3138,6 +3237,14 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.focusedBinding = null;
       syncSelection();
       render();
+      return;
+    }
+    if (action === "switch-section") {
+      const section = actionEl?.dataset.section || "";
+      if (section === "cards" || section === "avatar" || section === "display") {
+        state.activeSectionTab = section;
+        render();
+      }
       return;
     }
     if (action === "page-up" && pageIndex > 0) {
