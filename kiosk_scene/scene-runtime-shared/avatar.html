@@ -334,6 +334,8 @@
     const MOUTH_FORM_PARAM = 'ParamMouthForm';
     const STALE_MS = 15 * 60 * 1000;
     const POLL_MS = 2500;
+    const TARGET_FPS_IDLE = 20;
+    const TARGET_FPS_ACTIVE = 60;
     let rendererConfig = DEFAULT_RENDERER_CONFIG;
 
     const DEFAULT_MOTION_MAP = {
@@ -1297,9 +1299,11 @@
         setLipSyncValue(0.08, 0);
         lipSyncDecayTimer = window.setTimeout(() => {
           setLipSyncValue(0, 0);
+          if (app && app.ticker) { app.ticker.maxFPS = TARGET_FPS_IDLE; }
         }, 120);
       } else {
         setLipSyncValue(0, 0);
+        if (app && app.ticker) { app.ticker.maxFPS = TARGET_FPS_IDLE; }
       }
     }
 
@@ -1368,6 +1372,7 @@
       }
       stopLipSync({ decay: false });
       lipSyncState.active = true;
+      if (app && app.ticker) { app.ticker.maxFPS = TARGET_FPS_ACTIVE; }
       let cursor = 0;
 
       const step = () => {
@@ -1458,6 +1463,7 @@
       if (options && options.speak) {
         stopLipSync({ decay: false });
         lipSyncState.active = true;
+        if (app && app.ticker) { app.ticker.maxFPS = TARGET_FPS_ACTIVE; }
       } else {
         stopLipSync({ decay: false });
       }
@@ -2104,6 +2110,9 @@
           preferWebGLVersion: IS_DISPLAY_MODE ? 1 : 2,
           powerPreference: IS_DISPLAY_MODE ? 'low-power' : undefined,
         });
+        // Cap FPS to reduce CPU/GPU load — 20fps is enough for Live2D idle,
+        // full 60fps during active lip-sync/motion
+        app.ticker.maxFPS = TARGET_FPS_IDLE;
         stage.appendChild(app.view);
         app.view.addEventListener('webglcontextlost', (event) => {
           event.preventDefault();
