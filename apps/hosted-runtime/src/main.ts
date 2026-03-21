@@ -344,6 +344,27 @@ function remapLegacyHostedUrl(value: string, bootstrapUrl: string): string {
   return normalized;
 }
 
+function resolveAvatarAdapterOverride(): "static" | "live2d" | null {
+  const params = new URLSearchParams(window.location.search);
+  const explicit = String(params.get("avatar") || params.get("avatarAdapter") || "").trim().toLowerCase();
+  if (explicit === "static" || explicit === "live2d") {
+    return explicit;
+  }
+
+  if (isEditorMode()) {
+    return null;
+  }
+
+  const hostname = String(window.location.hostname || "").trim().toLowerCase();
+  const isDirectLocalDisplayHost = hostname === "localhost" || hostname === "127.0.0.1";
+  const isSceneAddonPort = String(window.location.port || "").trim() === "48123";
+  if (isDirectLocalDisplayHost && isSceneAddonPort) {
+    return "static";
+  }
+
+  return null;
+}
+
 function normalizeHostedAvatarManifest(
   manifest: AvatarManifestV1,
   manifestUrl: string,
@@ -375,6 +396,32 @@ function normalizeHostedAvatarManifest(
       .map(([key, value]) => [key, resolveHostedUrl(String(value || ""), manifestUrl)])
       .filter(([, value]) => Boolean(value)),
   );
+
+  const adapterOverride = resolveAvatarAdapterOverride();
+  if (adapterOverride === "static" && normalized.adapter === "live2d") {
+    const staticImageUrl = remapHostedAssetValue(
+      String(normalized.fallbackPortrait || normalized.modelUrl || normalized.entry || "").trim(),
+    );
+    if (staticImageUrl) {
+      return {
+        ...normalized,
+        adapter: "static",
+        runtimeUrl: "",
+        entry: staticImageUrl,
+        modelUrl: staticImageUrl,
+        fallbackPortrait: staticImageUrl,
+        motionMapUrl: "",
+        capabilities: {
+          supportsEmotion: false,
+          supportsMotion: false,
+          supportsViewPresets: true,
+          supportsLipSync: false,
+          supportsPointerFocus: false,
+        },
+        presetThumbs,
+      };
+    }
+  }
 
   return {
     ...normalized,
