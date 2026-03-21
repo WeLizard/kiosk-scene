@@ -77,22 +77,69 @@ echo "INFO: Kiosk Scene root: ${SCENE_ROOT}"
 echo "INFO: Active pack file: ${SCENE_ACTIVE_PACK_FILE}"
 echo "INFO: Default pack id: ${SCENE_DEFAULT_PACK_ID}"
 echo "INFO: Direct scene URL: http://homeassistant.local:48123/scene/"
+if [ -f "${SCENE_RUNTIME_DIR}/index.html" ]; then
+  echo "INFO: Runtime seed ready: ${SCENE_RUNTIME_DIR}/index.html"
+else
+  echo "WARNING: Runtime seed missing: ${SCENE_RUNTIME_DIR}/index.html"
+fi
 
 python3 /scene_host_service.py &
 SCENE_HOST_PID=$!
+echo "INFO: scene_host_service.py started (PID=${SCENE_HOST_PID})"
 
 python3 /scene_config_service.py &
 SCENE_EDITOR_PID=$!
+echo "INFO: scene_config_service.py started (PID=${SCENE_EDITOR_PID})"
 
 nginx -g 'daemon off;' &
 NGINX_PID=$!
+echo "INFO: nginx started (PID=${NGINX_PID})"
+
+SHUTTING_DOWN=0
+SCENE_HOST_EXIT_REPORTED=0
+SCENE_EDITOR_EXIT_REPORTED=0
+
+refresh_live_pids() {
+  LIVE_PIDS=()
+  for pid in "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      LIVE_PIDS+=("$pid")
+    fi
+  done
+}
 
 cleanup() {
+  SHUTTING_DOWN=1
   kill "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID" 2>/dev/null || true
   wait "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID" 2>/dev/null || true
 }
 
 trap cleanup EXIT INT TERM
 
-wait -n "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID"
-exit $?
+refresh_live_pids
+while [ ${#LIVE_PIDS[@]} -gt 0 ]; do
+  if wait -n "${LIVE_PIDS[@]}"; then
+    EXIT_STATUS=0
+  else
+    EXIT_STATUS=$?
+  fi
+
+  refresh_live_pids
+
+  if ! kill -0 "$SCENE_HOST_PID" 2>/dev/null && [ "$SHUTTING_DOWN" -eq 0 ] && [ "$SCENE_HOST_EXIT_REPORTED" -eq 0 ]; then
+    echo "ERROR: scene_host_service.py exited with status ${EXIT_STATUS}; keeping nginx alive so /scene/ stays reachable"
+    SCENE_HOST_EXIT_REPORTED=1
+  fi
+
+  if ! kill -0 "$SCENE_EDITOR_PID" 2>/dev/null && [ "$SHUTTING_DOWN" -eq 0 ] && [ "$SCENE_EDITOR_EXIT_REPORTED" -eq 0 ]; then
+    echo "ERROR: scene_config_service.py exited with status ${EXIT_STATUS}; keeping nginx alive so /scene/ stays reachable"
+    SCENE_EDITOR_EXIT_REPORTED=1
+  fi
+
+  if ! kill -0 "$NGINX_PID" 2>/dev/null; then
+    if [ "$SHUTTING_DOWN" -eq 0 ]; then
+      echo "ERROR: nginx exited with status ${EXIT_STATUS}; stopping Kiosk Scene"
+    fi
+    exit "$EXIT_STATUS"
+  fi
+done
