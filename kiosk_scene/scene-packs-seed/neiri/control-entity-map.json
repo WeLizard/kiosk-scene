@@ -1,0 +1,7 @@
+{
+  "viewPreset": "input_text.neiri_view_preset",
+  "pageMode": "input_text.neiri_page_mode",
+  "pageTarget": "input_text.neiri_page_target",
+  "pageUntil": "input_text.neiri_page_until",
+  "revision": "input_number.neiri_control_revision"
+}

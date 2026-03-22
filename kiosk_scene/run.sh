@@ -30,6 +30,7 @@ export SCENE_EDITOR_PORT="48098"
 export SCENE_EDITOR_PATH_PREFIX="/scene-editor-form"
 
 IMAGE_SCENE_RUNTIME_SEED_DIR="/opt/kiosk-scene/scene-runtime-seed"
+IMAGE_SCENE_PACKS_SEED_DIR="/opt/kiosk-scene/scene-packs-seed"
 LEGACY_SCENE_ROOT="/config/openclaw-scene"
 LEGACY_NEIRI_SCENE_DIR="/config/www/neiri-scene"
 LEGACY_LIVE2D_DIR="/config/www/live2d"
@@ -61,6 +62,11 @@ if [ -d "$IMAGE_SCENE_RUNTIME_SEED_DIR" ]; then
     rm -rf "${SCENE_RUNTIME_DIR:?}/"*
     cp -r "$IMAGE_SCENE_RUNTIME_SEED_DIR/." "$SCENE_RUNTIME_DIR/" 2>/dev/null || true
   fi
+fi
+
+# Seed scene-packs from Docker image (--ignore-existing preserves user edits)
+if [ -d "$IMAGE_SCENE_PACKS_SEED_DIR" ]; then
+  rsync -a --ignore-existing "$IMAGE_SCENE_PACKS_SEED_DIR/" "$SCENE_PACKS_DIR/" 2>/dev/null || true
 fi
 
 for scene_file in renderer.kiosk-scene.json scene.default.json entity-map.json avatar.manifest.json neiri-control.json weather.json; do

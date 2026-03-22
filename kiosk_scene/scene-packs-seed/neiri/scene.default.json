@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "rotation": {
+    "order": [
+      "weather",
+      "week",
+      "home"
+    ],
+    "defaultDwellSeconds": 18
+  },
+  "display": {
+    "safeArea": {
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "layoutPaddingPx": 16,
+    "layoutGapPx": 16,
+    "globalScale": 1
+  },
+  "pages": [
+    {
+      "id": "weather",
+      "kind": "overview",
+      "title": "Погода"
+    },
+    {
+      "id": "week",
+      "kind": "cards",
+      "slot": 0,
+      "cardStyle": "mini",
+      "title": "Ритм недели",
+      "subtitle": "Крупный недельный обзор и короткие маркеры дома",
+      "stampCaption": "Диапазон",
+      "cards": [
+        {
+          "type": "time",
+          "entity": "sensor.sun_next_rising",
+          "caption": "Рассвет",
+          "hint": "следующее утро"
+        },
+        {
+          "type": "time",
+          "entity": "sensor.sun_next_setting",
+          "caption": "Закат",
+          "hint": "следующий вечер"
+        },
+        {
+          "type": "todo",
+          "entity": "todo.shopping_list",
+          "caption": "Покупки",
+          "hint": "что ещё осталось"
+        },
+        {
+          "type": "onoff",
+          "entity": "light.wled_kitchen",
+          "caption": "Кухня",
+          "onText": "Свет включён",
+          "offText": "Свет выключен",
+          "hint": "лента и атмосфера"
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "kind": "cards",
+      "slot": 1,
+      "cardStyle": "full",
+      "title": "Дом",
+      "subtitle": "Тихая сводка Home Assistant без рычагов управления",
+      "stampCaption": "Страница",
+      "cards": [
+        {
+          "type": "todo",
+          "entity": "todo.shopping_list",
+          "caption": "Список покупок",
+          "hint": "есть что забрать по пути"
+        },
+        {
+          "type": "onoff",
+          "entity": "light.wled_kitchen",
+          "caption": "Кухня",
+          "onText": "Включён",
+          "offText": "Выключен",
+          "hint": "лента в комнате"
+        },
+        {
+          "type": "time",
+          "entity": "sensor.sun_next_rising",
+          "caption": "Рассвет",
+          "hint": "следующее событие"
+        },
+        {
+          "type": "time",
+          "entity": "sensor.sun_next_setting",
+          "caption": "Закат",
+          "hint": "следующее событие"
+        },
+        {
+          "type": "battery",
+          "entity": "sensor.2306epn60g_battery_level",
+          "stateEntity": "sensor.2306epn60g_battery_state",
+          "caption": "Телефон",
+          "hint": "состояние телефона"
+        },
+        {
+          "type": "network",
+          "downEntity": "sensor.archer_ax53_download_speed",
+          "upEntity": "sensor.archer_ax53_upload_speed",
+          "caption": "Сеть",
+          "hint": "Мбит/с по роутеру"
+        }
+      ]
+    }
+  ],
+  "avatar": {
+    "packId": "haru-pro"
+  }
+}

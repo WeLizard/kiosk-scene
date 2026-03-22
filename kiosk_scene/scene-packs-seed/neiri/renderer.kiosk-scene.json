@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "assistant": {
+    "name": "Нейри",
+    "locale": "ru-RU"
+  },
+  "links": {
+    "appUrl": "/scene/"
+  },
+  "avatar": {
+    "manifestUrl": "./avatar.manifest.json"
+  },
+  "scene": {
+    "configUrl": "./scene.default.json"
+  },
+  "state": {
+    "provider": "ha",
+    "stateUrl": "./neiri-state.seed.json",
+    "haApiFallback": true,
+    "idleLinesUrl": "./neiri-idle-lines.json",
+    "entityMapUrl": "./entity-map.json"
+  },
+  "control": {
+    "provider": "ha",
+    "controlUrl": "./neiri-control.json",
+    "entityMapUrl": "./control-entity-map.json"
+  }
+}

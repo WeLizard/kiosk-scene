@@ -1,0 +1,15 @@
+{
+  "online": "input_boolean.neiri_online",
+  "busy": "input_boolean.neiri_busy",
+  "status": "input_text.neiri_status",
+  "message": "input_text.neiri_message",
+  "source": "input_text.neiri_source",
+  "updatedAt": "input_text.neiri_updated_at",
+  "activity": "input_text.neiri_activity",
+  "cue": "input_text.neiri_cue",
+  "speaking": "input_boolean.neiri_speaking",
+  "intensity": "input_number.neiri_intensity",
+  "emotion": "input_text.neiri_emotion",
+  "motion": "input_text.neiri_motion",
+  "revision": "input_number.neiri_revision"
+}

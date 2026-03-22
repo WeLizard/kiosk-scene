@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "assistant": "Нейри",
+  "online": true,
+  "busy": false,
+  "status": "Жду",
+  "message": "",
+  "source": "local-preview",
+  "updatedAt": "2026-03-07T13:52:00Z",
+  "activity": "idle",
+  "cue": null,
+  "speaking": false,
+  "intensity": null,
+  "emotion": null,
+  "motion": null,
+  "revision": 1,
+  "event": "preview:boot"
+}

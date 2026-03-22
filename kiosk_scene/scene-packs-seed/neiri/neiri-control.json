@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "revision": 0,
+  "viewPreset": null,
+  "page": {
+    "mode": "auto",
+    "target": null,
+    "until": null
+  },
+  "cue": {
+    "cue": null,
+    "emotion": null,
+    "motion": null,
+    "until": null
+  }
+}
