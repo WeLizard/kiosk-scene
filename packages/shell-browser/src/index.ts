@@ -510,6 +510,10 @@ export function createHomeAssistantWeatherReader(options: HomeAssistantWeatherRe
     const upcomingForecast = forecastAll.slice(1, 6);
 
     return {
+      title: locale.startsWith("ru") ? "Погода" : "Weather",
+      todayCaption: locale.startsWith("ru") ? "Сегодня" : "Today",
+      updatedCaption: locale.startsWith("ru") ? "Обновлено" : "Updated",
+      forecastTitle: locale.startsWith("ru") ? "Недельный ритм" : "Weekly rhythm",
       todayValue: formatTodayDate(updatedAt, locale),
       todayLabel: formatTodayLabel(updatedAt, locale),
       updatedAt: formatWeatherTime(updatedAt, locale),
@@ -861,7 +865,11 @@ export class BrowserSceneShellApp {
     await this.avatarAdapter.setState(presentation.state);
     await this.avatarAdapter.setCue(this.currentControl.cue);
     await this.avatarAdapter.setViewPreset(this.currentPreset);
-    await this.avatarAdapter.showBubble(presentation.body, {
+    // Only send bubble when state has no message — otherwise the state-driven
+    // typewriter/lip-sync in the iframe handles the text display.
+    // Sending a bubble with speak:false would override the active typewriter.
+    const hasStateMessage = Boolean(trimText(presentation.state.message, 180));
+    await this.avatarAdapter.showBubble(hasStateMessage ? "" : presentation.body, {
       ttlMs: 0,
       speak: false,
       typewriter: false,

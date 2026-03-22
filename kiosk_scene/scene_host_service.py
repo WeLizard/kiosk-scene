@@ -570,7 +570,7 @@ def write_avatar_pack(
         "fallbackPortrait": dot_path(Path(model_info["preview_asset"])) if model_info["preview_asset"] else "",
         "motionMapUrl": "./motion-map.json",
         "presetThumbs": {
-            "full": dot_path(Path(model_info["preview_asset"])) if model_info["preview_asset"] else f"{SHARED_PRESET_BASE_URL}/preset-full.svg",
+            "full": f"{SHARED_PRESET_BASE_URL}/preset-full.svg",
             "torso": f"{SHARED_PRESET_BASE_URL}/preset-torso.svg",
             "head": f"{SHARED_PRESET_BASE_URL}/preset-head.svg",
         },

@@ -85,7 +85,7 @@ const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast?latitude=60.0712&
 const LEGACY_LIVE2D_PREFIX = "/local/live2d/";
 const SCENE_LEGACY_LIVE2D_PREFIX = "/scene-legacy/live2d/";
 
-const NEIRI_COPY_RU = {
+const COPY_RU = {
   ...DEFAULT_SCENE_SHELL_COPY_EN,
   offlineLabel: "Не в сети",
   busyLabel: "Думаю",
@@ -100,7 +100,7 @@ const NEIRI_COPY_RU = {
   idleBody: "Нейри рядом и продолжает работать в фоне.",
 };
 
-const NEIRI_LABELS_RU: SceneShellLabels = {
+const LABELS_RU: SceneShellLabels = {
   ...DEFAULT_SCENE_SHELL_LABELS_EN,
   humidity: "Влажность",
   pressure: "Давление",
@@ -115,14 +115,14 @@ const NEIRI_LABELS_RU: SceneShellLabels = {
   forecastRangeFallback: "Прогноз на несколько дней",
 };
 
-const NEIRI_PRESET_LABELS_RU = {
+const PRESET_LABELS_RU = {
   ...DEFAULT_SCENE_SHELL_PRESET_LABELS_EN,
   full: "Полный рост",
   torso: "Голова и туловище",
   head: "Только лицо",
 };
 
-const NEIRI_DEFAULT_WEATHER_RU: Partial<WeatherOverviewPayload> = {
+const DEFAULT_WEATHER_RU: Partial<WeatherOverviewPayload> = {
   title: "Погода",
   location: "Санкт-Петербург",
   todayCaption: "Сегодня",
@@ -856,28 +856,26 @@ void (async () => {
     }
 
     document.documentElement.dataset.packId = packId;
-    document.title = isNeiriPack
-      ? "Нейри"
-      : (packId ? `kiosk-scene hosted runtime (${packId})` : "kiosk-scene hosted runtime");
+    const assistantName = runtimeRendererConfig?.assistant?.name
+      || (isNeiriPack ? "Нейри" : packId || "kiosk-scene");
+    document.title = assistantName;
 
     await bootstrapSceneShellApp(root, {
       rendererConfigUrl,
-      weatherUrl: isNeiriPack ? "./weather.json" : undefined,
-      weatherReader: isNeiriPack
-        ? createHomeAssistantWeatherReader({
-            weatherEntity: WEATHER_ENTITY,
-            openMeteoUrl: OPEN_METEO_URL,
-            locale: "ru-RU",
-            iconBaseUrl: "./assets",
-            apiUrl: String(runtimeRendererConfig?.state?.apiUrl || "").trim() || undefined,
-            allowApiFallback: true,
-          })
-        : undefined,
+      weatherUrl: "./weather.json",
+      weatherReader: createHomeAssistantWeatherReader({
+        weatherEntity: WEATHER_ENTITY,
+        openMeteoUrl: OPEN_METEO_URL,
+        locale: "ru-RU",
+        iconBaseUrl: "./assets",
+        apiUrl: String(runtimeRendererConfig?.state?.apiUrl || "").trim() || undefined,
+        allowApiFallback: true,
+      }),
       iconBaseUrl: "./assets",
-      copy: isNeiriPack ? NEIRI_COPY_RU : undefined,
-      labels: isNeiriPack ? NEIRI_LABELS_RU : undefined,
-      presetLabels: isNeiriPack ? NEIRI_PRESET_LABELS_RU : undefined,
-      defaultWeather: isNeiriPack ? NEIRI_DEFAULT_WEATHER_RU : undefined,
+      copy: COPY_RU,
+      labels: LABELS_RU,
+      presetLabels: PRESET_LABELS_RU,
+      defaultWeather: DEFAULT_WEATHER_RU,
     });
     scheduleDisplayPowerReplay();
 

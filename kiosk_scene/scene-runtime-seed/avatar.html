@@ -334,7 +334,7 @@
     const MOUTH_FORM_PARAM = 'ParamMouthForm';
     const STALE_MS = 15 * 60 * 1000;
     const POLL_MS = 2500;
-    const TARGET_FPS_IDLE = 20;
+    const TARGET_FPS_IDLE = 24;
     const TARGET_FPS_ACTIVE = 60;
     let rendererConfig = DEFAULT_RENDERER_CONFIG;
 
@@ -906,17 +906,17 @@
       if (!window.PIXI || !PIXI.settings || !PIXI.ENV) {
         return;
       }
-      if (IS_DISPLAY_MODE) {
-        PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL_LEGACY;
-        if (PIXI.MIPMAP_MODES && Object.prototype.hasOwnProperty.call(PIXI.MIPMAP_MODES, 'OFF')) {
-          PIXI.settings.MIPMAP_TEXTURES = PIXI.MIPMAP_MODES.OFF;
-        }
-        if (PIXI.SCALE_MODES && Object.prototype.hasOwnProperty.call(PIXI.SCALE_MODES, 'LINEAR')) {
-          PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.LINEAR;
-        }
-        if (Object.prototype.hasOwnProperty.call(PIXI.settings, 'ANISOTROPIC_LEVEL')) {
-          PIXI.settings.ANISOTROPIC_LEVEL = 0;
-        }
+      // WebGL1 always — WebGL2 on ANGLE hangs the main thread
+      PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL;
+      // Mipmaps for smoother downscaled textures
+      if (PIXI.MIPMAP_MODES && Object.prototype.hasOwnProperty.call(PIXI.MIPMAP_MODES, 'ON')) {
+        PIXI.settings.MIPMAP_TEXTURES = PIXI.MIPMAP_MODES.ON;
+      }
+      if (PIXI.SCALE_MODES && Object.prototype.hasOwnProperty.call(PIXI.SCALE_MODES, 'LINEAR')) {
+        PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.LINEAR;
+      }
+      if (Object.prototype.hasOwnProperty.call(PIXI.settings, 'ANISOTROPIC_LEVEL')) {
+        PIXI.settings.ANISOTROPIC_LEVEL = 4;
       }
       PIXI.settings.FAIL_IF_MAJOR_PERFORMANCE_CAVEAT = false;
     }
@@ -1580,7 +1580,7 @@
       model.scale.set(baseScale);
       model.anchor.set(0.5, 0);
       model.x = w * 0.5 + viewState.x;
-      model.y = h * 0.03 + viewState.y;
+      model.y = h * 0.08 + viewState.y;
     }
 
     function setNeutralFocus(immediate = false) {
@@ -2004,7 +2004,7 @@
 
       if (displayMessage) {
         setMessage(displayMessage, busy ? 18000 : 14000, {
-          speak: isNewMessage && online && !busy,
+          speak: isNewMessage && online,
           typewriter: isNewMessage,
           key: 'state:' + revision + ':' + displayMessage
         });
@@ -2050,7 +2050,7 @@
       if (isRuntimeSuspended()) {
         return;
       }
-      if (IS_DISPLAY_MODE && Date.now() - lastExternalStateAt < POLL_MS * 4) {
+      if (lastExternalStateAt > 0 && Date.now() - lastExternalStateAt < POLL_MS * 4) {
         return;
       }
       try {
@@ -2107,11 +2107,11 @@
           antialias: shouldUseAntialias(),
           resolution: getRenderResolution(),
           backgroundAlpha: 0,
-          preferWebGLVersion: IS_DISPLAY_MODE ? 1 : 2,
-          powerPreference: IS_DISPLAY_MODE ? 'low-power' : undefined,
+          preferWebGLVersion: 1,
+          powerPreference: 'low-power',
         });
-        // Cap FPS to reduce CPU/GPU load — 20fps is enough for Live2D idle,
-        // full 60fps during active lip-sync/motion
+        // Cap FPS to reduce CPU/GPU load — 10fps is enough for Live2D idle
+        // with hardware GPU, full 60fps during active lip-sync/motion
         app.ticker.maxFPS = TARGET_FPS_IDLE;
         stage.appendChild(app.view);
         app.view.addEventListener('webglcontextlost', (event) => {
@@ -2188,12 +2188,12 @@
           if (model && pointers.size === 1) {
             model.focus(clientX, clientY);
           }
-          if (pointers.size === 1 && dragStart) {
+          if (pointers.size === 1 && dragStart && !IS_DISPLAY_MODE) {
             currentViewPreset = 'custom';
             viewState.x = dragStart.baseX + (clientX - dragStart.x);
             viewState.y = dragStart.baseY + (clientY - dragStart.y);
             fitModel();
-          } else if (pointers.size >= 2) {
+          } else if (pointers.size >= 2 && !IS_DISPLAY_MODE) {
             const dist = pointerDistance();
             if (pinchStartDistance > 0 && dist > 0) {
               currentViewPreset = 'custom';
