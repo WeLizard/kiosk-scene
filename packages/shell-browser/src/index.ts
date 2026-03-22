@@ -1210,16 +1210,15 @@ export class BrowserSceneShellApp {
       this.lastIdleIndex = next.index;
     }
 
-    if (this.idleTimer) {
-      window.clearTimeout(this.idleTimer);
+    if (!this.idleTimer) {
+      this.idleTimer = window.setTimeout(() => {
+        this.idleTimer = null;
+        const next = pickIdleLine(this.idleLines, this.lastIdleIndex);
+        this.currentIdleLine = next.line;
+        this.lastIdleIndex = next.index;
+        void this.refresh();
+      }, nextIdleDelayMs(18_000, 18_000));
     }
-
-    this.idleTimer = window.setTimeout(() => {
-      const next = pickIdleLine(this.idleLines, this.lastIdleIndex);
-      this.currentIdleLine = next.line;
-      this.lastIdleIndex = next.index;
-      void this.refresh();
-    }, nextIdleDelayMs(18_000, 18_000));
   }
 
   private requireEl(selector: string): HTMLElement {
