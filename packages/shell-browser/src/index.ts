@@ -514,8 +514,8 @@ export function createHomeAssistantWeatherReader(options: HomeAssistantWeatherRe
       todayCaption: locale.startsWith("ru") ? "Сегодня" : "Today",
       updatedCaption: locale.startsWith("ru") ? "Обновлено" : "Updated",
       forecastTitle: locale.startsWith("ru") ? "Недельный ритм" : "Weekly rhythm",
-      todayValue: formatTodayDate(updatedAt, locale),
-      todayLabel: formatTodayLabel(updatedAt, locale),
+      todayValue: formatTodayDate(new Date().toISOString(), locale),
+      todayLabel: formatTodayLabel(new Date().toISOString(), locale),
       updatedAt: formatWeatherTime(updatedAt, locale),
       temperature: formatWeatherNumber(weatherState?.attributes?.temperature ?? openMeteo?.current?.temperature_2m, 1),
       condition,
@@ -576,6 +576,7 @@ export class BrowserSceneShellApp {
   private idleTimer: number | null = null;
   private avatarAdapter: AvatarAdapter | null = null;
   private refreshIntervalHandle: number | null = null;
+  private lastWeatherRefreshAt = 0;
   private orderedPages: ScenePageV1[] = [];
   private carouselDragState: CarouselDragState | null = null;
 
@@ -691,6 +692,7 @@ export class BrowserSceneShellApp {
       defaultValue: [],
     }).read();
     this.weatherData = await this.readWeatherData();
+    this.lastWeatherRefreshAt = Date.now();
     this.currentState = await this.readAssistantState();
     this.hassStates = await this.readSceneStates();
     this.remoteControl = await this.readRemoteControl();
@@ -714,6 +716,13 @@ export class BrowserSceneShellApp {
     this.refreshIntervalHandle = window.setInterval(() => {
       void this.refresh();
     }, this.options.refreshIntervalMs ?? 3000);
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        void this.refreshWeatherIfStale(0);
+        void this.refresh();
+      }
+    });
   }
 
   async dispose(): Promise<void> {
@@ -826,7 +835,20 @@ export class BrowserSceneShellApp {
     this.carouselShellEl.addEventListener("lostpointercapture", finalizePointer);
   }
 
+  private async refreshWeatherIfStale(maxAgeMs = 10 * 60 * 1000): Promise<void> {
+    if (Date.now() - this.lastWeatherRefreshAt < maxAgeMs) {
+      return;
+    }
+    try {
+      this.weatherData = await this.readWeatherData();
+      this.lastWeatherRefreshAt = Date.now();
+    } catch {
+      // Weather refresh is best-effort.
+    }
+  }
+
   private async refresh(): Promise<void> {
+    await this.refreshWeatherIfStale();
     this.currentState = await this.readAssistantState();
     this.hassStates = await this.readSceneStates();
     this.remoteControl = await this.readRemoteControl(this.currentControl);
