@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: System packages used by the add-on wiring tests
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nginx-light rsync jq
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: TypeScript tests (unit + UI against the real Domovoy service)
+        run: pnpm test
+
+      - name: Python tests (add-on services, Domovoy, nginx wiring)
+        run: pnpm test:python
+
+      - name: Validate configs and build the demo
+        run: pnpm validate:demo && pnpm build:demo
+
+      - name: Rebuild the add-on seeds
+        run: pnpm release:kiosk-addon
+
+      - name: Committed seeds must match their sources
+        run: |
+          git add -N kiosk_scene/scene-runtime-seed kiosk_scene/extensions-seed
+          if ! git diff --exit-code --stat -- kiosk_scene/scene-runtime-seed kiosk_scene/extensions-seed; then
+            echo "::error::The committed add-on seeds are stale. Run 'pnpm release:kiosk-addon' and commit the result."
+            exit 1
+          fi
