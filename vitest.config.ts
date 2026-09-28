@@ -13,6 +13,7 @@ export default defineConfig({
       "@kiosk-scene/provider-ha": pkg("provider-ha"),
       "@kiosk-scene/provider-json": pkg("provider-json"),
       "@kiosk-scene/widgets-core": pkg("widgets-core"),
+      "@kiosk-scene/app-shell/kit-css": path.resolve(__dirname, "packages/domovoy-ui/test/kit-css.stub.ts"),
       "@kiosk-scene/app-shell": pkg("app-shell"),
       "@kiosk-scene/domovoy-ui": pkg("domovoy-ui"),
       "@kiosk-scene/shell-browser/styles": path.resolve(__dirname, "packages/shell-browser/src/styles.css"),

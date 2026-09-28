@@ -121,7 +121,7 @@ class VoiceGateway:
 
     def _avatar_react(self, result: dict[str, Any], reply: str) -> None:
         """Voice conversations are visible on the kiosk avatar (words + mouth). Typed web chat is not mirrored there."""
-        if not reply or result.get("status") == "listening" and False:
+        if not reply:
             return
         mood = {"applied": "success", "answered": "neutral", "clarify": "question", "review": "question",
                 "failed": "error", "partial": "error", "rejected": "error", "listening": "greet"}.get(result.get("status") or "", "neutral")

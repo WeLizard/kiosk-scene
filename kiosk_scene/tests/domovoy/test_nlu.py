@@ -133,6 +133,10 @@ class Rules(unittest.TestCase):
         self.assertEqual((i["type"], i["channel"], i["trigger"]["type"], i["trigger"]["entity_hint"]), ("create_reminder", "telegram", "state", "принтер"))
         i = self.one("Добавь фильтры для воды в список покупок")
         self.assertEqual((i["type"], i["items"]), ("add_shopping", ["Фильтры для воды"]))
+        # the destination may come first: found by the UI end-to-end test, the most natural spoken order
+        for phrase in ("Добавь в список покупок молоко и хлеб", "запиши в покупки: молоко, хлеб", "Добавь в мой список покупок молоко и хлеб"):
+            i = self.one(phrase)
+            self.assertEqual((i["type"], i["items"]), ("add_shopping", ["Молоко", "Хлеб"]), phrase)
 
     def test_corrections_reference_the_previous_command(self) -> None:
         self.assertEqual(self.one("нет, десять")["quantity"], 10)

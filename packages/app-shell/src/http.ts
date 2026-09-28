@@ -7,11 +7,19 @@ export interface HttpClientOptions {
   timeoutMs?: number;
   /** Returns a bearer token for LAN access, when one is configured. */
   getToken?: () => string | null;
+  /** Sent with every request (e.g. the CSRF marker header). */
+  headers?: Record<string, string>;
+  /** Called for every 401 so the app can ask for a token once instead of every view handling it. */
+  onUnauthorized?: (error: ExtensionError) => void;
 }
 
 export interface HttpRequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  /** Sent as-is (audio, files). Takes precedence over `body`; set `Content-Type` in `headers`. */
+  rawBody?: BodyInit;
+  /** Extra headers for this request only. */
+  headers?: Record<string, string>;
   query?: Record<string, string | number | boolean | null | undefined>;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -75,13 +83,15 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
       onAbort();
     }
     try {
-      const headers: Record<string, string> = { Accept: "application/json" };
+      const headers: Record<string, string> = { Accept: "application/json", ...(options.headers ?? {}), ...(request.headers ?? {}) };
       const token = options.getToken?.();
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
-      let body: string | undefined;
-      if (request.body !== undefined) {
+      let body: BodyInit | undefined;
+      if (request.rawBody !== undefined) {
+        body = request.rawBody;
+      } else if (request.body !== undefined) {
         headers["Content-Type"] = "application/json";
         body = JSON.stringify(request.body);
       }
@@ -102,7 +112,11 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         }
       }
       if (!response.ok) {
-        return { ok: false, error: errorFromPayload(response.status, payload) };
+        const error = errorFromPayload(response.status, payload);
+        if (response.status === 401) {
+          options.onUnauthorized?.(error);
+        }
+        return { ok: false, error };
       }
       return { ok: true, data: payload as T };
     } catch (error) {

@@ -2,7 +2,8 @@
 
 .ks-admin,
 .ks-dialog,
-.ks-toasts {
+.ks-toasts,
+.ks-scope {
   --ks-bg: #f5f7f9;
   --ks-surface: #ffffff;
   --ks-surface-2: #eef2f5;
@@ -25,7 +26,8 @@
 @media (prefers-color-scheme: dark) {
   .ks-admin,
   .ks-dialog,
-  .ks-toasts {
+  .ks-toasts,
+  .ks-scope:not([data-theme="kiosk"]) {
     --ks-bg: #12181e;
     --ks-surface: #1a222a;
     --ks-surface-2: #222c36;
@@ -44,8 +46,19 @@
 
 .ks-admin *,
 .ks-dialog *,
-.ks-toasts * {
+.ks-toasts *,
+.ks-scope * {
   box-sizing: border-box;
+}
+
+/* Widgets inside the (always light) kiosk scene keep the light palette whatever the OS prefers. */
+.ks-scope[data-theme="kiosk"] {
+  --ks-bg: transparent;
+  --ks-surface: rgba(255, 255, 255, 0.72);
+  --ks-surface-2: rgba(32, 48, 65, 0.06);
+  --ks-border: rgba(32, 48, 65, 0.12);
+  --ks-text: #203041;
+  --ks-muted: rgba(32, 48, 65, 0.66);
 }
 
 /* ---------- layout ---------- */
@@ -769,5 +782,65 @@
 @media (max-width: 899px) {
   .ks-toasts {
     bottom: 72px;
+  }
+}
+
+/* ---------- small shared pieces used by extensions ---------- */
+
+.ks-chip {
+  font: inherit;
+  font-size: 14px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ks-border);
+  background: var(--ks-surface);
+  color: var(--ks-text);
+  cursor: pointer;
+}
+
+.ks-chip.is-active {
+  background: var(--ks-accent);
+  border-color: var(--ks-accent);
+  color: var(--ks-accent-text);
+}
+
+.ks-link {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ks-accent);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ks-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.ks-filters .ks-field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.ks-list-click > li {
+  cursor: pointer;
+}
+
+.ks-list-click > li:hover,
+.ks-list-click > li:focus-visible {
+  background: var(--ks-surface-2);
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .ks-hide-narrow {
+    display: none;
   }
 }

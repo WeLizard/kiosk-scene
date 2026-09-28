@@ -45,7 +45,15 @@ importers:
 
   packages/adapter-unity-webgl: {}
 
+  packages/app-shell: {}
+
   packages/core: {}
+
+  packages/domovoy-ui:
+    devDependencies:
+      vite:
+        specifier: ^6.2.2
+        version: 6.4.1(@types/node@24.12.0)
 
   packages/provider-ha: {}
 

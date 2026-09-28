@@ -360,6 +360,10 @@ class RuleInterpreter:
         m = re.match(r"^(?:добавь|занеси|запиши|внеси|положи|добавить|записать)\s+(?P<items>.+?)\s+(?:в|на)\s+(?:мой\s+|наш\s+)?(?:список\s+)?(?:покупок|покупки|закупок)$", folded)
         if m:
             return [_intent("add_shopping", 0.93, original, items=self._split_items(original[m.start("items"):m.end("items")]))]
+        # verb + destination first: «добавь в список покупок молоко и хлеб» (the most natural spoken order)
+        m = re.match(r"^(?:добавь|занеси|запиши|внеси|положи|добавить|записать)\s+(?:в|на)\s+(?:мой\s+|наш\s+)?(?:список\s+)?(?:покупок|покупки|закупок)\s*[,:]?\s*(?P<items>.+)$", folded)
+        if m:
+            return [_intent("add_shopping", 0.93, original, items=self._split_items(original[m.start("items"):]))]
         m = re.match(r"^(?:в\s+(?:список\s+)?(?:покупок|покупки))\s*[,:]?\s*(?:добавь|запиши)?\s*(?P<items>.+)$", folded)
         if m:
             return [_intent("add_shopping", 0.9, original, items=self._split_items(original[m.start("items"):]))]

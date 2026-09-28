@@ -2,6 +2,41 @@ import type { ExtensionError, ExtensionResult } from "@kiosk-scene/core";
 import { Disposer, h, replaceChildren, type Child } from "./dom.js";
 
 export type Tone = "neutral" | "good" | "warn" | "bad" | "info";
+
+/** Built-in labels; an extension whose users read another language replaces them once with `setUiStrings`. */
+export interface UiStrings {
+  retry: string;
+  cancel: string;
+  confirm: string;
+  save: string;
+  close: string;
+  required: string;
+  loading: string;
+  nothingHere: string;
+  olderData: string;
+}
+
+const DEFAULT_STRINGS: UiStrings = {
+  retry: "Retry",
+  cancel: "Cancel",
+  confirm: "Confirm",
+  save: "Save",
+  close: "Close",
+  required: "Required",
+  loading: "Loading…",
+  nothingHere: "Nothing here yet",
+  olderData: "Showing older data",
+};
+
+let strings: UiStrings = { ...DEFAULT_STRINGS };
+
+export function setUiStrings(patch: Partial<UiStrings>): void {
+  strings = { ...strings, ...patch };
+}
+
+export function uiStrings(): UiStrings {
+  return strings;
+}
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 export interface ButtonOptions {
@@ -34,7 +69,7 @@ export function emptyState(title: string, hint?: string, action?: HTMLElement): 
   return h("div", { class: "ks-empty" }, h("strong", null, title), hint ? h("p", null, hint) : null, action);
 }
 
-export function spinner(label = "Loading…"): HTMLElement {
+export function spinner(label: string = strings.loading): HTMLElement {
   return h("div", { class: "ks-loading", role: "status", aria: { live: "polite" } }, h("span", { class: "ks-spinner", aria: { hidden: true } }), label);
 }
 
@@ -44,7 +79,7 @@ export function errorState(error: ExtensionError, onRetry?: () => void): HTMLEle
     { class: "ks-error", role: "alert" },
     h("strong", null, error.message),
     error.code ? h("small", null, error.code) : null,
-    onRetry && error.retryable !== false ? button("Retry", { onClick: onRetry }) : null,
+    onRetry && error.retryable !== false ? button(strings.retry, { onClick: onRetry }) : null,
   );
 }
 
@@ -151,7 +186,7 @@ export function form(
 ): FormHandle {
   const handles = Object.fromEntries(fields.map((item) => [item.name, field(item)])) as Record<string, FieldHandle>;
   const banner = h("div", { class: "ks-form-error", role: "alert", hidden: true });
-  const submit = button(options.submitLabel ?? "Save", { variant: "primary", type: "submit" });
+  const submit = button(options.submitLabel ?? strings.save, { variant: "primary", type: "submit" });
   const el = h("form", { class: "ks-form", novalidate: true }, banner, h("div", { class: "ks-form-grid" }, Object.values(handles).map((item) => item.el)), h("div", { class: "ks-form-actions" }, submit, options.extraActions));
   const handle: FormHandle = {
     el,
@@ -176,7 +211,7 @@ export function form(
     for (const item of fields) {
       const value = handles[item.name].value();
       if (item.required && (value === "" || value === false)) {
-        handles[item.name].setError("Required");
+        handles[item.name].setError(strings.required);
         valid = false;
       } else {
         handles[item.name].setError(null);
@@ -201,7 +236,7 @@ export interface Column<T> {
 
 export function table<T>(columns: Column<T>[], rows: T[], empty?: HTMLElement): HTMLElement {
   if (!rows.length) {
-    return empty ?? emptyState("Nothing here yet");
+    return empty ?? emptyState(strings.nothingHere);
   }
   return h(
     "div",
@@ -243,7 +278,7 @@ export function openDialog(title: string, body: HTMLElement | ((close: (result?:
   const panel = h(
     "div",
     { class: "ks-dialog", role: "dialog", aria: { modal: true, labelledby: titleId }, tabindex: -1 },
-    h("div", { class: "ks-dialog-head" }, h("h2", { id: titleId }, title), button("×", { variant: "ghost", title: "Close", onClick: () => close(undefined) })),
+    h("div", { class: "ks-dialog-head" }, h("h2", { id: titleId }, title), button("×", { variant: "ghost", title: strings.close, onClick: () => close(undefined) })),
     h("div", { class: "ks-dialog-body" }, content),
   );
   const overlay = h("div", { class: "ks-overlay" }, panel);
@@ -291,8 +326,8 @@ export function confirmDialog(options: { title: string; message: string; confirm
       h(
         "div",
         { class: "ks-form-actions" },
-        button("Cancel", { onClick: () => close(false) }),
-        button(options.confirmLabel ?? "Confirm", { variant: options.destructive ? "danger" : "primary", onClick: () => close(true) }),
+        button(strings.cancel, { onClick: () => close(false) }),
+        button(options.confirmLabel ?? strings.confirm, { variant: options.destructive ? "danger" : "primary", onClick: () => close(true) }),
       ),
     ),
   );
@@ -365,7 +400,7 @@ export function asyncView<T>(options: AsyncViewOptions<T>): AsyncViewHandle {
       }
       if (hasData) {
         banner.hidden = false;
-        replaceChildren(banner, `Showing older data — ${result.error.message} `, button("Retry", { variant: "ghost", onClick: refresh }));
+        replaceChildren(banner, `${strings.olderData} — ${result.error.message} `, button(strings.retry, { variant: "ghost", onClick: refresh }));
       } else {
         replaceChildren(content, errorState(result.error, refresh));
       }
