@@ -152,5 +152,10 @@ Run everything with `pnpm test && pnpm test:python`.
   always states the resolved date so a misunderstanding is visible immediately.
 * Recurring CalDAV events are shown (marked ↻) but read-only: change them in the calendar app. Domovoy does not edit
   what it cannot edit safely.
+* The API does not check the `Host`/`Origin` of requests from trusted networks. A DNS-rebinding page opened in a browser
+  on a trusted device could therefore talk to the API as that device (the CSRF header does not stop a page that the
+  browser considers same-origin). Keep `domovoy_trusted_networks` to the kiosk itself; a Host allow-list is a
+  candidate next step. A reverse proxy in front of the add-on that talks from `127.0.0.1` is trusted as "local", so put
+  authentication in the proxy or do not expose the port.
 * A language model can only be as good as the one you point it at; Domovoy validates and queues its output but cannot
   make a weak model reliable.
