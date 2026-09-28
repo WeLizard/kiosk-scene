@@ -64,6 +64,11 @@ class SettingsService:
             if isinstance(DEFAULTS[key], dict):
                 _check_nested(key, DEFAULTS[key], value)
             self._check(key, value)
+        auto = float(patch.get("auto_apply_confidence", self.get("auto_apply_confidence")))
+        review = float(patch.get("review_confidence", self.get("review_confidence")))
+        if review > auto:
+            raise ValidationError("The review threshold cannot be higher than the auto-apply threshold",
+                                  fields={"review_confidence": "Must not exceed the auto-apply threshold"})
         for key, value in patch.items():
             # Nested settings are patched, not replaced: sending {"ai": {"auto_apply": true}} keeps base_url etc.
             merged = {**self.get(key), **value} if isinstance(DEFAULTS[key], dict) else value

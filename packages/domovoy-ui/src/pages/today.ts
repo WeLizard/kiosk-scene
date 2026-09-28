@@ -139,7 +139,9 @@ export function mountToday(host: HTMLElement, _params: Record<string, unknown>, 
             : emptyLine("Задач нет."),
         ),
         data.review_count
-          ? card("Ждёт проверки", h("div", null, h("p", null, `Есть неуверенные команды: ${data.review_count}. Я ничего не записал без вашего подтверждения.`), button("Открыть проверку", { variant: "primary", onClick: () => runtime.navigate("domovoy.review") })))
+          ? card("Ждёт проверки", h("div", null, h("p", null, `Есть неуверенные команды: ${data.review_count}. Я ничего не записал без вашего подтверждения.`),
+              // the review page exists in the admin UI only; on the kiosk there is nothing to open
+              kiosk ? h("p", { class: "ks-muted" }, "Откройте администрирование на телефоне или компьютере, чтобы решить.") : button("Открыть проверку", { variant: "primary", onClick: () => runtime.navigate("domovoy.review") })))
           : null,
         data.warnings.length ? card("Календари", h("p", { class: "ks-stale-banner" }, `Не удалось прочитать: ${data.warnings.map((w) => w.source).join(", ")}`)) : null,
         kiosk ? null : card(

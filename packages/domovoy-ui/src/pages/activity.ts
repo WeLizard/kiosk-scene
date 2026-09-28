@@ -4,7 +4,7 @@ import { describeIntent } from "../intents.js";
 import { T } from "../i18n.js";
 import type { AuditRow, CommandRecord, OutboxRow } from "../types.js";
 import { formatDateTime } from "../util.js";
-import { card, emptyLine, listItem, liveRefresh, pageHead, perform, read, smallButton, statusBadge, view } from "./common.js";
+import { card, emptyLine, keepFocus, listItem, liveRefresh, pageHead, perform, read, smallButton, statusBadge, view } from "./common.js";
 
 type Tab = "audit" | "commands" | "outbox";
 
@@ -19,9 +19,9 @@ export function mountActivity(host: HTMLElement, _params: Record<string, unknown
 
   const mountTab = (): void => {
     handle?.dispose();
-    replaceChildren(tabs, TABS.map(([id, label]) =>
-      h("button", { type: "button", role: "tab", class: `ks-chip${tab === id ? " is-active" : ""}`, "aria-selected": String(tab === id), onClick: () => { tab = id; mountTab(); } }, label),
-    ));
+    keepFocus(tabs, () => replaceChildren(tabs, TABS.map(([id, label]) =>
+      h("button", { type: "button", role: "tab", dataset: { key: id }, class: `ks-chip${tab === id ? " is-active" : ""}`, "aria-selected": String(tab === id), onClick: () => { tab = id; mountTab(); } }, label),
+    )));
     if (tab === "audit") {
       handle = asyncView<{ audit: AuditRow[] }>({
         host: content,

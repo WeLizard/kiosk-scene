@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@kiosk-scene/core";
 import { isAbsoluteUrl } from "@kiosk-scene/core";
 
 export interface ExtensionBootstrapEntry {
@@ -33,9 +34,28 @@ export const DEFAULT_BOOTSTRAP_URL = "../scene-api/bootstrap";
 const LEGACY_LIVE2D_PREFIX = "/local/live2d/";
 const SCENE_LEGACY_LIVE2D_PREFIX = "/scene-legacy/live2d/";
 
+export function isSameOrigin(url: string, base: string = window.location.href): boolean {
+  try {
+    return new URL(url, base).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The bootstrap document decides which code the page runs (extension modules are `import()`ed from it), so `?bootstrap=`
+ * is honoured only when it points at this same origin. A link that says `?bootstrap=https://elsewhere/…` must not be able
+ * to make a kiosk (or an admin page sharing Home Assistant's origin under ingress) execute someone else's script.
+ */
 export function resolveBootstrapUrl(): string {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("bootstrap") || DEFAULT_BOOTSTRAP_URL;
+  const requested = new URLSearchParams(window.location.search).get("bootstrap");
+  if (requested && isSameOrigin(requested)) {
+    return requested;
+  }
+  if (requested) {
+    console.warn(`Ignoring ?bootstrap=${requested}: it is not on this origin.`);
+  }
+  return DEFAULT_BOOTSTRAP_URL;
 }
 
 export function resolveIngressRoot(bootstrapUrl: string): string | null {
@@ -100,7 +120,7 @@ export function resolveHostedUrl(value: string, bootstrapUrl: string): string {
 }
 
 export async function loadBootstrap(url: string): Promise<SceneHostBootstrap> {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetchWithTimeout(fetch, url, { cache: "no-store" });
   let payload: SceneHostBootstrap;
   try {
     payload = await response.json() as SceneHostBootstrap;
@@ -114,7 +134,7 @@ export async function loadBootstrap(url: string): Promise<SceneHostBootstrap> {
 }
 
 export async function readJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetchWithTimeout(fetch, url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
   }

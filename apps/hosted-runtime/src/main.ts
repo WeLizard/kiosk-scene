@@ -217,6 +217,18 @@ async function boot(container: HTMLElement): Promise<BrowserSceneShellApp | null
   // and widget cards when they arrive.
   void loadBootstrapExtensions(registry, bootstrap, bootstrapUrl);
 
+  try {
+    await mountEditorIfRequested();
+  } catch (error) {
+    // retryBoot will run boot() again: without this the retry would stack a second shell (and a second set of
+    // extension services, e.g. a second microphone) on top of this one.
+    await shell.dispose();
+    await Promise.allSettled(registry.listExtensions().map((extension) => registry.unload(extension.id)));
+    throw error;
+  }
+  return shell;
+
+  async function mountEditorIfRequested(): Promise<void> {
   if (isEditorMode()) {
     await mountNativeEditorShell({
       packId,
@@ -229,7 +241,7 @@ async function boot(container: HTMLElement): Promise<BrowserSceneShellApp | null
     });
     scheduleDisplayPowerReplay();
   }
-  return shell;
+  }
 }
 
 void retryBoot(() => boot(root), {

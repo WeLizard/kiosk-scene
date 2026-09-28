@@ -119,4 +119,41 @@ describe("createLongPollSource", () => {
     expect(good).toHaveBeenCalledTimes(1);
     source.close();
   });
+
+  it("treats a 200 that is not an events document as a failure instead of spinning while 'live'", async () => {
+    // a captive portal / proxy answering 200 with HTML (surfaced by the HTTP client as { message }) and an empty body (null)
+    const junk = [ok({ message: "<html>Sign in to Wi-Fi</html>" }), ok(null), ok("text"), ok({ cursor: "abc" })];
+    const http = scriptedHttp([ok({ cursor: 5, events: [] }), ...junk, ok({ cursor: 6, events: [{ seq: 6, topic: "items.x" }] })]);
+    const source = createLongPollSource({ id: "t", http, pauseWhenHidden: false, random: () => 0, minBackoffMs: 100, maxBackoffMs: 400 });
+    const seen = vi.fn();
+    const statuses: string[] = [];
+    source.onStatus((status) => statuses.push(status));
+    source.subscribe("items", seen);
+    await flush();
+    // no tight loop: one request per backoff period, not hundreds
+    expect(http.calls.length).toBeLessThan(6);
+    expect(statuses).toContain("reconnecting");
+    await vi.advanceTimersByTimeAsync(5000);
+    await flush();
+    expect(seen.mock.calls.some(([message]) => message.topic === "items.x")).toBe(true);   // recovers when a real document arrives
+    expect(source.status()).toBe("live");
+    source.close();
+  });
+
+  it("counts its own poll timeout as a failure: a server that never answers is not 'live'", async () => {
+    const http = scriptedHttp([ok({ cursor: 1, events: [] })]);                // afterwards every request parks until aborted
+    const source = createLongPollSource({ id: "t", http, pauseWhenHidden: false, waitSeconds: 2, graceSeconds: 1, random: () => 0, minBackoffMs: 100 });
+    const statuses: string[] = [];
+    source.onStatus((status) => statuses.push(status));
+    source.subscribe("items", () => undefined);
+    await flush();
+    expect(source.status()).toBe("live");
+    await vi.advanceTimersByTimeAsync(3100);                                   // waitSeconds + grace: our timeout fires
+    await flush();
+    expect(statuses).toContain("reconnecting");
+    await vi.advanceTimersByTimeAsync(30_000);
+    await flush();
+    expect(source.status()).toBe("offline");
+    source.close();
+  });
 });

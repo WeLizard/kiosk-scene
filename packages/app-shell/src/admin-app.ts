@@ -108,7 +108,7 @@ export function mountAdminApp(root: HTMLElement, options: AdminAppOptions): Admi
   function navLink(page: PageDefinition, className: string): HTMLAnchorElement {
     return h(
       "a",
-      { class: className, href: buildRoute(page.id), dataset: { pageId: page.id }, onClick: () => shell.setAttribute("data-menu", "closed") },
+      { class: className, href: buildRoute(page.id), dataset: { pageId: page.id }, onClick: () => setMenu(false, false) },
       h("span", { class: "ks-nav-icon", aria: { hidden: true } }, page.icon ?? page.title.slice(0, 1)),
       h("span", { class: "ks-nav-label" }, page.title),
     );
@@ -247,9 +247,37 @@ export function mountAdminApp(root: HTMLElement, options: AdminAppOptions): Admi
   }
 
   const onHashChange = (): void => void show();
-  const menuButton = button("☰", { variant: "ghost", title: labels.menu, onClick: () => shell.setAttribute("data-menu", shell.getAttribute("data-menu") === "open" ? "closed" : "open") });
+  const menuButton = button("☰", { variant: "ghost", title: labels.menu, onClick: () => setMenu(shell.getAttribute("data-menu") !== "open") });
   menuButton.classList.add("ks-menu-button");
   menuButton.setAttribute("aria-label", labels.menu);
+  menuButton.setAttribute("aria-expanded", "false");
+
+  /**
+   * The phone drawer: while it is closed nothing in it can be tabbed to (`inert` + hidden by CSS), while it is open
+   * focus moves into it and Escape closes it and returns focus to the button.
+   */
+  function setMenu(open: boolean, restoreFocus = true): void {
+    shell.setAttribute("data-menu", open ? "open" : "closed");
+    menuButton.setAttribute("aria-expanded", String(open));
+    const sidebar = shell.querySelector<HTMLElement>(".ks-sidebar");
+    const drawerMode = window.matchMedia?.("(max-width: 899px)").matches ?? false;
+    if (sidebar) {
+      sidebar.toggleAttribute("inert", drawerMode && !open);
+    }
+    if (open) {
+      shell.querySelector<HTMLElement>(".ks-sidebar a")?.focus();
+    } else if (restoreFocus && drawerMode && sidebar?.contains(document.activeElement)) {
+      menuButton.focus();
+    }
+  }
+  const onMenuKey = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && shell.getAttribute("data-menu") === "open") {
+      setMenu(false);
+    }
+  };
+  document.addEventListener("keydown", onMenuKey);
+  const onResize = (): void => setMenu(shell.getAttribute("data-menu") === "open", false);
+  window.addEventListener("resize", onResize);
 
   replaceChildren(
     shell,
@@ -260,7 +288,7 @@ export function mountAdminApp(root: HTMLElement, options: AdminAppOptions): Admi
       navList,
       h("div", { class: "ks-nav-footer" }, (options.footerLinks ?? []).map((link) => h("a", { href: link.href, class: "ks-nav-footer-link" }, link.label))),
     ),
-    h("div", { class: "ks-scrim", onClick: () => shell.setAttribute("data-menu", "closed") }),
+    h("div", { class: "ks-scrim", onClick: () => setMenu(false) }),
     h("div", { class: "ks-content" }, h("header", { class: "ks-topbar" }, menuButton, title, statusPill), view),
     bottomNav,
   );
@@ -274,6 +302,7 @@ export function mountAdminApp(root: HTMLElement, options: AdminAppOptions): Admi
     }
   });
   window.addEventListener("hashchange", onHashChange);
+  setMenu(false, false);
   renderNav();
   watchSources();
   void show();
@@ -284,6 +313,8 @@ export function mountAdminApp(root: HTMLElement, options: AdminAppOptions): Admi
       disposed = true;
       services.stop();
       window.removeEventListener("hashchange", onHashChange);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("keydown", onMenuKey);
       unsubscribeRegistry();
       for (const unsubscribe of statusUnsubscribers.splice(0)) {
         unsubscribe();

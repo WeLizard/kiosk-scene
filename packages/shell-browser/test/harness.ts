@@ -39,13 +39,28 @@ export function defaultFiles(sceneOverrides: Record<string, unknown> = {}): Reco
 /** Installs a `fetch` that serves `files` from BASE; returns handles to steer failures per path. */
 export function installFakeFetch(files: Record<string, unknown> = defaultFiles()): FakeBackend {
   const backend: FakeBackend = { files, hooks: {}, hits: {} };
-  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const name = url.pathname.replace("/scene-runtime/", "");
     backend.hits[name] = (backend.hits[name] ?? 0) + 1;
     const hook = backend.hooks[name]?.();
     if (hook) {
-      return hook;
+      // Like a real fetch, a hooked (possibly never-answering) request rejects when its signal aborts.
+      const signal = init?.signal;
+      if (!signal) {
+        return hook;
+      }
+      return Promise.race([
+        hook,
+        new Promise<Response>((_, reject) => {
+          const abort = (): void => reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+          if (signal.aborted) {
+            abort();
+          } else {
+            signal.addEventListener("abort", abort, { once: true });
+          }
+        }),
+      ]);
     }
     if (name in backend.files) {
       return new Response(JSON.stringify(backend.files[name]), { status: 200 });

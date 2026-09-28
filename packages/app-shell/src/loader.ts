@@ -38,6 +38,8 @@ export async function loadExtensions(
   const timeoutMs = options.timeoutMs ?? 15_000;
   const reports: ExtensionLoadReport[] = [];
   for (const descriptor of descriptors) {
+    // a failure must never take down an extension that was already running under this id
+    const alreadyLoaded = registry.listExtensions().some((manifest) => manifest.id === descriptor.id);
     try {
       const loaded = await withTimeout(importModule(descriptor.moduleUrl), timeoutMs, `Import of ${descriptor.id}`);
       const candidate = (loaded as { default?: unknown } | null)?.default ?? loaded;
@@ -52,6 +54,11 @@ export async function loadExtensions(
       }
       reports.push({ id: descriptor.id, ok: true });
     } catch (error) {
+      // A timeout leaves `activate()` running in the background; if it finishes later it must not leave half an
+      // extension registered. Unloading now is a no-op when nothing was registered yet.
+      if (!alreadyLoaded) {
+        void registry.unload(descriptor.id).catch(() => undefined);
+      }
       reports.push({ id: descriptor.id, ok: false, error: error instanceof Error ? error.message : String(error) });
     }
   }

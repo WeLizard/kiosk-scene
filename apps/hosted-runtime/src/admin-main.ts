@@ -77,7 +77,12 @@ async function boot(): Promise<void> {
     ],
   });
   await loadBootstrapExtensions(registry, bootstrap, bootstrapUrl);
-  window.addEventListener("pagehide", () => app.dispose(), { once: true });
+  // `persisted` = the page is going into the back/forward cache and may come back: keep it alive.
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) {
+      app.dispose();
+    }
+  });
 }
 
 void retryBoot(boot, {

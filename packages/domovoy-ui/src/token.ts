@@ -2,13 +2,14 @@ import { button, form, h, openDialog } from "@kiosk-scene/app-shell";
 import { T } from "./i18n.js";
 
 let open = false;
+let quietUntil = 0;
 
 /**
  * Opened once when the server says 401: only happens when the page is reached over the LAN without Home Assistant's
  * login in front of it. The token is kept in this browser only.
  */
 export function askForToken(store: (token: string) => void): void {
-  if (open) {
+  if (open || Date.now() < quietUntil) {
     return;
   }
   open = true;
@@ -24,7 +25,10 @@ export function askForToken(store: (token: string) => void): void {
     });
     return h("div", null, h("p", null, "Сервер просит подтвердить, что это вы. Введите токен из раздела «Интеграции → Доступ» (или откройте страницу из панели Home Assistant — там токен не нужен)."), f.el);
   });
-  void dialog.closed.then(() => {
+  void dialog.closed.then((saved) => {
     open = false;
+    if (saved !== true) {
+      quietUntil = Date.now() + 5 * 60_000;   // cancelled: do not reopen on every failed refresh
+    }
   });
 }

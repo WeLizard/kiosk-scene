@@ -204,21 +204,30 @@ export function renderCardsBody(ctx: SlideRenderContext, page: ScenePageV1, inde
         </div>`;
 }
 
+/**
+ * A number that ends up inside a `style="…"` attribute. Scene files can be edited by hand or imported, so anything
+ * that is not a plain in-range integer falls back instead of being interpolated as text.
+ */
+function gridInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Math.trunc(Number(value));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
 export function renderGridBody(ctx: SlideRenderContext, page: ScenePageV1, index: number, pageCount: number): string {
   const rawCards = page.cards || [];
   const cards = resolveSceneCards(rawCards, ctx.states, ctx.locale);
-  const cols = page.gridColumns || 4;
-  const rows = page.gridRows || 3;
+  const cols = gridInt(page.gridColumns, 1, 12, 4);
+  const rows = gridInt(page.gridRows, 1, 12, 3);
   const stampCaption = trimText(page.stampCaption, 24) || ctx.labels.pageStamp;
   const stampValue = trimText(page.stampValue, 32) || `${index + 1} / ${pageCount}`;
 
   const cardsHtml = cards.map((card, cardIndex) => {
     const raw = rawCards[cardIndex] || {};
-    const col = Number(raw.col);
-    const row = Number(raw.row);
-    const w = Math.max(1, Number(raw.w) || 1);
-    const h = Math.max(1, Number(raw.h) || 1);
-    const hasPosition = Number.isFinite(col) && Number.isFinite(row);
+    const col = Math.trunc(Number(raw.col));
+    const row = Math.trunc(Number(raw.row));
+    const w = gridInt(raw.w, 1, 24, 1);
+    const h = gridInt(raw.h, 1, 24, 1);
+    const hasPosition = Number.isFinite(col) && Number.isFinite(row) && col >= 0 && row >= 0 && col < 100 && row < 100;
     const gridStyle = hasPosition
       ? `grid-column: ${col + 1} / span ${w}; grid-row: ${row + 1} / span ${h};`
       : "";

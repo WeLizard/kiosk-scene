@@ -192,4 +192,49 @@ describe("createMicClient", () => {
     await vi.waitFor(() => expect(states.some((s) => s.kind === "unavailable")).toBe(true));
     client.stop();
   });
+
+  it("never goes live if stop() is called while the permission prompt is still open", async () => {
+    const track = { enabled: true, stop: vi.fn() };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream;
+    let grant: (stream: MediaStream) => void = () => undefined;
+    const states: MicState[] = [];
+    const createContext = vi.fn();
+    const client = createMicClient({
+      http: {} as HttpClient,
+      room: "",
+      onState: (s) => states.push(s),
+      mediaDevices: { getUserMedia: () => new Promise<MediaStream>((resolve) => { grant = resolve; }) },
+      audioContextFactory: createContext as unknown as () => AudioContext,
+    });
+    const started = client.start();
+    client.stop();                                    // the person (or the host) shut it down before answering the prompt
+    grant(stream);
+    await started;
+    expect(track.stop).toHaveBeenCalled();            // the just-granted microphone is released at once
+    expect(createContext).not.toHaveBeenCalled();     // nothing was wired up
+    expect(states.at(-1)?.kind).toBe("off");          // and the UI does not claim to be listening
+  });
+
+  it("honours a mute pressed while the prompt was open", async () => {
+    const track = { enabled: true, stop: vi.fn() };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream;
+    let grant: (stream: MediaStream) => void = () => undefined;
+    const states: MicState[] = [];
+    const processor = { connect: vi.fn(), disconnect: vi.fn(), onaudioprocess: null };
+    const context = {
+      sampleRate: RATE, state: "running", destination: {}, createMediaStreamSource: () => ({ connect: vi.fn(), disconnect: vi.fn() }),
+      createScriptProcessor: () => processor, close: vi.fn(async () => undefined), resume: vi.fn(async () => undefined),
+    } as unknown as AudioContext;
+    const client = createMicClient({
+      http: {} as HttpClient, room: "", onState: (s) => states.push(s), audioContextFactory: () => context,
+      mediaDevices: { getUserMedia: () => new Promise<MediaStream>((resolve) => { grant = resolve; }) },
+    });
+    const started = client.start();
+    client.setMuted(true);
+    grant(stream);
+    await started;
+    expect(track.enabled).toBe(false);
+    expect(states.at(-1)?.kind).toBe("muted");
+    client.stop();
+  });
 });

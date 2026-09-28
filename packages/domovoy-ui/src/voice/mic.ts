@@ -58,6 +58,9 @@ export function createMicClient(options: MicClientOptions): MicClient {
   let vad: EnergyVad | null = null;
   let muted = false;
   let running = false;
+  let starting = false;
+  /** Bumped by every stop(): a start() that was still waiting for the permission prompt sees it and cleans up. */
+  let generation = 0;
   let inFlight = false;
   let resetTimer: number | undefined;
 
@@ -107,7 +110,7 @@ export function createMicClient(options: MicClientOptions): MicClient {
       return muted;
     },
     async start() {
-      if (running) {
+      if (running || starting) {
         return;
       }
       const blocked = micUnavailableReason();
@@ -115,14 +118,28 @@ export function createMicClient(options: MicClientOptions): MicClient {
         emit({ kind: "unavailable", reason: blocked });
         return;
       }
+      const mine = generation;
+      starting = true;
       emit({ kind: "starting" });
+      let opened: MediaStream;
       try {
-        stream = await (options.mediaDevices ?? navigator.mediaDevices).getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+        opened = await (options.mediaDevices ?? navigator.mediaDevices).getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       } catch (error) {
+        starting = false;
+        if (mine !== generation) {
+          return; // stopped while the prompt was open: the person no longer wants it, say nothing
+        }
         const name = (error as { name?: string } | null)?.name;
         emit({ kind: "unavailable", reason: name === "NotAllowedError" ? "Доступ к микрофону запрещён в браузере." : name === "NotFoundError" ? "Микрофон не найден." : "Не удалось открыть микрофон." });
         return;
       }
+      if (mine !== generation) {
+        // stop() was called while the permission prompt was open: the microphone must not go live afterwards
+        opened.getTracks().forEach((track) => track.stop());
+        starting = false;
+        return;
+      }
+      stream = opened;
       context = options.audioContextFactory ? options.audioContextFactory() : new AudioContext();
       if (context.state === "suspended") {
         // Autoplay policy: without a kiosk flag the context stays suspended until the first touch.
@@ -153,9 +170,16 @@ export function createMicClient(options: MicClientOptions): MicClient {
       source.connect(processor);
       processor.connect(context.destination); // required for the node to run; it outputs silence
       running = true;
-      emit({ kind: "listening" });
+      starting = false;
+      // muted (or unmuted) while the prompt was open: honour it now that there is a stream
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = !muted;
+      });
+      emit(muted ? { kind: "muted" } : { kind: "listening" });
     },
     stop() {
+      generation += 1;
+      starting = false;
       running = false;
       window.clearTimeout(resetTimer);
       processor?.disconnect();
@@ -175,7 +199,7 @@ export function createMicClient(options: MicClientOptions): MicClient {
       stream?.getAudioTracks().forEach((track) => {
         track.enabled = !value;
       });
-      emit(value ? { kind: "muted" } : running ? { kind: "listening" } : { kind: "off" });
+      emit(value ? { kind: "muted" } : running ? { kind: "listening" } : starting ? { kind: "starting" } : { kind: "off" });
     },
   };
 }

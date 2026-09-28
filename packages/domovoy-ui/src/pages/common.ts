@@ -42,12 +42,16 @@ export async function perform<T = unknown>(
  */
 export function liveRefresh(runtime: ExtensionRuntime, disposer: Disposer, topics: string[], refresh: () => void, waitMs = 250, host?: HTMLElement): void {
   let held = false;
-  const typing = (): boolean => {
+  /** Somebody is in the middle of using a form here: typing in a field, or about to press its button. */
+  const busy = (): boolean => {
     const active = document.activeElement;
-    return Boolean(host && active && host.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
+    if (!host || !active || !host.contains(active)) {
+      return false;
+    }
+    return /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || (active.tagName === "BUTTON" && active.closest("form") !== null);
   };
   const run = (): void => {
-    if (typing()) {
+    if (busy()) {
       held = true;
       return;
     }
@@ -57,14 +61,16 @@ export function liveRefresh(runtime: ExtensionRuntime, disposer: Disposer, topic
   const debounced = debounce(run, waitMs);
   disposer.add(() => debounced.cancel());
   if (host) {
-    const onFocusOut = (): void => {
-      if (held) {
-        window.setTimeout(() => {
-          if (held && !typing()) {
-            run();
-          }
-        }, 0);
+    const onFocusOut = (event: FocusEvent): void => {
+      // moving to another control of the same page is still "using the form": wait until focus really leaves
+      if (!held || (event.relatedTarget instanceof Node && host.contains(event.relatedTarget))) {
+        return;
       }
+      window.setTimeout(() => {
+        if (held && !busy()) {
+          run();
+        }
+      }, 150);
     };
     host.addEventListener("focusout", onFocusOut);
     disposer.add(() => host.removeEventListener("focusout", onFocusOut));
@@ -73,6 +79,15 @@ export function liveRefresh(runtime: ExtensionRuntime, disposer: Disposer, topic
   // (subscribing to "*" would fire on *every* change, defeating the topic filter).
   for (const topic of topics) {
     disposer.add(runtime.subscribe(EVENTS_SOURCE_ID, topic, () => debounced()));
+  }
+}
+
+/** Runs `rebuild` (which replaces the children of `container`) without losing keyboard focus on a `data-key` control. */
+export function keepFocus(container: HTMLElement, rebuild: () => void): void {
+  const key = document.activeElement instanceof HTMLElement && container.contains(document.activeElement) ? document.activeElement.dataset.key : undefined;
+  rebuild();
+  if (key) {
+    container.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`)?.focus();
   }
 }
 

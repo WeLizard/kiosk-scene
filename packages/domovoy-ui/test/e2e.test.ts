@@ -23,6 +23,8 @@ describe.skipIf(!pythonAvailable)("Domovoy UI ↔ backend", { timeout: 30_000 },
   beforeAll(async () => {
     backend = await startBackend();
     globalThis.fetch = nodeFetch;
+    // The extension only talks to its own origin (the add-on serves page and API together): make the page live there.
+    (window as unknown as { happyDOM: { setURL(url: string): void } }).happyDOM.setURL(`${backend.url}scene-runtime/admin.html`);
     registry = new ExtensionRegistry();
     await registry.load(extension, { apiBase: backend.url });
     runtime = createExtensionRuntime({ registry, mode: "admin", locale: "ru", config: {}, resolveUrl: (u) => u, navigate });
@@ -30,6 +32,7 @@ describe.skipIf(!pythonAvailable)("Domovoy UI ↔ backend", { timeout: 30_000 },
 
   afterAll(async () => {
     globalThis.fetch = originalFetch;
+    (window as unknown as { happyDOM: { setURL(url: string): void } }).happyDOM.setURL("http://kiosk.test/scene-runtime/index.html");
     await registry.unload("domovoy");
     await backend?.stop();
   });
@@ -69,6 +72,12 @@ describe.skipIf(!pythonAvailable)("Domovoy UI ↔ backend", { timeout: 30_000 },
   }
 
   const text = (root: ParentNode): string => root.textContent ?? "";
+
+  it("refuses to load with an API base on another origin (the token is sent there)", async () => {
+    const other = new ExtensionRegistry();
+    await expect(other.load(extension, { apiBase: "https://evil.example/api/" })).rejects.toThrow(/same origin/);
+    expect(other.listPages()).toEqual([]);
+  });
 
   it("registers the whole extension: 11 admin sections, kiosk widgets, services", () => {
     const admin = registry.listPages().filter((p) => p.modes.includes("admin")).map((p) => p.id);
@@ -124,9 +133,12 @@ describe.skipIf(!pythonAvailable)("Domovoy UI ↔ backend", { timeout: 30_000 },
     expect(await say(today, "напомни завтра в 9 утра позвонить в банк")).toContain("выполнено");
     expect(await say(today, "добавь в список покупок молоко и хлеб")).toContain("выполнено");
     expect(await say(today, "добавь в календарь врача на завтра в 15:00")).toContain("выполнено");
-    await vi.waitFor(() => expect(text(today)).toMatch(/[Пп]озвонить в банк/), { timeout: 8000 });
-    expect(text(today)).toMatch(/[Мм]олоко/);
-    expect(text(today).toLowerCase()).toContain("врач");
+    // three commands → three refreshes in flight; the page settles on the state after the last one
+    await vi.waitFor(() => {
+      expect(text(today)).toMatch(/[Пп]озвонить в банк/);
+      expect(text(today)).toMatch(/[Мм]олоко/);
+      expect(text(today).toLowerCase()).toContain("врач");
+    }, { timeout: 8000 });
     mounted.pop()!.dispose();
 
     const tasks = await mount("domovoy.tasks");
@@ -248,6 +260,56 @@ describe.skipIf(!pythonAvailable)("Domovoy UI ↔ backend", { timeout: 30_000 },
     const ignored = await (await post("api/voice/command", { text: "что там по телевизору", room: "спальня", require_trigger: true })).json();
     expect(ignored).toMatchObject({ handled: false, reason: "no_trigger" });
     expect((await read()).revision).toBe(after.revision);
+  });
+
+  it("EDITING keeps what the form cannot show: a device-state reminder keeps its trigger and time window", async () => {
+    const trigger = { type: "state", entity_id: "sensor.printer", to: "idle", require_transition: true, window: { from: "08:00", to: "22:00" } };
+    const created = await fetch(`${backend.url}api/reminders`, { method: "POST", headers: { "Content-Type": "application/json", "X-Domovoy-Client": "test" }, body: JSON.stringify({ text: "Снять деталь с принтера", trigger, channel: "ui" }) });
+    expect(created.status).toBe(200);
+    const id = (await created.json()).reminder.id as number;
+
+    const tasks = await mount("domovoy.tasks");
+    await vi.waitFor(() => expect(text(tasks)).toContain("Снять деталь"), { timeout: 5000 });
+    const row = Array.from(tasks.querySelectorAll("li")).find((li) => li.textContent?.includes("Снять деталь"))!;
+    click(row, "Изменить");
+    const dialog = document.querySelector<HTMLElement>(".ks-dialog")!;
+    expect(dialog.querySelector<HTMLSelectElement>('select[name="mode"]')!.value).toBe("keep");
+    dialog.querySelector<HTMLInputElement>('input[name="text"]')!.value = "Снять деталь и выключить принтер";
+    dialog.querySelector<HTMLFormElement>("form")!.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector(".ks-dialog")).toBeNull(), { timeout: 5000 });
+
+    const after = await runtime.readData<{ reminders: Array<{ id: number; text: string; trigger: Record<string, unknown> }> }>("domovoy.api", { path: "api/reminders" });
+    const reminder = after.ok ? after.data.reminders.find((r) => r.id === id) : undefined;
+    expect(reminder?.text).toBe("Снять деталь и выключить принтер");
+    expect(reminder?.trigger).toMatchObject({ type: "state", entity_id: "sensor.printer", to: "idle", window: { from: "08:00", to: "22:00" } });
+  });
+
+  it("SETTINGS: an emptied number is an error on the form, not a silent 0 that would auto-apply everything", async () => {
+    const settings = await mount("domovoy.settings");
+    await vi.waitFor(() => expect(text(settings)).toContain("Насколько доверять"), { timeout: 5000 });
+    const form = Array.from(settings.querySelectorAll("form")).find((f) => f.querySelector('input[name="auto_apply_confidence"]'))!;
+    const before = await runtime.readData<{ settings: { auto_apply_confidence: number } }>("domovoy.api", { path: "api/settings" });
+    form.querySelector<HTMLInputElement>('input[name="auto_apply_confidence"]')!.value = "";
+    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await vi.waitFor(() => expect(form.querySelector(".has-error")).not.toBeNull(), { timeout: 3000 });
+    const after = await runtime.readData<{ settings: { auto_apply_confidence: number } }>("domovoy.api", { path: "api/settings" });
+    expect(after.ok && before.ok && after.data.settings.auto_apply_confidence).toBe(before.ok ? before.data.settings.auto_apply_confidence : -1);
+  });
+
+  it("REVIEW: an approval that changes nothing is reported as such and the item stays in the queue", async () => {
+    const created = await fetch(`${backend.url}api/command`, { method: "POST", headers: { "Content-Type": "application/json", "X-Domovoy-Client": "test" }, body: JSON.stringify({ text: "мне надо помыть машину", session_id: "rv" }) });
+    expect((await created.json()).status).toBe("review");
+    // make the proposal impossible to apply: move an item that does not exist
+    const queue = await runtime.readData<{ items: Array<{ id: number }> }>("domovoy.api", { path: "api/review" });
+    const id = queue.ok ? queue.data.items[0].id : 0;
+    await fetch(`${backend.url}api/review/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", "X-Domovoy-Client": "test" }, body: JSON.stringify({ proposal: [{ type: "move_item", name: "несуществующая вещь", location_path: ["Гараж"], confidence: 0.6 }] }) });
+    const review = await mount("domovoy.review");
+    await vi.waitFor(() => expect(text(review)).toContain("несуществующая вещь"), { timeout: 5000 });
+    click(review, "Подтвердить");
+    await vi.waitFor(() => expect(document.querySelector(".ks-toast-bad")?.textContent).toContain("осталось в очереди"), { timeout: 5000 });
+    const still = await runtime.readData<{ items: Array<{ id: number }> }>("domovoy.api", { path: "api/review" });
+    expect(still.ok && still.data.items.some((i) => i.id === id)).toBe(true);
+    await fetch(`${backend.url}api/review/${id}/reject`, { method: "POST", headers: { "Content-Type": "application/json", "X-Domovoy-Client": "test" }, body: "{}" });   // tidy up for the tests after this one
   });
 
   it("RESTART: data survives a restart of the service and an open page reconnects by itself", async () => {

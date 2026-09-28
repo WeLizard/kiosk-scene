@@ -11,11 +11,14 @@ function reminderForm(runtime: ExtensionRuntime, contacts: Contact[], reminder: 
   const tz = timezone();
   const kind = reminder?.kind ?? "time";
   const trig = (reminder?.trigger ?? {}) as Record<string, any>;
+  // A "device state" condition cannot be built in this form; editing such a reminder must leave it exactly as it is.
+  const keepsTrigger = kind !== "time" && trig.type === "state";
+  const window = trig.window ? { window: trig.window } : {};        // a time-of-day window survives edits
   void formDialog(
     reminder ? "Изменить напоминание" : "Новое напоминание",
     [
       { name: "text", label: "О чём напомнить", required: true, value: reminder?.text ?? "", wide: true },
-      { name: "mode", label: "Когда", type: "select", options: [{ value: "time", label: "В указанное время" }, { value: "presence", label: "Когда приду домой" }, { value: "room", label: "Когда зайду в комнату" }], value: kind === "time" ? "time" : String(trig.type ?? "presence") },
+      { name: "mode", label: "Когда", type: "select", options: [...(keepsTrigger ? [{ value: "keep", label: "Условие устройства (не меняется)" }] : []), { value: "time", label: "В указанное время" }, { value: "presence", label: "Когда приду домой" }, { value: "room", label: "Когда зайду в комнату" }], value: keepsTrigger ? "keep" : kind === "time" ? "time" : String(trig.type ?? "presence") },
       { name: "due_at", label: "Дата и время", type: "datetime-local", value: reminder?.due_at ? isoToLocalInput(reminder.due_at, tz) : "" },
       { name: "place", label: "Комната", value: trig.place && trig.type === "room" ? String(trig.place) : "", hint: "Для «когда зайду в комнату»: как в настройках комнат, например «кухня»." },
       { name: "channel", label: "Как сообщить", type: "select", options: CHANNEL_OPTIONS, value: reminder?.channel ?? "speak" },
@@ -24,7 +27,9 @@ function reminderForm(runtime: ExtensionRuntime, contacts: Contact[], reminder: 
     async (values) => {
       const mode = String(values.mode);
       const body: Record<string, unknown> = { text: String(values.text).trim(), channel: values.channel, recipient: values.recipient };
-      if (mode === "time") {
+      if (mode === "keep") {
+        // text, channel and recipient only: the trigger (and its memory of the last observed state) is untouched
+      } else if (mode === "time") {
         if (!values.due_at) {
           return { ok: false as const, error: { code: "validation", message: "Укажите время", fields: { due_at: "Укажите время" } } };
         }
@@ -34,14 +39,14 @@ function reminderForm(runtime: ExtensionRuntime, contacts: Contact[], reminder: 
         if (!String(values.place).trim()) {
           return { ok: false as const, error: { code: "validation", message: "Укажите комнату", fields: { place: "Укажите комнату" } } };
         }
-        body.trigger = { type: "room", place: String(values.place).trim(), require_transition: true };
+        body.trigger = { type: "room", place: String(values.place).trim(), require_transition: true, ...window };
       } else {
         const person = (await runtime.readData<{ settings: { ha: { person_entity: string } } }>("domovoy.api", { path: "api/settings" }));
         const entity = person.ok ? person.data.settings.ha.person_entity : "";
         if (!entity) {
           return { ok: false as const, error: { code: "validation", message: "Сначала укажите person-сущность в Интеграциях → Home Assistant." } };
         }
-        body.trigger = { type: "presence", person: entity, place: "home", require_transition: true };
+        body.trigger = { type: "presence", person: entity, place: "home", require_transition: true, ...window };
       }
       const result = reminder
         ? await runtime.invokeAction("domovoy.actions", "reminders.update", { id: reminder.id, ...body })

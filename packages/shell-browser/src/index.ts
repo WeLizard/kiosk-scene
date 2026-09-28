@@ -35,6 +35,7 @@ import {
   type ScenePageV1,
   type StateV1,
   type ViewPreset,
+  fetchWithTimeout,
 } from "@kiosk-scene/core";
 import {
   createHomeAssistantStatesReader,
@@ -86,9 +87,21 @@ interface SlideEntry {
   /** Last rendered inner HTML (or app binding) – the slide is only touched when this changes. */
   signature: string;
   views: MountedView[];
+  /** Live widgets by card index. They survive a re-render of their slide while their widget and props are unchanged. */
+  widgets: Map<number, WidgetMount>;
   /** Bumped whenever the slide's mounted views are discarded, so late async mounts can bail out. */
   generation: number;
   appPropsKey: string;
+}
+
+interface WidgetMount {
+  widgetId: string;
+  key: string;
+  /** The element the widget was mounted into (the widget keeps its own references into it). */
+  slot: HTMLElement;
+  view: MountedView | null;
+  failed: boolean;
+  disposed: boolean;
 }
 
 const EDITABLE_SELECTOR = "input, textarea, select, [contenteditable=''], [contenteditable='true']";
@@ -285,6 +298,9 @@ export class BrowserSceneShellApp {
     this.remoteControl = await this.readRemoteControl();
     this.currentControl = mergeControlV1(this.remoteControl, this.uiControl);
 
+    if (this.disposed) {
+      return; // disposed while the first data was loading: start nothing that would then never be stopped
+    }
     if (this.options.extensions) {
       this.extensionRuntime = createExtensionRuntime({
         registry: this.options.extensions,
@@ -527,7 +543,9 @@ export class BrowserSceneShellApp {
 
   private async runRefreshCycle(): Promise<void> {
     this.cycleConnectivityFailures = 0;
-    await this.refreshWeatherIfStale();
+    // Weather is decoration: give it a moment, but never let a slow weather source hold up state, control and rotation.
+    // (It keeps running and the next cycle picks up its result.)
+    await Promise.race([this.refreshWeatherIfStale(), new Promise<void>((resolve) => setTimeout(resolve, 3000))]);
     const [state, states, remoteControl] = await Promise.all([
       this.readAssistantState(),
       this.readSceneStates(),
@@ -651,7 +669,7 @@ export class BrowserSceneShellApp {
         const el = document.createElement("section");
         el.dataset.slideId = page.id;
         el.dataset.scenePageId = page.id;
-        entry = { pageId: page.id, kind: page.kind, el, signature: "\u0000", views: [], generation: 0, appPropsKey: "" };
+        entry = { pageId: page.id, kind: page.kind, el, signature: "\u0000", views: [], widgets: new Map(), generation: 0, appPropsKey: "" };
         this.slides.set(page.id, entry);
       }
       entry.el.className = slideClassFor(page);
@@ -694,13 +712,43 @@ export class BrowserSceneShellApp {
     if (entry.signature === body) {
       return;
     }
-    this.disposeViews(entry);
     entry.signature = body;
+    // The slide's HTML is rewritten whenever *any* card on it changes (a number from Home Assistant, say). A widget
+    // beside it must not be torn down for that — it may hold half-typed text — so live widgets are carried over into
+    // the new markup when their widget and props are unchanged.
+    const previous = entry.widgets;
+    entry.widgets = new Map();
     entry.el.innerHTML = body;
     for (const slot of Array.from(entry.el.querySelectorAll<HTMLElement>("[data-widget-slot]"))) {
       const cardIndex = Number(slot.dataset.sceneCardIndex);
       const card = page.cards?.[cardIndex];
-      void this.mountWidget(entry, slot, trimText(card?.widget, 96), (card?.props ?? {}) as Record<string, unknown>);
+      const widgetId = trimText(card?.widget, 96);
+      const props = (card?.props ?? {}) as Record<string, unknown>;
+      const key = JSON.stringify(props);
+      const old = previous.get(cardIndex);
+      if (old && !old.failed && old.widgetId === widgetId) {
+        if (old.key !== key) {
+          try {
+            old.view?.update?.(props);
+          } catch (error) {
+            console.warn(`Widget ${widgetId} update failed`, error);
+          }
+          old.key = key;
+        }
+        for (const { name, value } of Array.from(slot.attributes)) {
+          old.slot.setAttribute(name, value); // the card frame (position, classes) may have changed
+        }
+        slot.replaceWith(old.slot);
+        entry.widgets.set(cardIndex, old);
+        previous.delete(cardIndex);
+        continue;
+      }
+      const mount: WidgetMount = { widgetId, key, slot, view: null, failed: false, disposed: false };
+      entry.widgets.set(cardIndex, mount);
+      void this.mountWidget(mount, props);
+    }
+    for (const gone of previous.values()) {
+      this.disposeWidget(gone);
     }
   }
 
@@ -758,37 +806,47 @@ export class BrowserSceneShellApp {
     })();
   }
 
-  private async mountWidget(
-    entry: SlideEntry,
-    slot: HTMLElement,
-    widgetId: string,
-    props: Record<string, unknown>,
-  ): Promise<void> {
-    const definition = widgetId ? this.options.extensions?.getWidget(widgetId) : null;
+  private async mountWidget(mount: WidgetMount, props: Record<string, unknown>): Promise<void> {
+    const definition = mount.widgetId ? this.options.extensions?.getWidget(mount.widgetId) : null;
     if (!definition || !this.extensionRuntime) {
-      slot.classList.add("is-unavailable");
-      slot.textContent = this.labels.extensionUnavailable;
+      mount.failed = true;
+      mount.slot.classList.add("is-unavailable");
+      mount.slot.textContent = this.labels.extensionUnavailable;
       return;
     }
-    const generation = entry.generation;
     try {
-      const view = await definition.mount(slot, props, this.extensionRuntime);
-      if (entry.generation !== generation || this.disposed) {
+      const view = await definition.mount(mount.slot, props, this.extensionRuntime);
+      if (mount.disposed || this.disposed) {
         view.dispose();
         return;
       }
-      entry.views.push(view);
+      mount.view = view;
     } catch (error) {
-      if (entry.generation === generation) {
-        slot.classList.add("is-unavailable");
-        slot.textContent = this.labels.extensionUnavailable;
+      if (!mount.disposed) {
+        mount.failed = true;
+        mount.slot.classList.add("is-unavailable");
+        mount.slot.textContent = this.labels.extensionUnavailable;
       }
-      console.warn(`Widget ${widgetId} failed to mount`, error);
+      console.warn(`Widget ${mount.widgetId} failed to mount`, error);
     }
+  }
+
+  private disposeWidget(mount: WidgetMount): void {
+    mount.disposed = true;
+    try {
+      mount.view?.dispose();
+    } catch (error) {
+      console.warn("Widget dispose failed", error);
+    }
+    mount.view = null;
   }
 
   private disposeViews(entry: SlideEntry): void {
     entry.generation += 1;
+    for (const mount of entry.widgets.values()) {
+      this.disposeWidget(mount);
+    }
+    entry.widgets.clear();
     for (const view of entry.views.splice(0)) {
       try {
         view.dispose();
@@ -966,9 +1024,11 @@ export class BrowserSceneShellApp {
   }
 
   private async readJson<T>(url: string): Promise<T> {
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await fetchWithTimeout(fetch, url, { cache: "no-store" });
     if (!response.ok) {
-      throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
+      const error = new Error(`Failed to load ${url}: HTTP ${response.status}`) as Error & { status?: number };
+      error.status = response.status;
+      throw error;
     }
     return response.json() as Promise<T>;
   }

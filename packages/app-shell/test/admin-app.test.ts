@@ -140,4 +140,31 @@ describe("mountAdminApp", () => {
     expect(root.textContent).toContain("fast");
     app.dispose();
   });
+
+  it("phone drawer: closed = not focusable, open = focus inside, Escape closes and returns focus", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query: string) => ({ matches: query.includes("899px"), media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList);
+    const registry = new ExtensionRegistry();
+    await registry.load(extension());
+    const root = h("div");
+    document.body.appendChild(root);
+    const app = mountAdminApp(root, { registry, title: "Home" });
+    await settle();
+    const sidebar = root.querySelector<HTMLElement>(".ks-sidebar")!;
+    const button = root.querySelector<HTMLButtonElement>(".ks-menu-button")!;
+    expect(sidebar.hasAttribute("inert")).toBe(true);
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+
+    button.click();
+    expect(sidebar.hasAttribute("inert")).toBe(false);
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(root.querySelector(".ks-admin")!.getAttribute("data-menu")).toBe("open");
+    expect(sidebar.contains(document.activeElement)).toBe(true);
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(root.querySelector(".ks-admin")!.getAttribute("data-menu")).toBe("closed");
+    expect(sidebar.hasAttribute("inert")).toBe(true);
+    expect(document.activeElement).toBe(button);
+    app.dispose();
+    vi.restoreAllMocks();
+  });
 });

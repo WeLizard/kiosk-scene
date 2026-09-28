@@ -30,14 +30,19 @@ function settingsForm(
   const f = form(fields, {
     onSubmit: async (values, handle) => {
       const { settings, secrets } = build(values);
+      const filled = Object.fromEntries(Object.entries(secrets ?? {}).filter(([, v]) => v !== ""));
       if (settings && Object.keys(settings).length) {
-        const result = await runtime.invokeAction("domovoy.actions", "settings.update", settings);
+        const result = await runtime.invokeAction<{ secrets_cleared?: string[] }>("domovoy.actions", "settings.update", settings);
         if (!result.ok) {
           handle.showErrors(result.error);
           return;
         }
+        // A secret belongs to the address it was saved for: pointing the integration elsewhere forgets it.
+        const forgotten = (result.data.secrets_cleared ?? []).filter((name) => !(name in filled));
+        if (forgotten.length) {
+          toast("Адрес изменён, поэтому сохранённый ключ сброшен — введите его заново.", "warn", 9000);
+        }
       }
-      const filled = Object.fromEntries(Object.entries(secrets ?? {}).filter(([, v]) => v !== ""));
       if (Object.keys(filled).length) {
         const result = await runtime.invokeAction("domovoy.actions", "secrets.set", filled);
         if (!result.ok) {

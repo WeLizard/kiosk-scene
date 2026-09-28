@@ -14,6 +14,7 @@ export interface UiStrings {
   loading: string;
   nothingHere: string;
   olderData: string;
+  renderFailed: string;
 }
 
 const DEFAULT_STRINGS: UiStrings = {
@@ -26,6 +27,7 @@ const DEFAULT_STRINGS: UiStrings = {
   loading: "Loading…",
   nothingHere: "Nothing here yet",
   olderData: "Showing older data",
+  renderFailed: "This view could not be displayed.",
 };
 
 let strings: UiStrings = { ...DEFAULT_STRINGS };
@@ -250,6 +252,9 @@ export function table<T>(columns: Column<T>[], rows: T[], empty?: HTMLElement): 
   );
 }
 
+/** Open dialogs, oldest first: a confirmation inside another dialog must be the only one Escape closes. */
+const dialogStack: HTMLElement[] = [];
+
 export interface DialogHandle {
   el: HTMLElement;
   close(result?: unknown): void;
@@ -269,6 +274,10 @@ export function openDialog(title: string, body: HTMLElement | ((close: (result?:
       return;
     }
     disposer.dispose();
+    const at = dialogStack.indexOf(overlay);
+    if (at >= 0) {
+      dialogStack.splice(at, 1);
+    }
     overlay.remove();
     previouslyFocused?.focus?.();
     resolveClosed(result);
@@ -288,6 +297,9 @@ export function openDialog(title: string, body: HTMLElement | ((close: (result?:
     }
   });
   const onKey = (event: KeyboardEvent): void => {
+    if (dialogStack[dialogStack.length - 1] !== overlay) {
+      return; // a dialog opened on top of this one owns the keyboard
+    }
     if (event.key === "Escape") {
       event.stopPropagation();
       close(undefined);
@@ -313,6 +325,7 @@ export function openDialog(title: string, body: HTMLElement | ((close: (result?:
   document.addEventListener("keydown", onKey, true);
   disposer.add(() => document.removeEventListener("keydown", onKey, true));
   document.body.appendChild(overlay);
+  dialogStack.push(overlay);
   (panel.querySelector<HTMLElement>("input, select, textarea, button.ks-btn-primary") ?? panel).focus();
   return { el: overlay, close, closed };
 }
@@ -390,9 +403,16 @@ export function asyncView<T>(options: AsyncViewOptions<T>): AsyncViewHandle {
         return;
       }
       if (result.ok) {
-        hasData = true;
-        banner.hidden = true;
-        replaceChildren(content, options.render(result.data, refresh));
+        try {
+          const rendered = options.render(result.data, refresh);
+          hasData = true;
+          banner.hidden = true;
+          replaceChildren(content, rendered);
+        } catch (error) {
+          // Unexpected data must produce a message with a retry, not an endless spinner and an unhandled rejection.
+          console.error("View render failed", error);
+          replaceChildren(content, errorState({ code: "render_failed", message: strings.renderFailed, retryable: true }, refresh));
+        }
         return;
       }
       if (result.error.code === "aborted") {

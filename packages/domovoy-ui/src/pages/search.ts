@@ -2,7 +2,7 @@ import { Disposer, badge, debounce, h, replaceChildren, spinner } from "@kiosk-s
 import type { ExtensionRuntime, MountedView } from "@kiosk-scene/core";
 import { T } from "../i18n.js";
 import type { SearchHit } from "../types.js";
-import { emptyLine, listItem, liveRefresh, read, view } from "./common.js";
+import { emptyLine, keepFocus, listItem, liveRefresh, read, view } from "./common.js";
 import { openItemDialog } from "./inventory.js";
 
 interface SearchResponse {
@@ -24,12 +24,13 @@ export function mountSearch(host: HTMLElement, params: Record<string, unknown>, 
   let sequence = 0;
   let controller: AbortController | null = null;
 
-  const renderChips = (): void => {
+  const renderChips = (): void => keepFocus(chips, () => {
     replaceChildren(
       chips,
       Object.entries(T.kinds).map(([kind, label]) =>
         h("button", {
           type: "button",
+          dataset: { key: kind },
           class: `ks-chip${active.has(kind) ? " is-active" : ""}`,
           "aria-pressed": String(active.has(kind)),
           onClick: () => {
@@ -44,7 +45,7 @@ export function mountSearch(host: HTMLElement, params: Record<string, unknown>, 
         }, label),
       ),
     );
-  };
+  });
 
   const open = (hit: SearchHit): void => {
     if (hit.kind === "item") {

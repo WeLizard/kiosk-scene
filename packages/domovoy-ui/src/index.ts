@@ -3,6 +3,7 @@ import { KIT_CSS } from "@kiosk-scene/app-shell/kit-css";
 import { EXTENSION_API_VERSION, type Extension, type ExtensionHost, type PageDefinition } from "@kiosk-scene/core";
 import { EVENTS_SOURCE_ID, createApi, storeToken } from "./api.js";
 import { T } from "./i18n.js";
+import { setServerTimezone } from "./util.js";
 import { mountActivity } from "./pages/activity.js";
 import { mountCalendar } from "./pages/calendar.js";
 import { mountIntegrations } from "./pages/integrations.js";
@@ -42,11 +43,24 @@ const extension: Extension = {
 
   activate(host: ExtensionHost): void {
     const apiBase = typeof host.config.apiBase === "string" && host.config.apiBase ? host.config.apiBase : "../domovoy-api/";
-    setUiStrings({ retry: T.retry, cancel: T.cancel, confirm: T.confirm, save: T.save, close: T.close, required: "Обязательное поле", loading: T.loading, nothingHere: T.empty, olderData: "Показаны прежние данные" });
+    // The API token is sent to this address: it must be this origin (the host already checks; this is the second lock).
+    if (new URL(apiBase, window.location.href).origin !== window.location.origin) {
+      throw new Error("Domovoy: apiBase must be on the same origin as the page");
+    }
+    setUiStrings({ retry: T.retry, cancel: T.cancel, confirm: T.confirm, save: T.save, close: T.close, required: "Обязательное поле", loading: T.loading, nothingHere: T.empty, olderData: "Показаны прежние данные", renderFailed: "Не удалось показать этот раздел." });
     injectStyles("domovoy-ui-kit", KIT_CSS);
     injectStyles("domovoy-ui", DOMOVOY_CSS);
 
-    const api = createApi({ baseUrl: apiBase, onUnauthorized: () => askForToken(storeToken) });
+    // Only the administration page can ask for a token: a kiosk has nobody to type it (it is let in through the
+    // add-on's trusted networks instead), and a modal over the display every few seconds would be worse than an error.
+    const isAdminPage = /\/admin\.html$/.test(window.location.pathname);
+    const api = createApi({ baseUrl: apiBase, onUnauthorized: () => { if (isAdminPage) { askForToken(storeToken); } } });
+    // Every page formats times in the household's zone; learn it once, up front, whichever page opens first.
+    void api.http.request<{ timezone?: string }>("api/state").then((state) => {
+      if (state.ok && state.data.timezone) {
+        setServerTimezone(state.data.timezone);
+      }
+    });
     host.registerDataProvider(api.data);
     host.registerActionProvider(api.actions);
     host.registerRealtimeSource(createLongPollSource({ id: EVENTS_SOURCE_ID, http: api.http, waitSeconds: 25, pauseWhenHidden: true }));

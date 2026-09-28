@@ -63,6 +63,26 @@ describe("scene shell rendering", () => {
   });
 });
 
+describe("scene files are not trusted markup", () => {
+  it("cannot inject attributes through grid sizes or card positions", async () => {
+    installFakeFetch(defaultFiles({
+      rotation: { order: ["grid"], defaultDwellSeconds: 20 },
+      pages: [{
+        id: "grid", kind: "grid", title: "Grid", gridColumns: '3" onfocus="x" tabindex="0" y="', gridRows: "2px; background: url(//evil)",
+        cards: [{ type: "text", caption: "A", value: "1", col: '0" onmouseover="x', row: 0, w: "9999", h: -3 }],
+      }],
+    }));
+    const { root } = await start();
+    const html = root.innerHTML;
+    expect(html).not.toContain("onfocus");
+    expect(html).not.toContain("onmouseover");
+    expect(html).not.toContain("evil");
+    const container = root.querySelector<HTMLElement>(".grid-cards-container")!;
+    expect(container.getAttribute("style")).toBe("--grid-cols: 4; --grid-rows: 3;");     // garbage → the defaults
+    expect(container.attributes.length).toBe(2);                                          // class + style, nothing smuggled in
+  });
+});
+
 describe("weather without data", () => {
   const placeholder = {
     title: "Weather", location: "", todayCaption: "Today", todayValue: "28 September", todayLabel: "Monday", updatedCaption: "Updated",
@@ -111,6 +131,21 @@ describe("refresh lifecycle", () => {
     // One in-flight cycle plus at most one queued follow-up, never eight.
     expect(backend.hits["state.json"]).toBeLessThanOrEqual(2);
     expect(backend.hits["state.json"]).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not hang on a source that accepts the connection and never answers", async () => {
+    const backend = installFakeFetch();
+    const { root, shell } = await start({ staleAfterFailures: 1 });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    backend.hooks["state.json"] = () => new Promise<Response>(() => undefined);      // half-open connection: no answer, no error
+    const cycle = shell.refreshNow();
+    await vi.advanceTimersByTimeAsync(10_500);                                         // the request timeout, not forever
+    await cycle;
+    expect(root.dataset.stale).toBe("true");                                         // and the display says so
+    backend.hooks["state.json"] = undefined;
+    await shell.refreshNow();
+    expect(root.dataset.stale).toBe("false");
+    vi.useRealTimers();
   });
 
   it("removes its document listener and stops refreshing after dispose", async () => {
@@ -341,6 +376,59 @@ describe("extension pages and widgets", () => {
     await shell.refreshNow();
     await shell.refreshNow();
     expect(mounts).toHaveLength(1);
+  });
+
+  it("keeps a widget alive (and its half-typed text) when a card beside it changes", async () => {
+    installFakeFetch(defaultFiles({
+      pages: [
+        { id: "cards", kind: "cards", title: "Cards", cards: [{ type: "widget", widget: "demo.input", props: { label: "a" } }, { type: "text", caption: "T", value: "v" }] },
+        { id: "second", kind: "cards", title: "Second", cards: [] },
+      ],
+    }));
+    const lifecycle = { mounts: 0, disposes: 0, updates: [] as unknown[] };
+    const registry = registryWith((host) => {
+      host.registerWidget({
+        id: "demo.input",
+        title: "Input",
+        mount: (el) => {
+          lifecycle.mounts += 1;
+          el.append(Object.assign(document.createElement("input"), { className: "typed" }));
+          return { update: (props) => lifecycle.updates.push(props), dispose: () => { lifecycle.disposes += 1; } };
+        },
+      });
+    });
+    await settle();
+    const { root, shell } = await start({ extensions: registry });
+    await settle();
+    const internals = shell as unknown as {
+      slides: Map<string, { signature: string }>;
+      sceneRuntimeConfig: { pages: unknown[] };
+      applySlideHtml(entry: unknown, body: string, page: unknown): void;
+    };
+    const input = root.querySelector<HTMLInputElement>(".typed")!;
+    input.value = "half-typed";
+    const slot = root.querySelector("[data-widget-slot]")!;
+    const entry = internals.slides.get("cards")!;
+
+    // a sibling card changes: the whole slide's markup is rewritten
+    internals.applySlideHtml(entry, entry.signature.replace(">v<", ">changed<"), internals.sceneRuntimeConfig.pages[0]);
+    expect(root.querySelector('[data-slide-id="cards"]')!.textContent).toContain("changed");
+    expect(lifecycle).toMatchObject({ mounts: 1, disposes: 0 });
+    expect(root.querySelector("[data-widget-slot]")).toBe(slot);
+    expect(root.querySelector<HTMLInputElement>(".typed")).toBe(input);
+    expect(input.value).toBe("half-typed");
+
+    // the same widget with new props is updated in place, not remounted
+    const page = structuredClone(internals.sceneRuntimeConfig.pages[0]) as { cards: Array<{ props: unknown }> };
+    page.cards[0].props = { label: "b" };
+    internals.applySlideHtml(entry, `${entry.signature}<!-- props -->`, page);
+    expect(lifecycle).toMatchObject({ mounts: 1, disposes: 0, updates: [{ label: "b" }] });
+
+    // removing the widget card disposes it
+    const without = structuredClone(page) as { cards: unknown[] };
+    without.cards = [];
+    internals.applySlideHtml(entry, "<div>empty</div>", without);
+    expect(lifecycle.disposes).toBe(1);
   });
 
   it("does not let a failing extension page break other slides", async () => {

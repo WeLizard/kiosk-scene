@@ -79,13 +79,13 @@ export function mountSettings(host: HTMLElement, _params: Record<string, unknown
       setServerTimezone(state.timezone);
       const general = panel("Общие", null, saveForm(runtime, [
         { name: "timezone", label: "Часовой пояс", type: "select", options: timezoneOptions(s.timezone), value: s.timezone, hint: `Сейчас на сервере: ${state.timezone}`, wide: true },
-        { name: "default_reminder_hour", label: "Во сколько напоминать, если сказали только «завтра» (час)", type: "number", min: 0, max: 23, value: s.default_reminder_hour, wide: true },
-        { name: "default_event_minutes", label: "Длительность события по умолчанию, минут", type: "number", min: 5, max: 1440, value: s.default_event_minutes, wide: true },
+        { name: "default_reminder_hour", label: "Во сколько напоминать, если сказали только «завтра» (час)", type: "number", min: 0, max: 23, required: true, value: s.default_reminder_hour, wide: true },
+        { name: "default_event_minutes", label: "Длительность события по умолчанию, минут", type: "number", min: 5, max: 1440, required: true, value: s.default_event_minutes, wide: true },
       ], (v) => ({ timezone: String(v.timezone), default_reminder_hour: Number(v.default_reminder_hour), default_event_minutes: Number(v.default_event_minutes) }), refresh));
 
       const confidence = panel("Насколько доверять пониманию команд", "Правила понимают привычные фразы сами. Если уверенность ниже порога — команда не выполняется, а ждёт вашего решения в «Проверке». Записи, предложенные языковой моделью, всегда идут на проверку, пока вы явно не разрешите иначе.", saveForm(runtime, [
-        { name: "auto_apply_confidence", label: "Выполнять сразу при уверенности от (0–1)", type: "number", min: 0, max: 1, step: 0.05, value: s.auto_apply_confidence, wide: true },
-        { name: "review_confidence", label: "Отправлять на проверку от (ниже — переспрашивать)", type: "number", min: 0, max: 1, step: 0.05, value: s.review_confidence, wide: true },
+        { name: "auto_apply_confidence", label: "Выполнять сразу при уверенности от (0–1)", type: "number", min: 0, max: 1, step: 0.05, required: true, value: s.auto_apply_confidence, wide: true },
+        { name: "review_confidence", label: "Отправлять на проверку от (ниже — переспрашивать)", type: "number", min: 0, max: 1, step: 0.05, required: true, value: s.review_confidence, wide: true },
         { name: "ai_auto_apply", label: "Выполнять записи языковой модели без проверки (при уверенности от 0,9)", type: "checkbox", value: s.ai.auto_apply, hint: "Не рекомендуется: модель может ошибаться. Всё можно отменить в «Журнале», но лучше сначала посмотреть.", wide: true },
       ], (v) => ({ auto_apply_confidence: Number(v.auto_apply_confidence), review_confidence: Number(v.review_confidence), ai: { auto_apply: v.ai_auto_apply === true } }), refresh));
 
@@ -93,7 +93,7 @@ export function mountSettings(host: HTMLElement, _params: Record<string, unknown
         saveForm(runtime, [
           { name: "enabled", label: "Принимать голосовые команды с микрофона киоска", type: "checkbox", value: s.voice.enabled, wide: true },
           { name: "trigger_words", label: "Слова-триггеры", value: (s.voice.trigger_words ?? []).join(", "), hint: "Через запятую, все падежи, которые вы произносите: «домовой, домового, домовому».", wide: true },
-          { name: "window_s", label: "После обращения слушать без повторного слова, секунд", type: "number", min: 5, max: 120, value: s.voice.window_s, wide: true },
+          { name: "window_s", label: "После обращения слушать без повторного слова, секунд", type: "number", min: 5, max: 120, required: true, value: s.voice.window_s, wide: true },
           { name: "reply", label: "Как отвечать", type: "select", options: [{ value: "speak", label: "Голосом через колонки" }, { value: "text", label: "Только текстом на экране" }], value: s.voice.reply, wide: true },
           { name: "room", label: "Комната этого микрофона", value: s.voice.room, hint: "Чтобы ответ прозвучал в ближайшей колонке.", wide: true },
           { name: "speak_enabled", label: "Озвучивать напоминания и ответы", type: "checkbox", value: s.speak.enabled, wide: true },

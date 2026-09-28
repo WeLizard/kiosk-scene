@@ -1,5 +1,5 @@
 import type { ControlProvider, ControlV1, StateProvider, StateV1 } from "@kiosk-scene/core";
-import { DEFAULT_CONTROL_V1, sanitizeControlV1, sanitizeStateV1, trimText } from "@kiosk-scene/core";
+import { DEFAULT_CONTROL_V1, fetchWithTimeout, sanitizeControlV1, sanitizeStateV1, trimText } from "@kiosk-scene/core";
 
 export interface JsonProviderOptions<TPayload> {
   url: string;
@@ -35,7 +35,7 @@ async function fetchJson<TPayload>(options: JsonProviderOptions<TPayload>): Prom
   url.searchParams.set(options.timestampParam || "ts", String(Date.now()));
 
   try {
-    const response = await fetchImpl(url.toString(), {
+    const response = await fetchWithTimeout(fetchImpl, url.toString(), {
       cache: "no-store",
     });
     if (!response.ok) {

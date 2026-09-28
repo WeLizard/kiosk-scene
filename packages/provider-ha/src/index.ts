@@ -1,5 +1,5 @@
 import type { ControlProvider, ControlV1, StateProvider, StateV1, ViewPreset } from "@kiosk-scene/core";
-import { DEFAULT_CONTROL_V1, sanitizeControlV1, sanitizeStateV1, trimText } from "@kiosk-scene/core";
+import { DEFAULT_CONTROL_V1, fetchWithTimeout, sanitizeControlV1, sanitizeStateV1, trimText } from "@kiosk-scene/core";
 
 export interface HomeAssistantEntityMap {
   online: string;
@@ -351,7 +351,7 @@ export function createHomeAssistantStatesReader(
       headers.Authorization = `Bearer ${token}`;
     }
 
-    inFlight = fetchImpl(explicitApiUrl || "/api/states", {
+    inFlight = fetchWithTimeout(fetchImpl, explicitApiUrl || "/api/states", {
       cache: "no-store",
       headers,
     })

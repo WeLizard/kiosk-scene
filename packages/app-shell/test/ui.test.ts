@@ -141,3 +141,36 @@ describe("createHttpClient()", () => {
     vi.useRealTimers();
   });
 });
+
+describe("asyncView() with unexpected data", () => {
+  it("shows an error with a retry when render() throws, instead of spinning forever", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const host = h("div");
+    document.body.appendChild(host);
+    let attempts = 0;
+    const view = asyncView<{ rows: string[] }>({
+      host,
+      load: async () => ({ ok: true, data: (attempts += 1) === 1 ? ({} as { rows: string[] }) : { rows: ["a"] } }),
+      render: (data) => h("ul", null, data.rows.map((row) => h("li", null, row))),     // first payload has no `rows`
+    });
+    await vi.waitFor(() => expect(host.querySelector(".ks-error")).not.toBeNull());
+    expect(host.querySelector(".ks-spinner")).toBeNull();
+    (host.querySelector(".ks-error button") as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(host.querySelector("li")?.textContent).toBe("a"));
+    view.dispose();
+  });
+});
+
+describe("stacked dialogs", () => {
+  it("Escape closes only the top-most dialog (a confirm inside another dialog)", async () => {
+    const outer = openDialog("Item", h("p", null, "details"));
+    const asked = confirmDialog({ title: "Delete?", message: "sure?" });
+    expect(document.querySelectorAll(".ks-dialog")).toHaveLength(2);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(await asked).toBe(false);
+    expect(document.querySelectorAll(".ks-dialog")).toHaveLength(1);                   // the outer one is still open
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await outer.closed;
+    expect(document.querySelectorAll(".ks-dialog")).toHaveLength(0);
+  });
+});

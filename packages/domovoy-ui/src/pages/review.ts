@@ -4,9 +4,33 @@ import { INTENT_SPECS, applyEdits, describeIntent, fieldText, intentTitle } from
 import { T } from "../i18n.js";
 import type { ReviewItem } from "../types.js";
 import { formatDateTime, isoToLocalInput, zonedToIso } from "../util.js";
-import { card, liveRefresh, pageHead, perform, read, smallButton, statusBadge, view } from "./common.js";
+import { card, keepFocus, liveRefresh, pageHead, perform, read, smallButton, statusBadge, view } from "./common.js";
 
 type Intent = Record<string, unknown>;
+
+interface ApproveResult {
+  ok: boolean;
+  still_pending?: boolean;
+  results: Array<{ ok: boolean; message: string }>;
+}
+
+/**
+ * Approving can succeed as a request and still change nothing (an ambiguous item, a provider that is down): the server
+ * then keeps the item in the queue. Say so, instead of a green "done".
+ */
+async function approveVia(runtime: ExtensionRuntime, id: number, proposal: Intent[] | undefined, success: string): Promise<boolean> {
+  const result = await perform<ApproveResult>(runtime, "review.approve", proposal ? { id, proposal } : { id });
+  if (!result.ok) {
+    return false;
+  }
+  const failed = result.data.results.filter((r) => !r.ok).map((r) => r.message);
+  if (result.data.still_pending) {
+    toast(`Не выполнено, осталось в очереди: ${failed.join(" ")}`, "bad", 9000);
+    return false;
+  }
+  toast(failed.length ? `Выполнено частично. ${failed.join(" ")}` : success, failed.length ? "warn" : "good", failed.length ? 9000 : 4500);
+  return true;
+}
 
 function editDialog(runtime: ExtensionRuntime, item: ReviewItem, onDone: () => void): void {
   const dialog = openDialog("Проверить и поправить", (close) => {
@@ -22,7 +46,7 @@ function editDialog(runtime: ExtensionRuntime, item: ReviewItem, onDone: () => v
             label: f.label,
             type: f.kind === "bool" ? "checkbox" : f.kind === "enum" ? "select" : f.kind === "iso" ? "datetime-local" : f.kind === "num" ? "text" : "text",
             value: value as string | boolean,
-            options: f.options?.map((o) => ({ value: o, label: T.channels[o] ?? T.lists[o] ?? o })),
+            options: f.options?.map((o) => ({ value: o, label: T.channels[o] ?? T.lists[o] ?? ({ set: "заменить на это число", add: "прибавить к имеющемуся" } as Record<string, string>)[o] ?? o })),
             wide: true,
           } satisfies FieldOptions;
         });
@@ -30,9 +54,7 @@ function editDialog(runtime: ExtensionRuntime, item: ReviewItem, onDone: () => v
     });
     const save = async (): Promise<void> => {
       const proposal = forms.map(({ intent, handle }) => applyEdits(intent, handle.values(), (local) => zonedToIso(local)));
-      const result = await perform(runtime, "review.approve", { id: item.id, proposal });
-      if (result.ok) {
-        toast("Выполнено с вашими правками", "good");
+      if (await approveVia(runtime, item.id, proposal, "Выполнено с вашими правками")) {
         close(true);
         onDone();
       }
@@ -51,14 +73,19 @@ function editDialog(runtime: ExtensionRuntime, item: ReviewItem, onDone: () => v
 export function mountReview(host: HTMLElement, _params: Record<string, unknown>, runtime: ExtensionRuntime): MountedView {
   const disposer = new Disposer();
   const content = h("div");
+  const approve = async (id: number, proposal: Intent[] | undefined, refresh: () => void): Promise<void> => {
+    if (await approveVia(runtime, id, proposal, "Выполнено")) {
+      refresh();
+    }
+  };
   let status: "pending" | "approved" | "rejected" = "pending";
   const tabs = h("div", { class: "ks-row dv-chips" });
 
-  const renderTabs = (): void => {
+  const renderTabs = (): void => keepFocus(tabs, () => {
     replaceChildren(tabs, (["pending", "approved", "rejected"] as const).map((s) =>
-      h("button", { type: "button", class: `ks-chip${status === s ? " is-active" : ""}`, "aria-pressed": String(status === s), onClick: () => { status = s; renderTabs(); handle.refresh(); } }, s === "pending" ? "Ждут решения" : s === "approved" ? "Принятые" : "Отклонённые"),
+      h("button", { type: "button", dataset: { key: s }, class: `ks-chip${status === s ? " is-active" : ""}`, "aria-pressed": String(status === s), onClick: () => { status = s; renderTabs(); handle.refresh(); } }, s === "pending" ? "Ждут решения" : s === "approved" ? "Принятые" : "Отклонённые"),
     ));
-  };
+  });
 
   const handle = asyncView<{ items: ReviewItem[] }>({
     host: content,
@@ -73,7 +100,7 @@ export function mountReview(host: HTMLElement, _params: Record<string, unknown>,
                 h("ul", { class: "ks-list" }, item.proposal.map((intent: Intent) => h("li", null, describeIntent(intent, (iso) => formatDateTime(iso))))),
                 status === "pending"
                   ? h("div", { class: "ks-row" },
-                      smallButton("Подтвердить", async () => { if ((await perform(runtime, "review.approve", { id: item.id }, { success: "Выполнено" })).ok) { refresh(); } }, "primary"),
+                      smallButton("Подтвердить", async () => { await approve(item.id, undefined, refresh); }, "primary"),
                       smallButton("Поправить…", () => editDialog(runtime, item, refresh)),
                       smallButton(T.reject, async () => { if ((await perform(runtime, "review.reject", { id: item.id })).ok) { refresh(); } }, "danger"),
                     )

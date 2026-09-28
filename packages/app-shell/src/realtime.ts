@@ -25,6 +25,10 @@ interface EventsPayload {
 
 export const RESYNC_TOPIC = "*";
 
+function isEventsPayload(value: unknown): value is EventsPayload {
+  return Boolean(value) && typeof value === "object" && typeof (value as { cursor?: unknown }).cursor === "number";
+}
+
 function topicMatches(subscription: string, topic: string): boolean {
   return subscription === RESYNC_TOPIC || topic === subscription || topic.startsWith(`${subscription}.`);
 }
@@ -119,7 +123,11 @@ export function createLongPollSource(options: LongPollOptions): RealtimeSource &
           break;
         }
         controller = new AbortController();
-        const timeout = setTimeout(() => controller?.abort(new DOMException("poll timeout", "TimeoutError")), waitSeconds * 1000 + graceMs);
+        let timedOut = false;
+        const timeout = setTimeout(() => {
+          timedOut = true;
+          controller?.abort(new DOMException("poll timeout", "TimeoutError"));
+        }, waitSeconds * 1000 + graceMs);
         const result = await options.http.request<EventsPayload>(path, {
           query: { since: cursor ?? undefined, timeout: cursor === null ? 0 : waitSeconds },
           signal: controller.signal,
@@ -130,11 +138,14 @@ export function createLongPollSource(options: LongPollOptions): RealtimeSource &
         if (closed) {
           break;
         }
-        if (!result.ok) {
-          if (result.error.code === "aborted") {
-            // Aborted by resume/close: loop again immediately unless closed.
-            continue;
-          }
+        // "Aborted" by resume/close is not a failure; the same code produced by our own poll timeout is (a server that
+        // accepts the connection and never answers must not look "live" forever).
+        if (!result.ok && result.error.code === "aborted" && !timedOut) {
+          continue;
+        }
+        // A 200 that is not an events document (a captive portal's page, an empty body from a proxy) is a failure too:
+        // treating it as data would spin in a tight loop reporting "live".
+        if (!result.ok || !isEventsPayload(result.data)) {
           failures += 1;
           setStatus(failures >= 3 ? "offline" : "reconnecting");
           const exp = Math.min(maxBackoff, minBackoff * 2 ** Math.min(failures - 1, 10));

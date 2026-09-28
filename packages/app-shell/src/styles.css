@@ -237,6 +237,12 @@
     box-shadow: var(--ks-shadow);
   }
 
+  /* closed drawer: off-screen *and* out of the accessibility tree / tab order */
+  .ks-admin:not([data-menu="open"]) .ks-sidebar {
+    visibility: hidden;
+    transition: transform 0.18s ease, visibility 0s linear 0.18s;
+  }
+
   .ks-admin[data-menu="open"] .ks-sidebar {
     transform: none;
   }

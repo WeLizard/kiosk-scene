@@ -59,8 +59,13 @@ GET events?since=<cursor>&timeout=<s>  →  { cursor, events: [{ seq, topic, pay
 * reconnect uses exponential backoff with jitter; polling pauses while the page is hidden;
 * `runtime.onRealtimeStatus` reports `connecting | live | reconnecting | offline`.
 
-A page that stays open therefore never shows stale data for longer than one round trip, and a service restart is
-recovered without user action (covered by the end-to-end test in `packages/domovoy-ui/test/e2e.test.ts`).
+* a response that is not an events document (a captive portal's HTML, an empty body) or a poll that the server never
+  answers counts as a failure — the status goes to `reconnecting`, then `offline` — instead of looking "live".
+
+A page that stays open therefore refreshes within a moment of a change, is told honestly when the server stops
+answering, and recovers from a service restart without user action (covered by the end-to-end test in
+`packages/domovoy-ui/test/e2e.test.ts`). Pages that contain forms pass their root element to `liveRefresh`, so a refresh
+that arrives while someone is typing (or about to press Save) is held until they leave the section.
 
 ## Admin mode and kiosk mode
 
@@ -72,9 +77,10 @@ recovered without user action (covered by the end-to-end test in `packages/domov
   anything marked `data-no-swipe`. If the extension is not loaded (yet), the slide shows a placeholder and upgrades
   when it arrives.
 
-Kiosk data and layout are rendered by a reconciling shell: an unchanged slide is never torn down on refresh, and a
-display that cannot reach its sources for `staleAfterFailures` cycles shows an honest "no connection" badge (4xx answers
-for optional files do not count).
+Kiosk data and layout are rendered by a reconciling shell: an unchanged slide is never torn down on refresh, a widget
+survives a re-render of its slide (its DOM and view are carried over while its widget id is unchanged; new props go to
+`update()`), every request has a timeout, and a display that cannot reach its sources for `staleAfterFailures` cycles
+shows an honest "no connection" badge (4xx answers for optional files do not count).
 
 ## Shipping an extension in the add-on
 
@@ -87,6 +93,11 @@ for optional files do not count).
    base scene from starting.
 
 Extension ids match `^[a-z][a-z0-9-]{1,31}$`, must equal their directory name, and modules must live inside it.
+
+**Trust boundary.** Loading an extension means running its code with the page's privileges (under Home Assistant
+ingress that includes Home Assistant's own origin), and its API base receives the user's token. So the host accepts
+`?bootstrap=` only from its own origin and refuses any extension whose `moduleUrl` or `apiBase` is on another origin;
+an extension should check this too (Domovoy does). Extensions are installed by the add-on owner, never from the network.
 
 ## Writing one
 

@@ -18,7 +18,7 @@ export interface VadOptions {
   hangoverMs?: number;
   /** Audio kept from before the start, so the first syllable is not clipped. */
   prerollMs?: number;
-  /** Hard cap; the utterance is cut and sent. */
+  /** Hard cap: an utterance that never pauses this long is not a command (see `discard: continuous`). */
   maxMs?: number;
   /** Utterances shorter than this are discarded (clicks, door slams). */
   minMs?: number;

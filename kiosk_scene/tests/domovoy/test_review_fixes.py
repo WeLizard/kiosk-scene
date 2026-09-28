@@ -133,6 +133,11 @@ class HttpSecurity(AppCase):
         self.assertEqual(self.call("GET", "/api/state")[0], 200)                                   # and the service is still fine
         self.assertEqual(self.call("PUT", "/api/settings", {"timezone": "Europe/Moscow", "voice": {"stt": {"language": "ru"}}})[0], 200)
 
+    def test_the_review_threshold_cannot_exceed_the_auto_apply_threshold(self) -> None:
+        status, err = self.call("PUT", "/api/settings", {"auto_apply_confidence": 0.4})           # review is 0.5 by default
+        self.assertEqual(status, 422, err)
+        self.assertEqual(self.call("PUT", "/api/settings", {"auto_apply_confidence": 0.4, "review_confidence": 0.3})[0], 200)
+
     def test_non_ascii_credentials_are_a_401_not_a_crash(self) -> None:
         self.assertEqual(self.call("GET", "/api/state", headers={"X-Domovoy-Origin": "lan", "Authorization": "Bearer токен".encode("utf-8").decode("latin-1")})[0], 401)
         status, _ = self.call("POST", "/frontends/assist", {"text": "привет"}, headers={"X-Domovoy-Origin": "lan", "X-Domovoy-Secret": "секрет".encode("utf-8").decode("latin-1")})

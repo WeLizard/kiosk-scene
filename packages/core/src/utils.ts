@@ -63,3 +63,31 @@ export function normalizeIdList(value: unknown, maxLength = 40): string[] {
     .map((item) => trimText(item, maxLength))
     .filter(Boolean);
 }
+
+
+/**
+ * `fetch` that gives up after `timeoutMs`. A kiosk that sits behind flaky Wi-Fi or a half-open connection would
+ * otherwise wait forever on one request — and, because refresh cycles are coalesced, never refresh again. The
+ * abort stays armed after the headers arrive, so a body that stalls mid-transfer is cut off too.
+ */
+export function fetchWithTimeout(
+  fetchImpl: typeof fetch,
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 10_000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("Request timed out", "TimeoutError")), timeoutMs);
+  const outer = init.signal;
+  if (outer) {
+    if (outer.aborted) {
+      controller.abort(outer.reason);
+    } else {
+      outer.addEventListener("abort", () => controller.abort(outer.reason), { once: true });
+    }
+  }
+  return fetchImpl(input, { ...init, signal: controller.signal }).catch((error: unknown) => {
+    clearTimeout(timer);
+    throw error;
+  });
+}

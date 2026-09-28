@@ -63,11 +63,13 @@ export function mountCalendar(host: HTMLElement, _params: Record<string, unknown
   const handle = asyncView<[Events, Sources]>({
     host: content,
     load: (signal) => {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start.getTime() + days * 86_400_000);
+      // "today" is the household's day (the server's time zone), not the browser's
+      const tz = timezone();
+      const today = dayKey(new Date().toISOString(), tz);
+      const start = zonedToIso(`${today}T00:00`, tz);
+      const end = zonedToIso(`${dayKey(new Date(Date.parse(`${today}T12:00:00Z`) + days * 86_400_000).toISOString(), "UTC")}T00:00`, tz);
       return both(
-        read<Events>(runtime, "api/calendar/events", { start: start.toISOString(), end: end.toISOString() }, signal),
+        read<Events>(runtime, "api/calendar/events", { start, end }, signal),
         read<Sources>(runtime, "api/calendar/sources", undefined, signal),
       );
     },
