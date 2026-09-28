@@ -94,6 +94,7 @@ class ReviewQueue:
 
     def __init__(self, db: Database, clock: Clock) -> None:
         self.db, self.clock = db, clock
+        self.recover()
 
     def add(self, *, command_id: int | None, proposal: Any, reason: str, confidence: float | None) -> int:
         with self.db.write() as conn:
@@ -124,14 +125,32 @@ class ReviewQueue:
         with self.db.read() as conn:
             return int(conn.execute("SELECT COUNT(*) FROM review_queue WHERE status = 'pending'").fetchone()[0])
 
-    def resolve(self, review_id: int, status: str, resolution: str = "") -> dict[str, Any]:
+    def claim(self, review_id: int) -> bool:
+        """Atomically take a pending item for execution; False if someone else already did."""
+        with self.db.write() as conn:
+            taken = conn.execute("UPDATE review_queue SET status = 'applying' WHERE id = ? AND status = 'pending'", (review_id,)).rowcount
+            if taken:
+                self.db.emit(conn, "review.changed", {"id": review_id, "status": "applying"})
+        return bool(taken)
+
+    def release(self, review_id: int) -> None:
+        with self.db.write() as conn:
+            conn.execute("UPDATE review_queue SET status = 'pending' WHERE id = ? AND status = 'applying'", (review_id,))
+            self.db.emit(conn, "review.changed", {"id": review_id, "status": "pending"})
+
+    def recover(self) -> int:
+        """After a crash in the middle of an approval: put such items back so a person can look at them."""
+        with self.db.write() as conn:
+            return conn.execute("UPDATE review_queue SET status = 'pending' WHERE status = 'applying'").rowcount
+
+    def resolve(self, review_id: int, status: str, resolution: str = "", expected: str = "pending") -> dict[str, Any]:
         if status not in ("approved", "rejected"):
             raise ValidationError("Invalid status")
         with self.db.write() as conn:
             row = conn.execute("SELECT * FROM review_queue WHERE id = ?", (review_id,)).fetchone()
             if row is None:
                 raise NotFoundError("Review item not found")
-            if row["status"] != "pending":
+            if row["status"] != expected:
                 raise ValidationError("Already resolved", code="already_resolved")
             conn.execute("UPDATE review_queue SET status = ?, resolved_at = ?, resolution = ? WHERE id = ?",
                          (status, self.clock.now_iso(), resolution[:500], review_id))

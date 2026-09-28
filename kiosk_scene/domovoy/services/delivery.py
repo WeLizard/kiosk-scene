@@ -17,7 +17,7 @@ class DeliveryService:
         self.outbox, self.contacts, self.db = outbox, contacts, db
 
     def send(self, ctx: Ctx, *, channel: str, recipient: str, text: str, key: str | None = None, room: str | None = None,
-             mood: str | None = None) -> dict[str, Any]:
+             mood: str | None = None, not_before: Any = None) -> dict[str, Any]:
         if channel not in CHANNELS:
             raise ValidationError(f"Unknown channel {channel}", fields={"channel": f"One of {', '.join(CHANNELS)}"})
         if channel == "ui":
@@ -27,10 +27,11 @@ class DeliveryService:
         if channel == "speak":
             target = {k: v for k, v in (("room", room), ("mood", mood)) if v}
             address = json.dumps(target, ensure_ascii=False)
-            return self.outbox.enqueue(ctx, channel="speak", recipient=recipient or "self", address=address, text=text, key=key)
+            return self.outbox.enqueue(ctx, channel="speak", recipient=recipient or "self", address=address, text=text, key=key,
+                                       not_before=not_before)
         contact = self._contact(recipient, channel)
         address = self._address(contact, channel)
-        return self.outbox.enqueue(ctx, channel=channel, recipient=contact["name"], address=address, text=text, key=key)
+        return self.outbox.enqueue(ctx, channel=channel, recipient=contact["name"], address=address, text=text, key=key, not_before=not_before)
 
     def _contact(self, recipient: str, channel: str) -> dict[str, Any]:
         matches = self.contacts.resolve(recipient or "self")

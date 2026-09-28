@@ -84,8 +84,9 @@ export DOMOVOY_PORT="48099"
 export DOMOVOY_TIMEZONE="$TZNAME"
 mkdir -p "$EXTENSIONS_DIR"
 
-# nginx needs this file to exist. Only addresses that look like an IP/CIDR are accepted, so a typo in the
-# option can never break the nginx configuration.
+# nginx needs this file to exist. Every entry is parsed by Python's `ipaddress` (which accepts exactly what nginx
+# accepts and normalises host bits); anything else is skipped with a warning, so a typo in the option can never
+# break the nginx configuration or inject directives.
 {
   echo "geo \$domovoy_origin {"
   echo "  default lan;"
@@ -93,8 +94,8 @@ mkdir -p "$EXTENSIONS_DIR"
   echo "  172.30.32.2/32 ingress;"
   while IFS= read -r network; do
     [ -z "$network" ] && continue
-    if printf '%s' "$network" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}(/[0-9]{1,2})?$|^[0-9a-fA-F:]+(/[0-9]{1,3})?$'; then
-      echo "  ${network} local;"
+    if normalized=$(python3 -c 'import ipaddress, sys; print(ipaddress.ip_network(sys.argv[1].strip(), strict=False))' "$network" 2>/dev/null); then
+      echo "  ${normalized} local;"
     else
       echo "WARNING: ignoring invalid domovoy_trusted_networks entry: ${network}" >&2
     fi

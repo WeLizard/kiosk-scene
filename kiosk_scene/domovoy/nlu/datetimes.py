@@ -10,6 +10,7 @@ import datetime as dt
 import re
 from dataclasses import dataclass, field
 
+from ..clock import UTC
 from .numbers import ordinal_value, parse_number
 
 MONTHS = {
@@ -197,7 +198,9 @@ def extract_when(text: str, now: dt.datetime, *, default_hour: int = 9, past_ok:
                 delta = dt.timedelta(weeks=amount)
             else:
                 delta = dt.timedelta(days=30 * amount)
-            delta_dt = now + delta
+            # minutes/hours are elapsed time (across a DST change "in 2 hours" is 2 real hours); days and longer keep
+            # the wall-clock time of day
+            delta_dt = (now.astimezone(UTC) + delta).astimezone(now.tzinfo) if unit.startswith(("мин", "час")) else now + delta
             result.relative = True
             claim(m)
 
@@ -412,3 +415,25 @@ def next_occurrence(rule: dict, after: dt.datetime) -> dt.datetime | None:
         except ValueError:
             return after.replace(year=after.year + interval, day=28)
     return None
+
+
+RECURRENCE_FREQS = ("daily", "weekly", "monthly", "yearly")
+
+
+def validate_recurrence(rule: object) -> dict:
+    """A recurrence rule rebuilt from an allow-list: a malformed one (`interval: "abc"`) must be refused when it is
+    saved, not crash the scheduler every tick when it comes due."""
+    from ..errors import ValidationError
+
+    if not isinstance(rule, dict) or rule.get("freq") not in RECURRENCE_FREQS:
+        raise ValidationError("Recurrence needs freq: daily, weekly, monthly or yearly", fields={"recurrence": "Invalid"})
+    interval = rule.get("interval", 1)
+    if isinstance(interval, bool) or not isinstance(interval, (int, float)) or int(interval) != interval or not 1 <= int(interval) <= 366:
+        raise ValidationError("Recurrence interval must be a whole number from 1 to 366", fields={"recurrence": "Invalid interval"})
+    clean: dict = {"freq": rule["freq"], "interval": int(interval)}
+    days = rule.get("byweekday")
+    if days not in (None, [], ()):
+        if rule["freq"] != "weekly" or not isinstance(days, list) or not all(isinstance(d, int) and not isinstance(d, bool) and 0 <= d <= 6 for d in days):
+            raise ValidationError("byweekday must be a list of weekdays 0 (Mon) .. 6 (Sun), for weekly rules", fields={"recurrence": "Invalid weekdays"})
+        clean["byweekday"] = sorted(set(days))
+    return clean

@@ -1,6 +1,7 @@
 """Minimal iCalendar (RFC 5545) reader/writer for VEVENT: enough for CalDAV CRUD without dependencies."""
 from __future__ import annotations
 
+import logging
 import datetime as dt
 import re
 import uuid
@@ -109,7 +110,12 @@ def parse_events(text: str, default_tz: dt.tzinfo = UTC) -> list[ICalEvent]:
                 depth -= 1
                 continue
             if upper == "END:VEVENT":
-                event = _build(current, default_tz)
+                try:
+                    event = _build(current, default_tz)
+                except (ValueError, OverflowError) as exc:
+                    # a server's malformed VEVENT (odd date format, ...) is skipped, the rest of the calendar is kept
+                    logging.getLogger("domovoy.ical").warning("Skipping malformed VEVENT: %s", exc)
+                    event = None
                 if event:
                     events.append(event)
                 current = None

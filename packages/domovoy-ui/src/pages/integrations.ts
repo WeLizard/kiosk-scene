@@ -323,7 +323,7 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         { name: "url", label: "Адрес Home Assistant", type: "url", value: s.ha.url, placeholder: "http://homeassistant.local:8123", hint: "В аддоне обычно http://supervisor/core — оставьте пустым, если работаете внутри HA.", wide: true },
         secretField("ha_token", "Долгоживущий токен доступа", data.secrets.ha_token),
         { name: "person_entity", label: "Ваш person", value: s.ha.person_entity, placeholder: "person.ivan", hint: "Для напоминаний «когда приду домой».", wide: true },
-        { name: "allowed_services", label: "Разрешённые сервисы управления", type: "textarea", rows: 4, value: lines(s.ha.allowed_services), placeholder: "light.turn_on\nlight.turn_off\nscript.turn_on", hint: "Только эти сервисы Домовой может вызывать. Замки, сигнализация и оболочка запрещены всегда.", wide: true },
+        { name: "allowed_services", label: "Разрешённые сервисы управления", type: "textarea", rows: 4, value: lines(s.ha.allowed_services), placeholder: "light.turn_on\nlight.turn_off\nscript.turn_on", hint: "Дополнительно к базовым (свет, розетки, вентиляторы, шторы, сцены). Замки, сигнализация, скрипты и Supervisor запрещены всегда.", wide: true },
       ], (v) => ({ settings: { ha: { url: String(v.url).trim(), person_entity: String(v.person_entity).trim(), allowed_services: splitLines(String(v.allowed_services)) } }, secrets: { ha_token: String(v.ha_token) } }), refresh)));
 
       const tg = section("telegram", "Telegram", status("telegram"), h("div", null, detail("telegram"), settingsForm(runtime, [

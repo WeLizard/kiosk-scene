@@ -61,7 +61,7 @@ changes for installations that leave it off.
 | --- | --- |
 | `domovoy_enabled` | start the service, load the extension, show the administration UI |
 | `domovoy_kiosk_mic` / `domovoy_kiosk_room` | let the kiosk browser listen for «домовой …» ([docs/voice.md](./voice.md)); the room name picks the nearest speaker |
-| `domovoy_trusted_networks` | LAN addresses / subnets that may use the API without a token — normally just the kiosk. The Home Assistant panel never needs a token |
+| `domovoy_trusted_networks` | LAN addresses / subnets (IPv4/IPv6, validated at start; invalid entries are skipped with a warning) that may use the API without a token — normally just the kiosk. The Home Assistant panel never needs a token |
 
 Paths added by the add-on:
 
@@ -76,8 +76,10 @@ Who is trusted: requests arriving through Home Assistant ingress (`172.30.32.2`)
 trusted; every other LAN client needs the API token (Integrations → Доступ) or must be listed in
 `domovoy_trusted_networks`. nginx decides this and overwrites the `X-Domovoy-Origin` header on every request.
 
-Home Assistant access uses the supervisor token automatically (`homeassistant_api: true`). Control services must be
-allow-listed by the owner in Integrations.
+Home Assistant access uses the supervisor token automatically (`homeassistant_api: true`), but only for the supervisor's
+own address. A small default set of control services works out of the box (lights, switches, fans, covers, scenes); the
+owner extends the list in Integrations. Locks, alarm panels, shell/python scripts and the supervisor API are never
+callable by Domovoy.
 
 Add scene pages/widgets by editing the pack's scene file: a page `{"id": "domovoy", "kind": "app", "app": "domovoy.today"}`
 and cards `{"type": "widget", "widget": "domovoy.next-event"}`, `domovoy.shopping`, `domovoy.today`, `domovoy.command`.

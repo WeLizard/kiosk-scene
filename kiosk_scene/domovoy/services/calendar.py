@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import sqlite3
 from typing import Any, Callable
 
@@ -13,6 +14,9 @@ from .context import Ctx
 from .search import SearchService
 
 LOCAL = "local"
+
+
+LOG = logging.getLogger("domovoy.calendar")
 
 
 class CalendarService:
@@ -55,6 +59,9 @@ class CalendarService:
                 events.extend(fetch())
             except ProviderError as exc:
                 warnings.append({"source": source_id, "message": exc.message, "code": exc.code})
+            except Exception as exc:  # noqa: BLE001 - a broken source is a warning, never an empty page or a 500
+                LOG.warning("Calendar source %s failed unexpectedly: %s", source_id, exc)
+                warnings.append({"source": source_id, "message": "Не удалось разобрать ответ календаря", "code": "bad_response"})
         events.sort(key=lambda e: (e.start, e.title))
         return {"events": [e.public() for e in events], "warnings": warnings}
 
@@ -86,7 +93,11 @@ class CalendarService:
             raise ValidationError("Start must include a timezone", fields={"start": "Invalid"})
         minutes = int(self.settings.get("default_event_minutes")) if self.settings else 60
         if all_day:
-            end = end or start + dt.timedelta(days=1)
+            # whole days: midnight to midnight in the event's own zone, whatever time of day the sentence resolved to
+            start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = end.replace(hour=0, minute=0, second=0, microsecond=0) if end else None
+            if end is None or end <= start:
+                end = start + dt.timedelta(days=1)
         else:
             end = end or start + dt.timedelta(minutes=minutes)
         if end <= start:

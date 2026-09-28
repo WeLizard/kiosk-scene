@@ -33,6 +33,14 @@ APPOINTMENT_NOMINATIVE = {
 }
 
 
+# Words that can follow «напиши/отправь/скажи» without being a person: prepositions, particles, channel names.
+_NOT_A_RECIPIENT = frozenset({
+    "в", "во", "на", "по", "с", "со", "за", "о", "об", "про", "для", "к", "ко", "у", "и", "а", "но", "не", "что", "чтобы", "это",
+    "там", "тут", "всем", "ему", "ей", "им", "еще", "ещё", "тоже", "сообщение", "сообщением", "телеграм", "телеграмм", "телеге", "тг",
+    "telegram", "голосом", "вслух", "уведомление", "уведомлением",
+})
+
+
 @dataclass
 class InterpretContext:
     now: dt.datetime
@@ -240,6 +248,9 @@ class RuleInterpreter:
         if not m:
             return None
         who = m.group("who")
+        if who in _NOT_A_RECIPIENT:
+            # «напиши в телеграм, что задержусь» names no one: ask instead of guessing a contact
+            return [_intent("clarify", 0.4, original, question="Кому отправить? Скажите, например: «напиши Ирине в Telegram, что задержусь».")]
         known = {stem(w) for name in ctx.contact_names for w in fold(name).split()}
         is_self = who in ("мне", "себе")
         if not is_self and stem(who) not in known and who not in ("контакту",):

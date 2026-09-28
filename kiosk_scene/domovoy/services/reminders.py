@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import sqlite3
 from typing import Any
 
 from ..clock import Clock, from_iso, to_iso
 from ..db import Database, dumps, loads
-from ..errors import NotFoundError, ValidationError
-from ..nlu.datetimes import next_occurrence
+from ..errors import DomovoyError, NotFoundError, ValidationError
+from ..nlu.datetimes import next_occurrence, validate_recurrence
 from .audit import AuditLog, row_to_dict
 from .context import Ctx
 from .delivery import CHANNELS, DeliveryService
+
+LOG = logging.getLogger("domovoy.reminders")
 
 TRIGGER_TYPES = ("presence", "room", "state")
 STATES = ("pending", "fired", "done", "cancelled")
@@ -95,6 +98,7 @@ class ReminderService:
         if due_at is not None and due_at.tzinfo is None:
             raise ValidationError("Time must include a timezone", fields={"due_at": "Invalid"})
         clean_trigger = validate_trigger(trigger) if trigger else None
+        recurrence = validate_recurrence(recurrence) if recurrence else None
         now = self.clock.now_iso()
         with self.db.write() as conn:
             cursor = conn.execute(
@@ -124,7 +128,15 @@ class ReminderService:
                 values["text"] = text[:500]
             if "due_at" in patch:
                 due = patch["due_at"]
-                values["due_at"] = to_iso(due) if isinstance(due, dt.datetime) else (str(due) if due else None)
+                if isinstance(due, dt.datetime):
+                    values["due_at"] = to_iso(due)
+                elif due:
+                    try:
+                        values["due_at"] = to_iso(from_iso(str(due)))    # normalised to UTC: a raw "+03:00" string sorts wrongly
+                    except ValueError:
+                        raise ValidationError("due_at must be ISO-8601 with a timezone", fields={"due_at": "Invalid"}) from None
+                else:
+                    values["due_at"] = None
             if "channel" in patch:
                 if patch["channel"] not in CHANNELS:
                     raise ValidationError("Unknown channel", fields={"channel": "Invalid"})
@@ -192,6 +204,22 @@ class ReminderService:
         ctx = ctx or Ctx(actor="system", source="scheduler")
         reminder_id = int(reminder["id"])
         fired_at = self.clock.now()
+        # Work out the next occurrence *before* delivering anything: a rule that cannot be evaluated (stored by an
+        # older version, edited in the database) is treated as "no repeat" instead of raising after the message has
+        # been sent and re-sending it on every tick.
+        rule = reminder.get("recurrence")
+        upcoming = None
+        if rule and reminder.get("due_at"):
+            try:
+                rule = validate_recurrence(rule)
+                upcoming = next_occurrence(rule, from_iso(reminder["due_at"]).astimezone(self.clock.tz))
+                guard = 0
+                while upcoming is not None and upcoming <= fired_at.astimezone(self.clock.tz) and guard < 1000:
+                    upcoming = next_occurrence(rule, upcoming)
+                    guard += 1
+            except (DomovoyError, ValueError, TypeError, OverflowError) as exc:
+                LOG.warning("Reminder %s has an unusable recurrence rule, firing once: %s", reminder_id, exc)
+                rule, upcoming = None, None
         key = f"reminder:{reminder_id}:{to_iso(fired_at)[:16]}"
         delivery_note = ""
         try:
@@ -200,15 +228,8 @@ class ReminderService:
             # e.g. the contact was deleted or has no address: never lose the reminder – show it on screen and say why.
             delivery_note = f" (доставка не удалась: {exc.message})"
             self.delivery.send(ctx, channel="ui", recipient="self", text=f"{reminder['text']}{delivery_note}", key=key + ":ui")
-        rule = reminder.get("recurrence")
         with self.db.write() as conn:
             if rule and reminder.get("due_at"):
-                base = from_iso(reminder["due_at"]).astimezone(self.clock.tz)
-                upcoming = next_occurrence(rule, base)
-                guard = 0
-                while upcoming is not None and upcoming <= fired_at.astimezone(self.clock.tz) and guard < 1000:
-                    upcoming = next_occurrence(rule, upcoming)
-                    guard += 1
                 conn.execute("UPDATE reminders SET due_at = ?, fired_at = ?, updated_at = ? WHERE id = ?",
                              (to_iso(upcoming) if upcoming else None, to_iso(fired_at), to_iso(fired_at), reminder_id))
                 if upcoming is None:

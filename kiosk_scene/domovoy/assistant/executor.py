@@ -9,12 +9,13 @@ Rules of the house:
 """
 from __future__ import annotations
 
+import hashlib
 import datetime as dt
 from dataclasses import dataclass, field
 from typing import Any
 
 from ..clock import from_iso, to_iso
-from ..errors import DomovoyError, ForbiddenError, ProviderError, ValidationError
+from ..errors import ConflictError, DomovoyError, ForbiddenError, NotFoundError, ProviderError, ValidationError
 from ..nlu.datetimes import format_when
 from ..nlu.presence_words import DAY_WINDOWS
 from ..services.context import Ctx
@@ -148,20 +149,30 @@ class Executor:
                        session={"last_item_id": item["id"], "last_location_id": location_id or session.get("last_location_id")})
 
     def do_place_item(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:
+        # Decide *which* item first: an ambiguous name must be asked about before anything is created, otherwise a
+        # "clarify" answer would leave freshly made places behind.
+        picked: dict[str, Any] | None = None
+        if intent.get("item_id"):
+            found = self._pick_item(intent, session, verb="положили")
+            if isinstance(found, Outcome):
+                return found
+            picked = found
+        else:
+            # Only a *confident* name match means "move that thing". "программатор stm32" is more specific than an
+            # existing "программатор": it is a different item, so it gets its own record instead of hijacking the other.
+            if [c for c in self.app.items.candidates(intent["name"]) if c["match_score"] >= 0.9]:
+                found = self._pick_item({"name": intent["name"]}, session, verb="положили")
+                if isinstance(found, Outcome):
+                    return found
+                picked = found
         location_id, created, path_text = self._locate(intent, ctx, session, create=True)
         if isinstance(path_text, Outcome):
             return path_text
-        # Only a *confident* name match means "move that thing". "программатор stm32" is more specific than an
-        # existing "программатор": it is a different item, so it gets its own record instead of hijacking the other.
-        candidates = [c for c in self.app.items.candidates(intent["name"]) if c["match_score"] >= 0.9]
-        if not candidates:
+        if picked is None:
             item, _ = self.app.items.create(ctx, name=intent["name"], quantity=intent.get("quantity"), unit=intent.get("unit", ""),
                                             location_id=location_id, confidence=intent.get("confidence"))
             return Outcome(True, f"Записано: «{item['name']}» — {path_text}.", refs=[{"kind": "item", "id": item["id"]}],
                            session={"last_item_id": item["id"], "last_location_id": location_id})
-        picked = self._pick_item({"name": intent["name"]}, session, verb="положили")
-        if isinstance(picked, Outcome):
-            return picked
         item = self.app.items.move(ctx, picked["id"], location_id)
         return Outcome(True, f"Перенесено: «{item['name']}» — {path_text}.", refs=[{"kind": "item", "id": item["id"]}],
                        session={"last_item_id": item["id"], "last_location_id": location_id})
@@ -199,7 +210,7 @@ class Executor:
                        refs=[{"kind": "item", "id": item["id"]}], session={"last_item_id": item["id"]})
 
     def do_use_item(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:
-        picked = self._pick_item({"name": intent["name"]}, session, verb="использовали")
+        picked = self._pick_item(intent, session, verb="использовали")
         if isinstance(picked, Outcome):
             return picked
         item = self.app.items.touch_used(ctx, picked["id"])
@@ -425,13 +436,16 @@ class Executor:
         channel = intent.get("channel") or "telegram"
         not_before = from_iso(intent["when"]) if intent.get("when") else None
         recipient = intent["recipient"]
-        entry = self.app.delivery.send(ctx, channel=channel, recipient=recipient, text=intent["text"], key=f"cmd:{ctx.command_id}:{recipient}:{channel}")
+        scheduled = bool(not_before and not_before > self.app.clock.now())
+        # The key covers the text: two different messages to the same person in one command are two messages, while a
+        # repeated approval of the same one is still delivered once. `not_before` goes into the row as it is created,
+        # so the scheduler can never see it as due before its time.
+        digest = hashlib.sha1(intent["text"].encode("utf-8")).hexdigest()[:10]
+        entry = self.app.delivery.send(ctx, channel=channel, recipient=recipient, text=intent["text"],
+                                       key=f"cmd:{ctx.command_id}:{recipient}:{channel}:{digest}", not_before=not_before if scheduled else None)
         who = entry.get("recipient") or recipient
         via = {"telegram": "в Telegram", "speak": "голосом", "ha_notify": "уведомлением", "ui": "на экран"}[channel]
-        if not_before and not_before > self.app.clock.now():
-            # scheduled: keep it queued until then
-            with self.app.db.write() as conn:
-                conn.execute("UPDATE outbox SET next_attempt_at = ? WHERE id = ? AND status = 'queued'", (to_iso(not_before), entry["id"]))
+        if scheduled:
             return Outcome(True, f"Отправлю {who} {via} {format_when(not_before.astimezone(self.app.clock.tz), self._now())}.",
                            refs=[{"kind": "outbox", "id": entry["id"]}])
         if "id" in entry and channel != "ui":
@@ -522,10 +536,17 @@ class Executor:
     # ---- meta ----------------------------------------------------------------------------------
 
     def do_undo(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:
-        target = session.get("last_command_id") or self.app.audit.last_undoable_command()
+        # Inside a conversation: what *this* conversation did last. With no conversation (a bare voice command), only
+        # something from the last quarter of an hour — never a change somebody made days ago.
+        target = session.get("last_command_id") or self.app.audit.last_undoable_command(max_age_s=15 * 60)
         if not target:
             return Outcome(False, "Нечего отменять.")
-        count = self.app.audit.undo_command(int(target), ctx)
+        try:
+            count = self.app.audit.undo_command(int(target), ctx)
+        except NotFoundError:
+            return Outcome(False, "Нечего отменять: у этой команды не было изменений, которые можно отменить.", session={"last_command_id": None})
+        except (ConflictError, ValidationError) as exc:
+            return Outcome(False, f"Не смог отменить: {exc.message}")
         return Outcome(True, f"Отменено действий: {count}.", session={"last_command_id": None})
 
     def do_help(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:

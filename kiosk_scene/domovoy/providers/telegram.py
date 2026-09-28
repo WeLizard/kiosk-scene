@@ -16,12 +16,24 @@ class TelegramProvider:
 
     channel = "telegram"
 
-    def __init__(self, token: Callable[[], str], health: HealthTracker, *, base_url: str = "https://api.telegram.org",
+    DEFAULT_BASE = "https://api.telegram.org"
+
+    def __init__(self, token: Callable[[], str], health: HealthTracker, *, base_url: str | Callable[[], str] = DEFAULT_BASE,
                  timeout: float = 10.0) -> None:
         self._token = token
         self.health = health
-        self.base_url = base_url.rstrip("/")
+        self._base_url = base_url
         self.timeout = timeout
+
+    @property
+    def base_url(self) -> str:
+        """Read on every call, so an address changed in the settings applies at once (no restart)."""
+        value = self._base_url() if callable(self._base_url) else self._base_url
+        return (value if isinstance(value, str) and value else self.DEFAULT_BASE).rstrip("/")
+
+    @base_url.setter
+    def base_url(self, value: str | Callable[[], str]) -> None:
+        self._base_url = value
 
     def configured(self) -> bool:
         return bool(self._token())

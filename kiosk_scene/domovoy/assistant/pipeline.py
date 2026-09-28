@@ -57,16 +57,30 @@ class CommandPipeline:
         if item["status"] != "pending":
             raise ValidationError("Already resolved", code="already_resolved")
         proposal = edited if edited is not None else item["proposal"]
+        if not proposal:
+            raise ValidationError("Nothing to apply: this item carries no proposed action. Reject it and say the command again.",
+                                  code="empty_proposal")
         intents = [validate_intent(i) for i in proposal]
+        # Claim first: two people (or two taps) approving the same item must not both execute it.
+        if not self.app.review.claim(review_id):
+            raise ValidationError("Already resolved", code="already_resolved")
         ctx = Ctx(actor="user", source="review", command_id=item["command_id"])
-        outcomes = [self.executor.run(i, ctx, {}) for i in intents]
-        self.app.review.resolve(review_id, "approved", "applied")
-        ok = all(o.ok for o in outcomes)
+        try:
+            outcomes = [self.executor.run(i, ctx, {}) for i in intents]
+        except Exception:
+            self.app.review.release(review_id)
+            raise
+        results = [{"ok": o.ok, "message": o.message, "refs": o.refs} for o in outcomes]
+        ok, any_ok = all(o.ok for o in outcomes), any(o.ok for o in outcomes)
+        if not any_ok:
+            # nothing was applied (ambiguous item, provider down, ...): it stays in the queue to fix or retry
+            self.app.review.release(review_id)
+            return {"ok": False, "still_pending": True, "results": results}
+        self.app.review.resolve(review_id, "approved", "applied" if ok else "partly applied", expected="applying")
         if item["command_id"]:
             self.app.commands.finish(item["command_id"], status="applied" if ok else "partial", interpreter="review",
-                                     intents=intents, confidence=1.0, reply=" ".join(o.message for o in outcomes),
-                                     result=[{"ok": o.ok, "message": o.message, "refs": o.refs} for o in outcomes])
-        return {"ok": ok, "results": [{"ok": o.ok, "message": o.message, "refs": o.refs} for o in outcomes]}
+                                     intents=intents, confidence=1.0, reply=" ".join(o.message for o in outcomes), result=results)
+        return {"ok": ok, "results": results}
 
     def reject_review(self, review_id: int) -> dict[str, Any]:
         return self.app.review.resolve(review_id, "rejected", "rejected by user")
@@ -153,7 +167,9 @@ class CommandPipeline:
             return {"status": "clarify", "reply": question, "results": [], "questions": [question], "interpreter": interpreter,
                     "confidence": overall, "intents": clean}
 
-        writes = [i for i in clean if is_mutating(i["type"])]
+        # A model may not undo things on its own either: "undo" is read-only for the rules (a person said it), but a
+        # write when it was proposed by a model.
+        writes = [i for i in clean if is_mutating(i["type"]) or (interpreter == "llm" and i["type"] == "undo")]
         ai_auto = bool(app.settings.get("ai").get("auto_apply"))
         needs_review = False
         review_reason = ""
@@ -239,7 +255,7 @@ class CommandPipeline:
         "update_event": lambda i: f"перенос события «{i.get('title')}»", "delete_event": lambda i: f"удаление события «{i.get('title')}»",
         "send_message": lambda i: f"сообщение для {i.get('recipient')}", "add_task": lambda i: f"задача «{i.get('title')}»",
         "add_shopping": lambda i: "покупки: " + ", ".join(i.get("items") or []), "complete_task": lambda i: f"отметка задачи «{i.get('title')}»",
-        "add_note": lambda i: f"заметка «{str(i.get('text') or '')[:40]}»", "ha_control": lambda i: f"управление устройством «{i.get('entity_hint')}»",
+        "add_note": lambda i: f"заметка «{str(i.get('text') or '')[:40]}»", "ha_control": lambda i: f"управление устройством «{i.get('entity_hint')}»", "undo": lambda i: "отмена последнего действия",
     }
 
     def _review_reply(self, writes: list[dict[str, Any]], review_id: int) -> str:

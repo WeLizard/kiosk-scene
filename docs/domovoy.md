@@ -45,12 +45,17 @@ text ─► interpreter ─► intents ─► strict validation ─► policy �
    * rules with confidence ≥ 0.8 apply immediately;
    * 0.5–0.8 goes to the **review queue** — nothing is written until a person approves (optionally after fixing the
      fields in the UI);
-   * anything a model proposed goes to review, unless the owner enabled `ai.auto_apply` *and* confidence ≥ 0.9;
+   * anything a model proposed goes to review — including an "undo" — unless the owner enabled `ai.auto_apply` *and*
+     confidence ≥ 0.9;
    * below 0.5 the answer is "say it differently"; missing information becomes a **clarifying question** with numbered
      options that stays pending in the session for 30 minutes («второй», «в шкафу»).
-4. **Executor.** Intents run in one transaction each. Every change writes an **audit** row with before/after snapshots;
-   `undo` works for any of them (external effects such as a CalDAV event have their own compensating undo).
-   Deletes are soft.
+4. **Executor.** Each change goes through a service that writes the data, its **audit** row (before/after snapshots),
+   the search index and the change-feed entry in one transaction; a command with several intents is not atomic as a
+   whole (each intent is). Deletes are soft. **Undo** works for changes to items, places, notes, tasks, reminders and
+   local calendar events, and for events created in CalDAV (compensating delete). It is not offered for sent messages,
+   Home Assistant calls, edits of CalDAV events or "used" marks — those are recorded, not reversible. A place cannot be
+   undone while things are in it, and a bare «отмени» only reaches back to the current conversation or the last 15
+   minutes.
 5. **Feed.** Each write appends to a change log; the UI's long-poll turns it into live updates.
 
 Corrections in conversation («нет, десять», «не девять, а десять», «нет, в четвёртой коробке») refer to the last thing
@@ -83,14 +88,16 @@ Everything is optional and shown with an honest status (works / degraded / not a
 
 | Integration | Notes |
 | --- | --- |
-| Home Assistant | inside the add-on the supervisor token is used automatically; only services on the owner's allow-list can be called; `lock.*`, `alarm_control_panel.*`, `shell_command.*`, `python_script.*`, `hassio.*` and `homeassistant.stop/restart` are refused always |
+| Home Assistant | inside the add-on the supervisor token is used automatically — and only ever sent to the supervisor's own address, never to an address typed into the settings. Without any configuration the assistant may call a small default set (turn on/off/toggle for lights, switches and fans, open/close covers, activate scenes); the owner adds more in Integrations. `lock.*`, `alarm_control_panel.*`, `shell_command.*`, `python_script.*`, `hassio.*` and `homeassistant.stop/restart` are refused for every caller, speakers and notifications included |
 | Calendar | built-in local calendar; CalDAV (read/create/update/delete, edits patch the VEVENT so attendees and alarms survive); Home Assistant calendars can be read and can receive new events. One source failing shows a warning, never an empty page |
 | Telegram | bot token; people link themselves by writing to the bot, the owner attaches the chat to a contact |
 | Language model | any OpenAI-compatible server (`/chat/completions`, `/embeddings`), local or cloud; not required |
 | Speech to text | any OpenAI-compatible `/audio/transcriptions` server, only for the kiosk microphone |
 
 Secrets (Telegram token, CalDAV password, HA token, LLM key) are **write-only**: the API and UI can set them and see
-that they are set, never read them back; they are excluded from exports and live in `secrets.json` (mode 0600).
+that they are set, never read them back; they are excluded from exports and live in `secrets.json` (mode 0600). A secret
+belongs to the address it was saved for: changing an integration's address to a different host forgets its secret, so
+an address typed into the settings can never be used to make the add-on hand a saved key to someone else's server.
 
 ## Security model
 

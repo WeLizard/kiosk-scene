@@ -69,6 +69,8 @@ class Scheduler:
                 fired += 1
             except DomovoyError as exc:
                 LOG.warning("Reminder %s could not fire: %s", reminder["id"], exc.message)
+            except Exception:  # noqa: BLE001 - one broken reminder must not keep the others from firing
+                LOG.exception("Reminder %s failed unexpectedly", reminder["id"])
         return fired
 
     def _job_triggers(self) -> int:

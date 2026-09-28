@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import datetime as dt
 import sqlite3
 from typing import Any, Callable
 
-from ..clock import Clock
+from ..clock import Clock, to_iso
 from ..db import Database, dumps, loads
 from ..errors import ConflictError, NotFoundError, ValidationError
 from .context import Ctx
@@ -153,12 +154,16 @@ class AuditLog:
                                   f"Отмена: {row['summary']}", undoable=False)
             conn.execute("UPDATE audit_log SET undone_by = ? WHERE id = ?", (undo_id, row["id"]))
 
-    def last_undoable_command(self) -> int | None:
+    def last_undoable_command(self, max_age_s: float | None = None) -> int | None:
+        """The newest command with something to undo; `max_age_s` keeps a bare «отмени» from reaching back to
+        something somebody did days ago in another conversation."""
+        sql = ("SELECT command_id FROM audit_log WHERE command_id IS NOT NULL AND undone_by IS NULL AND undoable = 1 AND action != 'undo'")
+        params: list[Any] = []
+        if max_age_s is not None:
+            sql += " AND ts >= ?"
+            params.append(to_iso(self.clock.now() - dt.timedelta(seconds=max_age_s)))
         with self.db.read() as conn:
-            row = conn.execute(
-                "SELECT command_id FROM audit_log WHERE command_id IS NOT NULL AND undone_by IS NULL AND undoable = 1 "
-                "AND action != 'undo' ORDER BY id DESC LIMIT 1"
-            ).fetchone()
+            row = conn.execute(sql + " ORDER BY id DESC LIMIT 1", params).fetchone()
         return int(row["command_id"]) if row else None
 
     def _undo_row(self, conn: sqlite3.Connection, row: sqlite3.Row, ctx: Ctx, *, force: bool) -> None:
@@ -176,6 +181,13 @@ class AuditLog:
             raise ConflictError(
                 "It was changed again after this action; undo the newer change first", code="changed_since"
             )
+        if row["action"] == "create" and row["entity_type"] == "location":
+            busy = conn.execute(
+                "SELECT (SELECT COUNT(*) FROM items WHERE location_id = ? AND deleted_at IS NULL) "
+                "+ (SELECT COUNT(*) FROM locations WHERE parent_id = ? AND deleted_at IS NULL)", (entity_id, entity_id)
+            ).fetchone()[0]
+            if busy:
+                raise ConflictError("The place is not empty: move or delete its contents first", code="location_not_empty")
         if row["action"] == "create":
             restored = dict(after or current or {})
             restored["deleted_at"] = self.clock.now_iso()
@@ -198,15 +210,22 @@ class AuditLog:
 
     @staticmethod
     def _restore(conn: sqlite3.Connection, table: str, entity_id: int, snapshot: dict[str, Any]) -> None:
-        columns = [c for c in snapshot if c != "id"]
+        # Column names are interpolated into SQL, and snapshots can come from an imported file: only real columns of
+        # this table are ever used.
+        real = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        columns = [c for c in snapshot if c != "id" and c in real]
         exists = conn.execute(f"SELECT 1 FROM {table} WHERE id = ?", (entity_id,)).fetchone()
-        if exists:
-            assignments = ", ".join(f"{c} = ?" for c in columns)
-            conn.execute(f"UPDATE {table} SET {assignments} WHERE id = ?", (*[snapshot[c] for c in columns], entity_id))
-        else:
-            names = ", ".join(["id", *columns])
-            marks = ", ".join("?" for _ in range(len(columns) + 1))
-            conn.execute(f"INSERT INTO {table}({names}) VALUES ({marks})", (entity_id, *[snapshot[c] for c in columns]))
+        try:
+            if exists:
+                assignments = ", ".join(f"{c} = ?" for c in columns)
+                conn.execute(f"UPDATE {table} SET {assignments} WHERE id = ?", (*[snapshot[c] for c in columns], entity_id))
+            else:
+                names = ", ".join(["id", *columns])
+                marks = ", ".join("?" for _ in range(len(columns) + 1))
+                conn.execute(f"INSERT INTO {table}({names}) VALUES ({marks})", (entity_id, *[snapshot[c] for c in columns]))
+        except sqlite3.IntegrityError:
+            # e.g. restoring a deleted place after a new one with the same name was created
+            raise ConflictError("Cannot restore: something with the same name exists already", code="name_taken") from None
 
 
 def _comparable(snapshot: dict[str, Any]) -> dict[str, Any]:

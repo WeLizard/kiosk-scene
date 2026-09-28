@@ -20,12 +20,12 @@ READ_ONLY = {"find_item", "list_location", "query_calendar", "query_tasks", "que
 INTENTS: dict[str, dict[str, tuple]] = {
     "add_item": {"name": (STR, 200, True), "quantity": (NUM,), "unit": (STR, 32), "location_path": (STRLIST, 8, 80),
                  "location_kinds": (STRLIST, 8, 24), "properties": (STRMAP,), "notes": (STR, 2000), "mode": (ENUM, ("set", "add"))},
-    "place_item": {"name": (STR, 200, True), "quantity": (NUM,), "unit": (STR, 32), "location_path": (STRLIST, 8, 80),
+    "place_item": {"name": (STR, 200), "item_id": (NUM,), "quantity": (NUM,), "unit": (STR, 32), "location_path": (STRLIST, 8, 80),
                    "location_kinds": (STRLIST, 8, 24)},
     "move_item": {"name": (STR, 200), "item_id": (NUM,), "location_path": (STRLIST, 8, 80), "location_kinds": (STRLIST, 8, 24),
                   "use_last": (BOOL,)},
     "consume_item": {"name": (STR, 200), "item_id": (NUM,), "quantity": (NUM, None, True), "use_last": (BOOL,)},
-    "use_item": {"name": (STR, 200, True)},
+    "use_item": {"name": (STR, 200), "item_id": (NUM,)},
     "set_quantity": {"name": (STR, 200), "item_id": (NUM,), "quantity": (NUM, None, True), "unit": (STR, 32), "use_last": (BOOL,)},
     "remove_item": {"name": (STR, 200), "item_id": (NUM,), "use_last": (BOOL,)},
     "find_item": {"query": (STR, 200, True), "since": (ISO,), "until": (ISO,), "location_path": (STRLIST, 8, 80), "count": (BOOL,)},
@@ -88,7 +88,7 @@ def validate_intent(raw: Any) -> dict[str, Any]:
         cleaned = _coerce(name, definition, value)
         if cleaned is not None:
             clean[name] = cleaned
-    if not (spec.get("name") or spec.get("item_id")) or intent_type not in ("move_item", "consume_item", "set_quantity", "remove_item"):
+    if not (spec.get("name") or spec.get("item_id")) or intent_type not in ("move_item", "consume_item", "set_quantity", "remove_item", "place_item", "use_item"):
         return clean
     if "name" not in clean and "item_id" not in clean and not clean.get("use_last"):
         raise _fail("Which item? name, item_id or use_last is required", "name")
@@ -113,6 +113,10 @@ def _coerce(name: str, definition: tuple, value: Any) -> Any:
         if number != number or number in (float("inf"), float("-inf")) or number < 0 or number > 1_000_000:
             raise _fail(f"{name} is out of range", name)
         return number
+    if kind == DICT and name == "recurrence":
+        from .datetimes import validate_recurrence
+
+        return validate_recurrence(value)
     if kind == BOOL:
         return bool(value) if isinstance(value, bool) else str(value).lower() in ("true", "1", "yes")
     if kind == STRLIST:

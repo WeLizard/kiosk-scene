@@ -159,6 +159,10 @@ class TaskService:
             raise ValidationError("Unknown list", fields={"list": f"One of {', '.join(TASK_LISTS)}"})
         if due_date is not None and not _is_date(due_date):
             raise ValidationError("Due date must be YYYY-MM-DD", fields={"due_date": "Invalid date"})
+        if recurrence:
+            from ..nlu.datetimes import validate_recurrence
+
+            recurrence = validate_recurrence(recurrence)
         now = self.clock.now_iso()
         with self.db.write() as conn:
             if dedupe:
@@ -290,12 +294,18 @@ class ContactService:
         if not key or key in ("self", "мне", "себе", "меня", "я", "me"):
             return [c for c in self.list() if c["is_self"]]
         exact, partial = [], []
+        wanted = set(key.split())
         for contact in self.list():
             keys = {norm_key(contact["name"]), *(norm_key(a) for a in contact["aliases"])}
             if key in keys:
                 exact.append(contact)
-            elif any(key and (key in k or k in key) for k in keys if k):
-                partial.append(contact)
+                continue
+            # «Иван» finds «Иван Петров» — whole words only, never a substring («в» must not match «Иван»)
+            for k in (k for k in keys if k):
+                have = set(k.split())
+                if (wanted <= have or have <= wanted) and all(len(t) >= 3 for t in (wanted if wanted <= have else have)):
+                    partial.append(contact)
+                    break
         return exact or partial
 
     def create(self, ctx: Ctx, *, name: str, aliases: list[str] | None = None, channels: dict[str, Any] | None = None,

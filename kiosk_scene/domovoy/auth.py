@@ -57,7 +57,7 @@ class Authenticator:
         if bearer:
             if self.limiter.blocked(remote_ip):
                 raise UnauthorizedError("Too many failed attempts, try again later", code="rate_limited")
-            if hmac.compare_digest(bearer, self.secrets.get("api_token")):
+            if hmac.compare_digest(bearer.encode("utf-8"), self.secrets.get("api_token").encode("utf-8")):
                 return Principal("token", True)
             self.limiter.record_failure(remote_ip)
             raise UnauthorizedError("Invalid token")
@@ -75,4 +75,4 @@ class Authenticator:
 
     def check_secret(self, name: str, supplied: str) -> bool:
         expected = self.secrets.get(name)
-        return bool(expected) and hmac.compare_digest(expected, supplied or "")
+        return bool(expected) and hmac.compare_digest(expected.encode("utf-8"), (supplied or "").encode("utf-8"))

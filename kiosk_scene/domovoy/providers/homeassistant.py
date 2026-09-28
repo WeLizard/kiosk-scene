@@ -103,6 +103,11 @@ class HomeAssistantProvider:
         return any(fnmatch.fnmatch(full, pattern) for pattern in self._allowed())
 
     def call_service(self, domain: str, service: str, data: dict[str, Any] | None = None, *, enforce_allowlist: bool = True) -> Any:
+        full = f"{domain}.{service}"
+        # The deny-list holds for every caller, including internal ones that skip the owner's allow-list (speakers,
+        # notifications): a misconfigured "custom" speaker must not be able to unlock a door.
+        if any(fnmatch.fnmatch(full, pattern) for pattern in ALWAYS_DENIED):
+            raise ForbiddenError(f"Service {full} is never allowed for the assistant", code="service_not_allowed")
         if enforce_allowlist and not self.is_allowed(domain, service):
             raise ForbiddenError(f"Service {domain}.{service} is not allowed for the assistant", code="service_not_allowed")
         if not domain.isidentifier() or not service.replace("_", "").isalnum():

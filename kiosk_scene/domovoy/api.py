@@ -335,12 +335,34 @@ def build_router(ctx: "ApiContext") -> Router:
     # ---- settings, integrations, security -------------------------------------------------------
     r.add("GET", "/api/settings", lambda req: {"settings": app.settings.all()})
 
+    # A stored secret is only ever sent to the address it was saved for. Pointing an integration somewhere else
+    # forgets its secret, so an address typed into the settings cannot be used to make the add-on hand a saved key
+    # to a stranger's server.
+    SECRET_BINDINGS = (("ha", ("url",), "ha_token"), ("telegram", ("base_url",), "telegram_token"), ("caldav", ("url",), "caldav_password"),
+                       ("ai", ("base_url",), "llm_api_key"), ("voice", ("stt", "base_url"), "llm_api_key"))
+
+    def _origin(url: Any) -> str:
+        parts = urlsplit(str(url or ""))
+        return f"{parts.scheme}://{(parts.hostname or '').lower()}:{parts.port or ''}" if parts.hostname else ""
+
+    def _dig(block: Any, path: tuple[str, ...]) -> Any:
+        for name in path:
+            block = block.get(name) if isinstance(block, dict) else None
+        return block
+
     def settings_put(req: Request) -> dict[str, Any]:
-        result = app.settings.update(req.json())
-        if "timezone" in req.json() and req.json()["timezone"]:
-            app.clock.set_timezone(req.json()["timezone"])
+        body = req.json()
+        before = app.settings.all()
+        result = app.settings.update(body)
+        cleared = []
+        for key, path, secret in SECRET_BINDINGS:
+            if key in body and _origin(_dig(before[key], path)) != _origin(_dig(result[key], path)) and app.secrets.has(secret):
+                app.secrets.set(secret, "")
+                cleared.append(secret)
+        if "timezone" in body and body["timezone"]:
+            app.clock.set_timezone(body["timezone"])
         app.refresh_embedder()
-        return {"settings": result}
+        return {"settings": result, "secrets_cleared": sorted(set(cleared))}
     r.add("PUT", "/api/settings", settings_put)
     r.add("GET", "/api/integrations", lambda req: {"integrations": app.integrations(),
           "secrets": {name: app.secrets.has(name) for name in WRITABLE_SECRETS}})
@@ -524,7 +546,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if not self.api.auth.check_secret("alice_secret", params.get("secret", "")):
                     raise UnauthorizedError("Invalid skill secret")
             elif auth_kind == "assist":
-                supplied = self.headers.get("X-Domovoy-Secret") or query.get("secret", "")
+                supplied = self.headers.get("X-Domovoy-Secret") or ""      # header only: a query string ends up in access logs
                 if not self.api.auth.check_secret("assist_secret", supplied):
                     principal = self.api.auth.authenticate(self.headers, method, peer_ip, remote_ip)
             request = Request(method, path, query, self.headers, body, principal, remote_ip)

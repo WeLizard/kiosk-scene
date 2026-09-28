@@ -53,13 +53,13 @@ class Domovoy:
         self.gate = ResourceGate(1)
         self.ha = HomeAssistantProvider(
             url=lambda: self.settings.get("ha")["url"] or self.env.ha_api_url,
-            token=lambda: self.secrets.get("ha_token") or supervisor_token(),
+            token=self._ha_token,
             health=self.health["home_assistant"],
             allowed=self._allowed_services,
         )
         self.telegram = TelegramProvider(
             token=lambda: self.secrets.get("telegram_token"), health=self.health["telegram"],
-            base_url=telegram_base_url or self.settings.get("telegram")["base_url"],
+            base_url=lambda: telegram_base_url or self.settings.get("telegram")["base_url"],
         )
         self.caldav = CalDavProvider(
             config=lambda: self.settings.get("caldav"), secret=lambda: self.secrets.get("caldav_password"),
@@ -100,6 +100,15 @@ class Domovoy:
         self.refresh_embedder()
 
     # ---- runtime configuration -----------------------------------------------------------------
+
+    def _ha_token(self) -> str:
+        """The owner's own long-lived token if set; otherwise the add-on's supervisor token — but that one is only
+        ever sent to the supervisor's proxy URL, never to an address someone typed into the settings."""
+        own = self.secrets.get("ha_token")
+        if own:
+            return own
+        url = (self.settings.get("ha")["url"] or "").rstrip("/")
+        return supervisor_token() if not url or url == self.env.ha_api_url.rstrip("/") else ""
 
     def _allowed_services(self) -> list[str]:
         from .providers.homeassistant import DEFAULT_ALLOWED_SERVICES

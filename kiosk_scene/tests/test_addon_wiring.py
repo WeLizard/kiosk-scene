@@ -89,12 +89,14 @@ class OriginFile(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, True)
 
     def test_only_well_formed_networks_reach_the_nginx_config_and_it_stays_valid(self) -> None:
-        conf = run_block(self.root, networks="192.168.1.40\n10.0.0.0/24\n1.2.3.4; } evil { \nnot-an-ip\nfd00::/8\n\n")
+        conf = run_block(self.root, networks="192.168.1.40\n10.0.0.0/24\n1.2.3.4; } evil { \nnot-an-ip\nfd00::/8\n\n"
+                                             "999.1.1.1\n1.2.3.0/33\nabcd\n123\n192.168.5.9/24\n")
         text = conf.read_text(encoding="utf-8")
-        for good in ("192.168.1.40 local;", "10.0.0.0/24 local;", "fd00::/8 local;", "127.0.0.1/32 local;", "172.30.32.2/32 ingress;", "default lan;"):
+        for good in ("192.168.1.40/32 local;", "10.0.0.0/24 local;", "fd00::/8 local;", "127.0.0.1/32 local;", "172.30.32.2/32 ingress;",
+                     "default lan;", "192.168.5.0/24 local;"):
             self.assertIn(good, text)
-        self.assertNotIn("evil", text)
-        self.assertNotIn("not-an-ip", text)
+        for bad in ("evil", "not-an-ip", "999.1.1.1", "1.2.3.0/33", "abcd", " 123 "):
+            self.assertNotIn(bad, text)
         config = nginx_conf(self.root, listen=free_port(), domovoy_port=free_port(), origin_conf=conf)
         checked = subprocess.run([NGINX, "-t", "-c", str(config), "-g", f"pid {self.root / 'n.pid'};"], capture_output=True, text=True)
         self.assertEqual(checked.returncode, 0, checked.stderr)
