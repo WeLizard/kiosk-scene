@@ -125,7 +125,7 @@ export function renderOverviewBody(ctx: SlideRenderContext, presentation: Assist
               <h2>${escapeHtml(weather.forecastTitle)}</h2>
               <p></p>
             </div>
-            <div class="forecast-grid">${forecastMarkup}</div>
+            ${forecastMarkup ? `<div class="forecast-grid">${forecastMarkup}</div>` : `<p class="forecast-empty">${escapeHtml(labels.forecastUnavailable)}</p>`}
           </div>
         </div>`;
 }

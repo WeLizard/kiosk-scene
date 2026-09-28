@@ -707,6 +707,11 @@
     color: var(--ks-muted);
     font-size: 12px;
   }
+
+  /* action columns have no header: no dangling ": " */
+  .ks-table td[data-label=""]::before {
+    content: none;
+  }
 }
 
 /* ---------- dialog + toasts ---------- */

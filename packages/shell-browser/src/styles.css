@@ -1404,6 +1404,14 @@ body::after {
   height: 100%;
   overflow: auto;
   overscroll-behavior: contain;
+  /* keep the last row clear of the page dots that float over the bottom edge */
+  padding-bottom: 64px;
+}
+
+.forecast-empty {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .widget-card {

@@ -58,6 +58,7 @@ export function buildLabels(lang: UiLang): SceneShellLabels {
     carouselRegion: "Карусель сцены",
     pagesRegion: "Переключение страниц",
     forecastRangeFallback: "Прогноз на несколько дней",
+    forecastUnavailable: "Прогноз недоступен",
     staleNotice: "Нет связи — данные могут быть устаревшими",
     extensionUnavailable: "Эта страница недоступна",
   };

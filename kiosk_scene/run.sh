@@ -14,6 +14,11 @@ if [ -z "$DEFAULT_PACK_ID" ] || [ "$DEFAULT_PACK_ID" = "null" ]; then
   DEFAULT_PACK_ID="neiri"
 fi
 
+DOMOVOY_ENABLED=$(jq -r '.domovoy_enabled // false' "$OPTIONS_FILE")
+DOMOVOY_KIOSK_MIC=$(jq -r '.domovoy_kiosk_mic // false' "$OPTIONS_FILE")
+DOMOVOY_KIOSK_ROOM=$(jq -r '.domovoy_kiosk_room // ""' "$OPTIONS_FILE")
+DOMOVOY_TRUSTED_NETWORKS=$(jq -r '(.domovoy_trusted_networks // []) | .[]' "$OPTIONS_FILE")
+
 export TZ="$TZNAME"
 export PYTHONUNBUFFERED=1
 
@@ -69,6 +74,48 @@ if [ -d "$IMAGE_SCENE_PACKS_SEED_DIR" ]; then
   rsync -a --ignore-existing "$IMAGE_SCENE_PACKS_SEED_DIR/" "$SCENE_PACKS_DIR/" 2>/dev/null || true
 fi
 
+# ---- Domovoy (optional) -------------------------------------------------------------------------
+IMAGE_EXTENSIONS_SEED_DIR="/opt/kiosk-scene/extensions-seed"
+EXTENSIONS_DIR="${SCENE_ROOT}/extensions"
+export SCENE_EXTENSIONS_DIR="$EXTENSIONS_DIR"
+export DOMOVOY_DATA_DIR="${SCENE_ROOT}/domovoy"
+export DOMOVOY_BIND="127.0.0.1"
+export DOMOVOY_PORT="48099"
+export DOMOVOY_TIMEZONE="$TZNAME"
+mkdir -p "$EXTENSIONS_DIR"
+
+# nginx needs this file to exist. Only addresses that look like an IP/CIDR are accepted, so a typo in the
+# option can never break the nginx configuration.
+{
+  echo "geo \$domovoy_origin {"
+  echo "  default lan;"
+  echo "  127.0.0.1/32 local;"
+  echo "  172.30.32.2/32 ingress;"
+  while IFS= read -r network; do
+    [ -z "$network" ] && continue
+    if printf '%s' "$network" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}(/[0-9]{1,2})?$|^[0-9a-fA-F:]+(/[0-9]{1,3})?$'; then
+      echo "  ${network} local;"
+    else
+      echo "WARNING: ignoring invalid domovoy_trusted_networks entry: ${network}" >&2
+    fi
+  done <<< "$DOMOVOY_TRUSTED_NETWORKS"
+  echo "}"
+} > /etc/nginx/domovoy-origin.conf
+
+# The extension module is part of the image and replaced on every start (like the runtime); its manifest is
+# generated from the add-on options, so switching Domovoy off removes it from the scene and the admin UI.
+if [ -d "${IMAGE_EXTENSIONS_SEED_DIR}/domovoy" ]; then
+  mkdir -p "${EXTENSIONS_DIR}/domovoy"
+  rsync -a --delete --exclude extension.json "${IMAGE_EXTENSIONS_SEED_DIR}/domovoy/" "${EXTENSIONS_DIR}/domovoy/" 2>/dev/null || true
+  jq -n \
+    --argjson enabled "$DOMOVOY_ENABLED" \
+    --argjson mic "$DOMOVOY_KIOSK_MIC" \
+    --arg room "$DOMOVOY_KIOSK_ROOM" \
+    '{id: "domovoy", title: "Домовой", module: "domovoy.js", enabled: $enabled,
+      config: {apiBase: "/domovoy-api/", mic: (if $mic then {room: $room} else false end)}}' \
+    > "${EXTENSIONS_DIR}/domovoy/extension.json"
+fi
+
 for scene_file in renderer.kiosk-scene.json scene.default.json entity-map.json avatar.manifest.json neiri-control.json weather.json; do
   if [ -f "${LEGACY_NEIRI_SCENE_DIR}/${scene_file}" ] && [ ! -f "${DEFAULT_PACK_DIR}/${scene_file}" ]; then
     cp "${LEGACY_NEIRI_SCENE_DIR}/${scene_file}" "${DEFAULT_PACK_DIR}/${scene_file}"
@@ -97,6 +144,32 @@ python3 /scene_config_service.py &
 SCENE_EDITOR_PID=$!
 echo "INFO: scene_config_service.py started (PID=${SCENE_EDITOR_PID})"
 
+DOMOVOY_PID=""
+if [ "$DOMOVOY_ENABLED" = "true" ]; then
+  # Restarts the service if it ever dies (with a growing pause), and stops it when the add-on stops.
+  run_domovoy() {
+    local child="" delay=5 started=0
+    trap '[ -n "$child" ] && kill "$child" 2>/dev/null; exit 0' TERM INT
+    while true; do
+      started=$SECONDS
+      python3 /opt/domovoy/domovoy_service.py &
+      child=$!
+      wait "$child" || true
+      child=""
+      if [ $((SECONDS - started)) -gt 60 ]; then delay=5; fi
+      echo "WARNING: Domovoy exited; restarting in ${delay}s"
+      sleep "$delay" &
+      wait $! || true
+      delay=$((delay * 2 > 60 ? 60 : delay * 2))
+    done
+  }
+  run_domovoy &
+  DOMOVOY_PID=$!
+  echo "INFO: Domovoy started (PID=${DOMOVOY_PID}), data in ${DOMOVOY_DATA_DIR}"
+else
+  echo "INFO: Domovoy is disabled (add-on option domovoy_enabled)"
+fi
+
 nginx -g 'daemon off;' &
 NGINX_PID=$!
 echo "INFO: nginx started (PID=${NGINX_PID})"
@@ -107,7 +180,7 @@ SCENE_EDITOR_EXIT_REPORTED=0
 
 refresh_live_pids() {
   LIVE_PIDS=()
-  for pid in "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID"; do
+  for pid in "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID" ${DOMOVOY_PID:+"$DOMOVOY_PID"}; do
     if kill -0 "$pid" 2>/dev/null; then
       LIVE_PIDS+=("$pid")
     fi
@@ -116,8 +189,8 @@ refresh_live_pids() {
 
 cleanup() {
   SHUTTING_DOWN=1
-  kill "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID" 2>/dev/null || true
-  wait "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID" 2>/dev/null || true
+  kill "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID" ${DOMOVOY_PID:+"$DOMOVOY_PID"} 2>/dev/null || true
+  wait "$SCENE_HOST_PID" "$SCENE_EDITOR_PID" "$NGINX_PID" ${DOMOVOY_PID:+"$DOMOVOY_PID"} 2>/dev/null || true
 }
 
 trap cleanup EXIT INT TERM

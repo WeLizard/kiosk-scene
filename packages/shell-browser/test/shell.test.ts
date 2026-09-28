@@ -63,6 +63,32 @@ describe("scene shell rendering", () => {
   });
 });
 
+describe("weather without data", () => {
+  const placeholder = {
+    title: "Weather", location: "", todayCaption: "Today", todayValue: "28 September", todayLabel: "Monday", updatedCaption: "Updated",
+    updatedAt: "—", temperature: "—", unit: "C", condition: "No data", feelsLike: "", badgeSummary: "No data", badgeRange: "—",
+    metrics: { humidity: "—", pressure: "—", wind: "—", clouds: "—" }, forecastTitle: "Weekly rhythm", forecast: [],
+  };
+
+  it("never shows the built-in sample week when the deployment has no forecast", async () => {
+    installFakeFetch(defaultFiles({ rotation: { order: ["weather"], defaultDwellSeconds: 20 }, pages: [{ id: "weather", kind: "overview", title: "Weather" }] }));
+    const { root } = await start({ defaultWeather: placeholder });
+    const text = root.querySelector('[data-slide-id="weather"]')!.textContent ?? "";
+    for (const invented of ["partly cloudy", "light rain", "soft showers", "Bright sky", "1017 hPa", "07:20", "mar"]) {
+      expect(text).not.toContain(invented);
+    }
+    expect(root.querySelector('[data-slide-id="weather"] .forecast-grid')).toBeNull();
+    expect(text).toContain("Forecast unavailable");
+    expect(text).toContain("No data");
+  });
+
+  it("still uses the sample week when nothing at all is configured (the demo app)", async () => {
+    installFakeFetch(defaultFiles({ rotation: { order: ["weather"], defaultDwellSeconds: 20 }, pages: [{ id: "weather", kind: "overview", title: "Weather" }] }));
+    const { root } = await start();
+    expect(root.querySelector('[data-slide-id="weather"] .forecast-grid')?.children.length).toBe(5);
+  });
+});
+
 describe("refresh lifecycle", () => {
   it("coalesces overlapping refreshes instead of stacking requests", async () => {
     const backend = installFakeFetch();

@@ -20,6 +20,8 @@ export interface SceneShellLabels {
   carouselRegion: string;
   pagesRegion: string;
   forecastRangeFallback: string;
+  /** Shown instead of the forecast row when no forecast is available. */
+  forecastUnavailable: string;
   /** Shown while the display cannot reach its data sources. */
   staleNotice: string;
   /** Shown in a slide whose extension page/widget is not available. */
@@ -84,6 +86,7 @@ export const DEFAULT_SCENE_SHELL_LABELS_EN: SceneShellLabels = {
   carouselRegion: "Scene carousel",
   pagesRegion: "Display pages",
   forecastRangeFallback: "Five-day forecast",
+  forecastUnavailable: "Forecast unavailable",
   staleNotice: "No connection — data may be outdated",
   extensionUnavailable: "This page is not available",
 };

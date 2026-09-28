@@ -132,6 +132,7 @@ class Policy(AppCase):
     def test_uncertain_writes_go_to_the_review_queue_not_the_database(self) -> None:
         r = self.say("мне надо разобрать гараж")                        # chatty "надо…" → task, confidence 0.72
         self.assertEqual(r["status"], "review", r)
+        self.assertIn("задача «Разобрать гараж»", r["reply"])            # says *what* is waiting, not just "a change"
         self.assertEqual(self.app.tasks.list(), [])
         review = self.app.review.list()
         self.assertEqual(len(review), 1)

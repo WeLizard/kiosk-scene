@@ -231,12 +231,20 @@ class CommandPipeline:
         return {"status": "review", "reply": reply, "results": [{"ok": True, "review_id": review_id, "message": reply}],
                 "interpreter": "deferred", "confidence": None, "intents": []}
 
+    _REVIEW_WHAT = {
+        "add_item": lambda i: f"запись «{i.get('name')}»", "place_item": lambda i: f"запись «{i.get('name')}»",
+        "move_item": lambda i: f"перемещение «{i.get('name') or 'вещи'}»", "consume_item": lambda i: f"списание «{i.get('name') or 'вещи'}»",
+        "set_quantity": lambda i: f"количество «{i.get('name') or 'вещи'}»", "remove_item": lambda i: f"удаление «{i.get('name') or 'вещи'}»",
+        "create_reminder": lambda i: f"напоминание «{i.get('text')}»", "create_event": lambda i: f"событие «{i.get('title')}»",
+        "update_event": lambda i: f"перенос события «{i.get('title')}»", "delete_event": lambda i: f"удаление события «{i.get('title')}»",
+        "send_message": lambda i: f"сообщение для {i.get('recipient')}", "add_task": lambda i: f"задача «{i.get('title')}»",
+        "add_shopping": lambda i: "покупки: " + ", ".join(i.get("items") or []), "complete_task": lambda i: f"отметка задачи «{i.get('title')}»",
+        "add_note": lambda i: f"заметка «{str(i.get('text') or '')[:40]}»", "ha_control": lambda i: f"управление устройством «{i.get('entity_hint')}»",
+    }
+
     def _review_reply(self, writes: list[dict[str, Any]], review_id: int) -> str:
         first = writes[0]
-        what = {
-            "add_item": lambda i: f"запись «{i.get('name')}»", "create_reminder": lambda i: f"напоминание «{i.get('text')}»",
-            "create_event": lambda i: f"событие «{i.get('title')}»", "send_message": lambda i: f"сообщение для {i.get('recipient')}",
-        }.get(first["type"], lambda i: "изменение")(first)
+        what = self._REVIEW_WHAT.get(first["type"], lambda i: "изменение")(first)
         return f"Не уверен, что правильно понял: {what}. Положил в очередь проверки, ничего пока не записано."
 
     def _resolve_pending(self, text: str, pending: dict[str, Any]) -> list[dict[str, Any]] | None:

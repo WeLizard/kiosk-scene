@@ -196,7 +196,7 @@ function haYaml(secret: string): string {
     `    url: "${HA_LOCAL_BASE}frontends/assist"`,
     "    method: POST",
     "    headers:",
-    `      Authorization: "Bearer ${secret}"`,
+    `      X-Domovoy-Secret: "${secret}"`,
     "      Content-Type: application/json",
     '    payload: \'{"text": {{ text | tojson }}, "room": {{ room | default("") | tojson }}, "speak": true}\'',
     "",
@@ -316,7 +316,7 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
       };
 
       const statusGrid = h("div", { class: "ks-grid dv-status-grid" }, data.integrations.map((i) =>
-        h("div", { class: "ks-card dv-status" }, h("strong", null, INTEGRATION_TITLES[i.name] ?? i.name), badge(statusLabel(i.status), statusTone(i.status)), h("small", { class: "ks-muted" }, i.detail || (i.configured ? "" : "не настроено"))),
+        h("div", { class: "ks-card dv-status" }, h("strong", null, INTEGRATION_TITLES[i.name] ?? i.name), badge(statusLabel(i.status), statusTone(i.status)), h("small", { class: "ks-muted" }, i.detail && i.detail.toLowerCase() !== statusLabel(i.status).toLowerCase() ? i.detail : "")),
       ));
 
       const ha = section("ha", "Home Assistant", status("home_assistant"), h("div", null, detail("home_assistant"), settingsForm(runtime, [

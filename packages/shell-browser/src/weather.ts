@@ -79,7 +79,9 @@ export function buildWeatherOverview(payload?: WeatherOverviewPatch): WeatherOve
       ...DEFAULT_WEATHER_OVERVIEW.metrics,
       ...(payload?.metrics || {}),
     },
-    forecast: Array.isArray(payload?.forecast) && payload.forecast.length
+    // An explicitly provided list wins even when it is empty: "no forecast available" must render as empty,
+    // never as the built-in sample week (which a real kiosk would show as if it were today's forecast).
+    forecast: Array.isArray(payload?.forecast)
       ? payload.forecast.map((item) => ({ ...item }))
       : DEFAULT_WEATHER_OVERVIEW.forecast.map((item) => ({ ...item })),
   };

@@ -237,6 +237,28 @@ class HttpApi(AppCase):
         ok = self.call("POST", f"/frontends/alice/{secret}", alice_request("ping"), headers={"X-Domovoy-Origin": "lan", "X-Domovoy-Client": ""})
         self.assertEqual(ok[1]["response"]["text"], "pong")
 
+    def test_ha_assist_endpoint_accepts_only_its_secret_header_or_a_trusted_caller(self) -> None:
+        # this is exactly what the rest_command shown on the Integrations page sends
+        secret = self.app.secrets.get("assist_secret")
+        lan = {"X-Domovoy-Origin": "lan"}
+        ok = self.call("POST", "/frontends/assist", {"text": "Добавь фильтры для воды в список покупок", "speak": False}, headers={**lan, "X-Domovoy-Secret": secret})
+        self.assertEqual(ok[0], 200)
+        self.assertEqual(ok[1]["status"], "applied")
+        self.assertEqual(self.call("POST", "/frontends/assist", {"text": "привет"}, headers={**lan, "X-Domovoy-Secret": "wrong"})[0], 401)
+        self.assertEqual(self.call("POST", "/frontends/assist", {"text": "привет"}, headers=lan)[0], 401)
+        # the assist secret is not a bearer token, and the api token is not the assist secret
+        self.assertEqual(self.call("POST", "/frontends/assist", {"text": "привет"}, headers={**lan, "Authorization": f"Bearer {secret}"})[0], 401)
+
+    def test_failed_logins_are_rate_limited_per_real_client_not_per_proxy(self) -> None:
+        # behind nginx every socket peer is 127.0.0.1; nginx puts the caller's address in X-Real-IP
+        def attempt(ip: str, token: str) -> int:
+            return self.call("GET", "/api/state", headers={"X-Domovoy-Origin": "lan", "X-Real-IP": ip, "Authorization": f"Bearer {token}"})[0]
+        for _ in range(10):
+            self.assertEqual(attempt("192.168.1.50", "nope"), 401)
+        self.assertEqual(self.call("GET", "/api/state", headers={"X-Domovoy-Origin": "lan", "X-Real-IP": "192.168.1.50", "Authorization": "Bearer nope"})[1]["error"]["code"], "rate_limited")
+        # a different device is unaffected, and the owner's phone can still sign in with the right token
+        self.assertEqual(attempt("192.168.1.77", self.app.secrets.get("api_token")), 200)
+
     def test_oversized_and_malformed_bodies_are_rejected(self) -> None:
         status, err = self.call("POST", "/api/command", raw=b"{not json")
         self.assertEqual((status, err["error"]["code"]), (422, "bad_json"))

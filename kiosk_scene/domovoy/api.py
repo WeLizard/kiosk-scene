@@ -450,6 +450,9 @@ class ApiContext:
         self.router = build_router(self)
 
 
+LOOPBACK = ("127.0.0.1", "::1")
+
+
 def _redact_path(path: str) -> str:
     return re.sub(r"(/frontends/alice/)[^/?\s]+", r"\1***", path)
 
@@ -506,12 +509,15 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.METHOD_NOT_ALLOWED, {"error": {"code": "method_not_allowed", "message": "Method not allowed"}})
                 return
             handler, params, auth_kind = matched  # type: ignore[misc]
-            remote_ip = self.client_address[0]
+            peer_ip = self.client_address[0]
+            # Behind nginx every peer is 127.0.0.1; the real client is what nginx put in X-Real-IP (it overwrites any
+            # value the client sent). Only a loopback peer is believed, so a LAN host cannot fake its address.
+            remote_ip = ((self.headers.get("X-Real-IP") or "").strip() or peer_ip) if peer_ip in LOOPBACK else peer_ip
             content_type = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             limit = self.api.app.env.max_body_bytes if path == "/api/import" else MAX_AUDIO_BYTES if content_type.startswith("audio/") else MAX_JSON_BYTES
             principal = None
             if auth_kind == "user":  # reject before reading a potentially large body
-                principal = self.api.auth.authenticate(self.headers, method, remote_ip)
+                principal = self.api.auth.authenticate(self.headers, method, peer_ip, remote_ip)
             body = self._read_body(limit) if method in MUTATING else b""
             body_consumed = True
             if auth_kind == "alice":
@@ -520,7 +526,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             elif auth_kind == "assist":
                 supplied = self.headers.get("X-Domovoy-Secret") or query.get("secret", "")
                 if not self.api.auth.check_secret("assist_secret", supplied):
-                    principal = self.api.auth.authenticate(self.headers, method, remote_ip)
+                    principal = self.api.auth.authenticate(self.headers, method, peer_ip, remote_ip)
             request = Request(method, path, query, self.headers, body, principal, remote_ip)
             request.params = params
             result = handler(request)

@@ -138,6 +138,13 @@ class Rules(unittest.TestCase):
             i = self.one(phrase)
             self.assertEqual((i["type"], i["items"]), ("add_shopping", ["Молоко", "Хлеб"]), phrase)
 
+    def test_event_titles_do_not_keep_the_preposition_of_a_removed_date(self) -> None:
+        # found by looking at real replies: «Врач на» / «Стоматолог на»
+        for phrase, title in (("Добавь в календарь врача на завтра в 15:00", "Врач"), ("Запиши в календарь стрижку на сегодня в 23:00", "Стрижка"),
+                              ("Добавь в календарь встречу с Иваном на завтра в 10:00", "Встреча с Иваном"), ("Добавь в календарь стоматолога на следующий четверг в 18:30", "Стоматолог")):
+            i = self.one(phrase)
+            self.assertEqual((i["type"], i["title"]), ("create_event", title), phrase)
+
     def test_corrections_reference_the_previous_command(self) -> None:
         self.assertEqual(self.one("нет, десять")["quantity"], 10)
         self.assertEqual(self.one("не девять, а десять")["quantity"], 10)

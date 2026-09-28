@@ -49,7 +49,9 @@ class Authenticator:
         self.secrets, self.trust_local = secrets, trust_local
         self.limiter = RateLimiter()
 
-    def authenticate(self, headers, method: str, remote_ip: str) -> Principal:
+    def authenticate(self, headers, method: str, peer_ip: str, client_ip: str | None = None) -> Principal:
+        """`peer_ip` is the socket peer (decides "local"); `client_ip` is the real caller behind the proxy (rate limits)."""
+        remote_ip = client_ip or peer_ip
         origin = (headers.get("X-Domovoy-Origin") or "").lower()
         bearer = self._bearer(headers)
         if bearer:
@@ -59,7 +61,7 @@ class Authenticator:
                 return Principal("token", True)
             self.limiter.record_failure(remote_ip)
             raise UnauthorizedError("Invalid token")
-        trusted_origin = origin in TRUSTED_ORIGINS or (not origin and self.trust_local and remote_ip in ("127.0.0.1", "::1"))
+        trusted_origin = origin in TRUSTED_ORIGINS or (not origin and self.trust_local and peer_ip in ("127.0.0.1", "::1"))
         if not trusted_origin:
             raise UnauthorizedError("Authentication required: use the Home Assistant panel or send the API token", code="auth_required")
         if method in MUTATING and not headers.get("X-Domovoy-Client"):
