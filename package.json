@@ -22,9 +22,11 @@
     "verify": "pnpm typecheck && pnpm validate:demo && pnpm build:demo && pnpm release:kiosk-addon"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "@types/node": "^24.0.0",
-    "typescript": "^5.8.2"
+    "happy-dom": "^17",
+    "typescript": "^5.8.2",
+    "vitest": "^3"
   }
 }

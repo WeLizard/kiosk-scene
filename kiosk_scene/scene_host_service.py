@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import email.policy
+import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import stat
 import tempfile
@@ -41,6 +43,7 @@ MAX_AVATAR_IMPORT_BYTES = int(
     os.environ.get("SCENE_AVATAR_IMPORT_MAX_BYTES", str(256 * 1024 * 1024))
 )
 MAX_AVATAR_IMPORT_FILES = int(os.environ.get("SCENE_AVATAR_IMPORT_MAX_FILES", "2048"))
+MAX_MOTION_MAP_BODY_BYTES = 4 * 1024 * 1024
 SHARED_AVATAR_RUNTIME_URL = (
     os.environ.get("SCENE_SHARED_AVATAR_RUNTIME_URL", "../../scene-runtime/avatar.html").strip()
     or "../../scene-runtime/avatar.html"
@@ -72,21 +75,44 @@ HOME_ASSISTANT_TOKEN_PATHS = (
 )
 
 
+SAFE_PACK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def is_safe_pack_id(value: str) -> bool:
+    return bool(SAFE_PACK_ID_RE.match(value)) and ".." not in value
+
+
 def load_active_pack_id() -> str:
     if ACTIVE_PACK_FILE.exists():
         try:
             payload = json.loads(ACTIVE_PACK_FILE.read_text(encoding="utf-8"))
             value = str(payload.get("id", "")).strip()
-            if value:
+            if value and is_safe_pack_id(value):
                 return value
+            if value:
+                logging.warning("Ignoring unsafe active pack id %r in %s", value, ACTIVE_PACK_FILE)
         except Exception as exc:
             logging.warning("Failed to read %s: %s", ACTIVE_PACK_FILE, exc)
     return DEFAULT_PACK_ID
 
 
+def display_config_is_current(pack_dir: Path) -> bool:
+    """`scene.display.json` is a derived file: it is only trusted while the digest
+    of the source it was compiled from still matches `scene.default.json`."""
+    display_path = pack_dir / DISPLAY_SCENE_CONFIG_FILENAME
+    source_path = pack_dir / "scene.default.json"
+    try:
+        display = json.loads(display_path.read_text(encoding="utf-8"))
+        recorded = str(display.get("sourceSha256") or "")
+        if not recorded:
+            return False
+        return recorded == hashlib.sha256(source_path.read_bytes()).hexdigest()
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def resolve_runtime_scene_config_name(pack_dir: Path) -> str:
-    display_config_path = pack_dir / DISPLAY_SCENE_CONFIG_FILENAME
-    if display_config_path.exists():
+    if display_config_is_current(pack_dir):
         return DISPLAY_SCENE_CONFIG_FILENAME
     return "scene.default.json"
 
@@ -121,7 +147,7 @@ def build_bootstrap() -> dict[str, Any]:
             "packDir": pack_dir.exists(),
             "rendererConfig": (pack_dir / "renderer.kiosk-scene.json").exists(),
             "sceneConfig": (pack_dir / "scene.default.json").exists(),
-            "sceneDisplayConfig": (pack_dir / DISPLAY_SCENE_CONFIG_FILENAME).exists(),
+            "sceneDisplayConfig": display_config_is_current(pack_dir),
             "entityMap": (pack_dir / "entity-map.json").exists(),
             "avatarManifest": (pack_dir / "avatar.manifest.json").exists(),
             "avatarPacksDir": AVATAR_PACKS_DIR.exists(),
@@ -721,6 +747,21 @@ def handle_avatar_import_chunk(
         shutil.rmtree(upload_dir, ignore_errors=True)
 
 
+def resolve_motion_map_path(pack_dir: Path, manifest: dict[str, Any]) -> Path | None:
+    """Location of the pack's motion-map, guaranteed to stay inside `pack_dir`."""
+    motion_map_rel = str(manifest.get("motionMapUrl") or "").strip()
+    if not motion_map_rel or motion_map_rel.startswith("/") or "://" in motion_map_rel:
+        return None
+    asset_root = str(manifest.get("assetRoot") or "").strip()
+    base = pack_dir
+    if asset_root and not asset_root.startswith("/") and "://" not in asset_root:
+        base = pack_dir / asset_root.removeprefix("./")
+    candidate = (base / motion_map_rel.removeprefix("./")).resolve()
+    if not candidate.is_relative_to(pack_dir.resolve()):
+        raise ValueError("motionMapUrl points outside of the avatar pack.")
+    return candidate
+
+
 def load_avatar_catalog() -> dict[str, Any]:
     packs: list[dict[str, Any]] = []
     if not AVATAR_PACKS_DIR.exists():
@@ -745,15 +786,11 @@ def load_avatar_catalog() -> dict[str, Any]:
 
         pack_id = pack_dir.name
         asset_root = str(manifest.get("assetRoot") or "").strip()
-        motion_map_rel = str(manifest.get("motionMapUrl") or "").strip()
-        asset_root_dir = pack_dir
-        if asset_root and not asset_root.startswith("/") and "://" not in asset_root:
-            asset_root_dir = pack_dir / asset_root.removeprefix("./")
-        motion_map_path = (
-            asset_root_dir / motion_map_rel.removeprefix("./")
-            if motion_map_rel and not motion_map_rel.startswith("/")
-            else None
-        )
+        try:
+            motion_map_path = resolve_motion_map_path(pack_dir, manifest)
+        except ValueError as exc:
+            logging.warning("Avatar pack %s: %s", pack_id, exc)
+            motion_map_path = None
         motion_count = 0
         if motion_map_path and motion_map_path.exists():
             try:
@@ -809,16 +846,8 @@ def load_avatar_pack_details(pack_id: str) -> dict[str, Any]:
         raise FileNotFoundError(f"Avatar pack not found: {pack_id}")
 
     manifest = read_json_file(manifest_path)
-    motion_map_rel = str(manifest.get("motionMapUrl") or "").strip()
     asset_root = str(manifest.get("assetRoot") or "").strip()
-    asset_root_dir = pack_dir
-    if asset_root and not asset_root.startswith("/") and "://" not in asset_root:
-        asset_root_dir = pack_dir / asset_root.removeprefix("./")
-    motion_map_path = (
-        asset_root_dir / motion_map_rel.removeprefix("./")
-        if motion_map_rel and not motion_map_rel.startswith("/")
-        else None
-    )
+    motion_map_path = resolve_motion_map_path(pack_dir, manifest)
     motion_map = {}
     if motion_map_path and motion_map_path.exists():
         motion_map = read_json_file(motion_map_path)
@@ -848,8 +877,11 @@ def load_avatar_pack_details(pack_id: str) -> dict[str, Any]:
 
 def save_avatar_pack_motion_map(pack_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     details = load_avatar_pack_details(pack_id)
-    motion_map_path = Path(str(details.get("motionMapPath") or ""))
+    motion_map_raw = str(details.get("motionMapPath") or "")
     manifest = details.get("manifest") or {}
+    if not motion_map_raw:
+        raise ValueError("Avatar pack does not define a writable motionMapUrl.")
+    motion_map_path = Path(motion_map_raw)
     motion_map = payload.get("motionMap")
     if not isinstance(motion_map, dict):
         raise ValueError("Request must provide a motionMap object.")
@@ -857,13 +889,13 @@ def save_avatar_pack_motion_map(pack_id: str, payload: dict[str, Any]) -> dict[s
     semantic = motion_map.get("semantic")
     if not isinstance(motions, list) or not isinstance(semantic, dict):
         raise ValueError("motionMap must contain motions[] and semantic{}.")
-    if not motion_map_path:
-        raise ValueError("Avatar pack does not define a writable motionMapUrl.")
     motion_map_path.parent.mkdir(parents=True, exist_ok=True)
-    motion_map_path.write_text(
+    temp_path = motion_map_path.with_name(motion_map_path.name + f".{uuid.uuid4().hex}.tmp")
+    temp_path.write_text(
         json.dumps(motion_map, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    os.replace(temp_path, motion_map_path)
     return {
         "success": True,
         "packId": pack_id,
@@ -883,6 +915,16 @@ def delete_avatar_pack(pack_id: str) -> dict[str, Any]:
     shutil.rmtree(pack_dir)
     logging.info("Deleted avatar pack: %s (%s)", pack_id, pack_dir)
     return {"success": True, "packId": pack_id}
+
+
+def parse_content_length(raw: str | None) -> int:
+    try:
+        value = int(str(raw or "0").strip() or "0")
+    except ValueError as exc:
+        raise ValueError("Invalid Content-Length header.") from exc
+    if value < 0:
+        raise ValueError("Invalid Content-Length header.")
+    return value
 
 
 class SceneHostHandler(BaseHTTPRequestHandler):
@@ -997,7 +1039,11 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         )
 
     def handle_avatar_import(self) -> None:
-        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        try:
+            content_length = parse_content_length(self.headers.get("Content-Length"))
+        except ValueError as exc:
+            self.send_json({"success": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
         if content_length <= 0:
             self.send_json(
                 {"success": False, "error": "Request body is empty."},
@@ -1076,7 +1122,17 @@ class SceneHostHandler(BaseHTTPRequestHandler):
             )
 
     def handle_avatar_pack_save(self, query_string: str) -> None:
-        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        try:
+            content_length = parse_content_length(self.headers.get("Content-Length"))
+        except ValueError as exc:
+            self.send_json({"success": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+        if content_length > MAX_MOTION_MAP_BODY_BYTES:
+            self.send_json(
+                {"success": False, "error": "Request body is too large."},
+                status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+            return
         if content_length <= 0:
             self.send_json(
                 {"success": False, "error": "Request body is empty."},

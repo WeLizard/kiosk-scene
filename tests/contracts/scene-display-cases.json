@@ -1,0 +1,367 @@
+[
+  {
+    "name": "minimal single page",
+    "input": {
+      "version": 1,
+      "rotation": {
+        "order": [
+          "page-1"
+        ],
+        "defaultDwellSeconds": 18
+      },
+      "pages": [
+        {
+          "id": "page-1",
+          "kind": "cards",
+          "title": "Overview"
+        }
+      ]
+    },
+    "expected": {
+      "rotation": {
+        "order": [
+          "page-1"
+        ],
+        "defaultDwellMs": 18000
+      },
+      "display": {
+        "safeAreaPx": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "layoutPaddingPx": 16,
+        "layoutGapPx": 16,
+        "globalScale": 1
+      },
+      "pageIds": [
+        "page-1"
+      ]
+    }
+  },
+  {
+    "name": "uppercase page ids keep their case and order",
+    "input": {
+      "version": 1,
+      "rotation": {
+        "order": [
+          "Weather",
+          "Home",
+          "week"
+        ],
+        "defaultDwellSeconds": 20
+      },
+      "pages": [
+        {
+          "id": "week",
+          "kind": "cards",
+          "title": "Week"
+        },
+        {
+          "id": "Home",
+          "kind": "cards",
+          "title": "Home"
+        },
+        {
+          "id": "Weather",
+          "kind": "overview",
+          "title": "Weather"
+        }
+      ]
+    },
+    "expected": {
+      "rotation": {
+        "order": [
+          "Weather",
+          "Home",
+          "week"
+        ],
+        "defaultDwellMs": 20000
+      },
+      "display": {
+        "safeAreaPx": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "layoutPaddingPx": 16,
+        "layoutGapPx": 16,
+        "globalScale": 1
+      },
+      "pageIds": [
+        "Weather",
+        "Home",
+        "week"
+      ]
+    }
+  },
+  {
+    "name": "unknown order entries are dropped, unlisted pages are appended",
+    "input": {
+      "version": 1,
+      "rotation": {
+        "order": [
+          "ghost",
+          "b"
+        ],
+        "defaultDwellSeconds": 18
+      },
+      "pages": [
+        {
+          "id": "a",
+          "kind": "cards",
+          "title": "A"
+        },
+        {
+          "id": "b",
+          "kind": "cards",
+          "title": "B"
+        },
+        {
+          "id": "c",
+          "kind": "cards",
+          "title": "C"
+        }
+      ]
+    },
+    "expected": {
+      "rotation": {
+        "order": [
+          "b",
+          "a",
+          "c"
+        ],
+        "defaultDwellMs": 18000
+      },
+      "display": {
+        "safeAreaPx": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "layoutPaddingPx": 16,
+        "layoutGapPx": 16,
+        "globalScale": 1
+      },
+      "pageIds": [
+        "b",
+        "a",
+        "c"
+      ]
+    }
+  },
+  {
+    "name": "display values are clamped",
+    "input": {
+      "version": 1,
+      "rotation": {
+        "order": [
+          "a"
+        ],
+        "defaultDwellSeconds": 1
+      },
+      "display": {
+        "safeArea": {
+          "top": -5,
+          "right": "12",
+          "bottom": 7.6,
+          "left": "oops"
+        },
+        "layoutPaddingPx": -1,
+        "layoutGapPx": 24,
+        "globalScale": 0.5
+      },
+      "pages": [
+        {
+          "id": "a",
+          "kind": "cards",
+          "title": "A"
+        }
+      ]
+    },
+    "expected": {
+      "rotation": {
+        "order": [
+          "a"
+        ],
+        "defaultDwellMs": 5000
+      },
+      "display": {
+        "safeAreaPx": {
+          "top": 0,
+          "right": 12,
+          "bottom": 8,
+          "left": 0
+        },
+        "layoutPaddingPx": 0,
+        "layoutGapPx": 24,
+        "globalScale": 0.75
+      },
+      "pageIds": [
+        "a"
+      ]
+    }
+  },
+  {
+    "name": "duplicate page ids are made unique",
+    "input": {
+      "version": 1,
+      "rotation": {
+        "order": [
+          "a",
+          "a"
+        ],
+        "defaultDwellSeconds": 18
+      },
+      "pages": [
+        {
+          "id": "a",
+          "kind": "cards",
+          "title": "First"
+        },
+        {
+          "id": "a",
+          "kind": "cards",
+          "title": "Second"
+        }
+      ]
+    },
+    "expected": {
+      "rotation": {
+        "order": [
+          "a",
+          "a-2"
+        ],
+        "defaultDwellMs": 18000
+      },
+      "display": {
+        "safeAreaPx": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "layoutPaddingPx": 16,
+        "layoutGapPx": 16,
+        "globalScale": 1
+      },
+      "pageIds": [
+        "a",
+        "a-2"
+      ]
+    }
+  },
+  {
+    "name": "grid dimensions are clamped and unknown kinds become cards",
+    "input": {
+      "version": 1,
+      "rotation": {
+        "order": [
+          "g",
+          "x"
+        ],
+        "defaultDwellSeconds": 18
+      },
+      "pages": [
+        {
+          "id": "g",
+          "kind": "grid",
+          "title": "Grid",
+          "gridColumns": 40,
+          "gridRows": 0
+        },
+        {
+          "id": "x",
+          "kind": "weird",
+          "title": "X"
+        }
+      ]
+    },
+    "expected": {
+      "rotation": {
+        "order": [
+          "g",
+          "x"
+        ],
+        "defaultDwellMs": 18000
+      },
+      "display": {
+        "safeAreaPx": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        },
+        "layoutPaddingPx": 16,
+        "layoutGapPx": 16,
+        "globalScale": 1
+      },
+      "pageIds": [
+        "g",
+        "x"
+      ],
+      "pages": {
+        "g": {
+          "kind": "grid",
+          "gridColumns": 12,
+          "gridRows": 1
+        },
+        "x": {
+          "kind": "cards"
+        }
+      }
+    }
+  },
+  {
+    "name": "blank and non-numeric display values fall back to defaults",
+    "input": {
+      "version": 1,
+      "rotation": {
+        "order": [
+          "a"
+        ],
+        "defaultDwellSeconds": 18
+      },
+      "display": {
+        "layoutPaddingPx": "",
+        "layoutGapPx": "wide",
+        "safeArea": {
+          "top": "  ",
+          "left": 8.5
+        }
+      },
+      "pages": [
+        {
+          "id": "a",
+          "kind": "cards",
+          "title": "A"
+        }
+      ]
+    },
+    "expected": {
+      "rotation": {
+        "order": [
+          "a"
+        ],
+        "defaultDwellMs": 18000
+      },
+      "display": {
+        "safeAreaPx": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 9
+        },
+        "layoutPaddingPx": 16,
+        "layoutGapPx": 16,
+        "globalScale": 1
+      },
+      "pageIds": [
+        "a"
+      ]
+    }
+  }
+]

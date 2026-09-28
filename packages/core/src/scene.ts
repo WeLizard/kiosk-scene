@@ -1,5 +1,5 @@
 import type { SceneConfigV1, SceneDisplayConfigV1, ScenePageV1 } from "./contracts.js";
-import { isObjectRecord, normalizeStringList, trimText } from "./utils.js";
+import { isObjectRecord, normalizeIdList, trimText } from "./utils.js";
 
 export interface NormalizedSceneConfigV1 {
   version: 1;
@@ -24,11 +24,53 @@ export interface NormalizedSceneConfigV1 {
 export type SceneRuntimeConfigV1 = SceneDisplayConfigV1;
 
 function normalizeNonNegativeNumber(value: unknown, fallback: number): number {
+  if (value === null || value === undefined || (typeof value === "string" && !value.trim())) {
+    return fallback;
+  }
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
     return fallback;
   }
-  return Math.max(0, numeric);
+  return Math.max(0, Math.round(numeric));
+}
+
+/**
+ * Pages must have unique ids: a duplicate gets a numeric suffix (`a`, `a-2`, ...).
+ * Mirrors `sanitize_page` in kiosk_scene/scene_config_service.py.
+ */
+export function ensureUniquePageIds<T extends { id: string }>(pages: T[]): T[] {
+  const used = new Set<string>();
+  return pages.map((page, index) => {
+    const rawId = trimText(page.id, 40) || `page-${index + 1}`;
+    let id = rawId;
+    let suffix = 2;
+    while (used.has(id)) {
+      id = `${rawId}-${suffix}`;
+      suffix += 1;
+    }
+    used.add(id);
+    return id === page.id ? page : { ...page, id };
+  });
+}
+
+/** Known ids in the requested order, followed by every page the order did not mention. */
+export function completeRotationOrder(pages: Array<{ id: string }>, rawOrder: unknown): string[] {
+  const known = new Set(pages.map((page) => page.id));
+  const seen = new Set<string>();
+  const order: string[] = [];
+  for (const id of normalizeIdList(rawOrder)) {
+    if (known.has(id) && !seen.has(id)) {
+      seen.add(id);
+      order.push(id);
+    }
+  }
+  for (const page of pages) {
+    if (!seen.has(page.id)) {
+      seen.add(page.id);
+      order.push(page.id);
+    }
+  }
+  return order;
 }
 
 function normalizeDisplayScale(value: unknown, fallback = 1): number {
@@ -105,7 +147,7 @@ export function mergeScenePage(basePage: ScenePageV1, incomingPage: unknown): Sc
 
 export function normalizeSceneConfig(config: unknown, defaults: SceneConfigV1): NormalizedSceneConfigV1 {
   const payload = unwrapSceneConfigPayload(config);
-  const defaultPages = Array.isArray(defaults.pages) ? defaults.pages.slice() : [];
+  const defaultPages = ensureUniquePageIds(Array.isArray(defaults.pages) ? defaults.pages.slice() : []);
   const incomingPages = isObjectRecord(payload) && Array.isArray(payload.pages) ? payload.pages : [];
 
   const pages = defaultPages.map((basePage) => {
@@ -119,14 +161,12 @@ export function normalizeSceneConfig(config: unknown, defaults: SceneConfigV1): 
   const defaultSafeArea = isObjectRecord(defaultDisplay.safeArea) ? defaultDisplay.safeArea : {};
   const incomingSafeArea = isObjectRecord(incomingDisplay.safeArea) ? incomingDisplay.safeArea : {};
   const rawOrder = Array.isArray(incomingRotation.order) ? incomingRotation.order : defaults.rotation.order;
-  const order = normalizeStringList(rawOrder).filter((item, index, list) => {
-    return pages.some((page) => page.id === item) && list.indexOf(item) === index;
-  });
+  const order = completeRotationOrder(pages, rawOrder);
 
   return {
     version: 1,
     rotation: {
-      order: order.length ? order : defaults.rotation.order.slice(),
+      order,
       defaultDwellMs: Math.max(
         5_000,
         (Number(incomingRotation.defaultDwellSeconds) || defaults.rotation.defaultDwellSeconds) * 1_000,
@@ -193,13 +233,12 @@ export function isSceneDisplayConfig(config: unknown): config is SceneDisplayCon
 }
 
 function normalizeSceneDisplayConfig(config: SceneDisplayConfigV1): SceneDisplayConfigV1 {
-  const pages = Array.isArray(config.pages)
-    ? config.pages.filter((page) => isObjectRecord(page)) as ScenePageV1[]
-    : [];
-  const rawOrder = Array.isArray(config.rotation?.order) ? config.rotation.order : pages.map((page) => page.id);
-  const order = normalizeStringList(rawOrder).filter((item, index, list) => {
-    return pages.some((page) => page.id === item) && list.indexOf(item) === index;
-  });
+  const pages = ensureUniquePageIds(
+    Array.isArray(config.pages)
+      ? config.pages.filter((page) => isObjectRecord(page)) as ScenePageV1[]
+      : [],
+  );
+  const order = completeRotationOrder(pages, config.rotation?.order);
   const display = config.display;
   const safeAreaPx = config.display.safeAreaPx;
   const avatar = isObjectRecord(config.avatar)
@@ -214,7 +253,7 @@ function normalizeSceneDisplayConfig(config: SceneDisplayConfigV1): SceneDisplay
     version: 1,
     kind: "scene.display",
     rotation: {
-      order: order.length ? order : pages.map((page) => page.id),
+      order,
       defaultDwellMs: Math.max(5_000, Number(config.rotation?.defaultDwellMs) || 18_000),
     },
     display: {
