@@ -1191,7 +1191,7 @@ script.turn_on`, hint: "Только эти сервисы Домовой мож
         { name: "username", label: "Логин", value: u.caldav.username },
         ue("caldav_password", "Пароль / пароль приложения", r.secrets.caldav_password),
         { name: "default", label: "Куда добавлять по умолчанию", type: "select", options: [{ value: "local", label: "Локальный календарь" }, { value: "caldav", label: "CalDAV" }], value: u.calendar.default },
-        { name: "ha_calendars", label: "Календари из Home Assistant (только чтение)", type: "textarea", rows: 2, value: Ie(u.calendar.ha_calendars), placeholder: "calendar.family", wide: !0 }
+        { name: "ha_calendars", label: "Календари из Home Assistant", type: "textarea", rows: 2, value: Ie(u.calendar.ha_calendars), placeholder: "calendar.family", hint: "По одному на строку. События из них видны; добавлять можно, менять и удалять — нет.", wide: !0 }
       ], (b) => ({ settings: { caldav: { url: String(b.url).trim(), username: String(b.username).trim() }, calendar: { default: b.default, ha_calendars: Te(String(b.ha_calendars)) } }, secrets: { caldav_password: String(b.caldav_password) } }), d))), h = G("llm", "Языковая модель (необязательно)", l("llm"), n(
         "div",
         null,

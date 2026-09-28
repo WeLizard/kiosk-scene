@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from ..errors import ProviderError, ProviderNotConfigured
-from ..text import norm_key
+from ..text import norm_key, speakable
 from .base import HealthTracker
 
 
@@ -90,7 +90,7 @@ class SpeakSender:
 def build_speak_call(speaker: dict[str, Any], text: str) -> tuple[str, str, dict[str, Any]]:
     entity = str(speaker["entity_id"])
     mode = speaker.get("mode") or "yandex_station_text"
-    text = " ".join(str(text).split())[:800]
+    text = speakable(text)[:800]
     if mode == "tts_speak":
         tts_entity = str(speaker.get("tts_entity") or "")
         if not tts_entity:

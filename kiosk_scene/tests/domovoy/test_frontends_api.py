@@ -10,7 +10,8 @@ import urllib.request
 from ..helpers import ADDON_DIR  # noqa: F401
 from domovoy.api import ApiServer
 from domovoy.assistant.voice import strip_trigger
-from domovoy.frontends.alice import AliceFrontend, speakable
+from domovoy.frontends.alice import AliceFrontend
+from domovoy.text import speakable
 from domovoy.frontends.assist import AssistFrontend
 from domovoy.server import build
 from .base import AppCase
@@ -104,12 +105,16 @@ class KioskMicrophone(AppCase):
         self.assertEqual(self.app.items.list()[0]["quantity"], 9)
 
     def test_the_answer_is_spoken_by_the_station_in_the_room_that_asked(self) -> None:
+        self.hear("Домовой, " + REMEMBER)
         r = self.hear("Эй, домовой, где резисторы?")
         self.assertTrue(r["spoken"], r)
         domain, service, data = self.ha.calls[-1]
         self.assertEqual((domain, service, data["entity_id"]), ("media_player", "play_media", "media_player.station_kitchen"))
-        self.assertEqual(data["media_content_id"], r["reply"].replace("→", ",").replace("«", "").replace("»", "") if False else data["media_content_id"])
-        self.assertTrue(data["media_content_id"])
+        # the screen text keeps its arrows and quotes; the voice gets a version a TTS engine reads sensibly
+        self.assertIn("→", r["reply"])
+        for symbol in ("→", "«", "»", "—"):
+            self.assertNotIn(symbol, data["media_content_id"])
+        self.assertIn("Коробка 3", data["media_content_id"])
 
     def test_conversation_window_lets_follow_ups_skip_the_trigger_word_until_it_expires(self) -> None:
         self.hear("Домовой, " + REMEMBER)

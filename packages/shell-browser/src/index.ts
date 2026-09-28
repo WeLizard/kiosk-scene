@@ -593,11 +593,12 @@ export class BrowserSceneShellApp {
     await attempt("setState", () => adapter.setState(presentation.state));
     await attempt("setCue", () => adapter.setCue(this.currentControl.cue));
     await attempt("setViewPreset", () => adapter.setViewPreset(this.currentPreset));
-    // Only send bubble when state has no message — otherwise the state-driven
-    // typewriter/lip-sync in the iframe handles the text display.
-    // Sending a bubble with speak:false would override the active typewriter.
+    // An adapter that renders `state.message` itself (Live2D's typewriter/lip-sync) must not get a competing bubble:
+    // a bubble with speak:false would override its typewriter. Every other adapter (static portrait, ...) gets the
+    // text through the bubble, otherwise the assistant's words would be invisible on the display.
     const hasStateMessage = Boolean(trimText(presentation.state.message, 180));
-    await attempt("showBubble", () => adapter.showBubble(hasStateMessage ? "" : presentation.body, {
+    const adapterRendersMessage = adapter.getCapabilities().rendersStateMessage === true;
+    await attempt("showBubble", () => adapter.showBubble(hasStateMessage && adapterRendersMessage ? "" : presentation.body, {
       ttlMs: 0,
       speak: false,
       typewriter: false,

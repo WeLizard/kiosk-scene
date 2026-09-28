@@ -179,6 +179,32 @@ describe("refresh lifecycle", () => {
     expect(root.querySelectorAll("[data-scene-page-id].slide").length).toBe(2);
   });
 
+  it("shows the assistant's message in the bubble unless the adapter renders state messages itself", async () => {
+    const files = defaultFiles();
+    files["state.json"] = { version: 1, revision: 2, message: "Готово: паяльник на верхней полке", speaking: true, online: true };
+    installFakeFetch(files);
+    const bubbles: string[] = [];
+    const adapter = (rendersStateMessage: boolean): AvatarAdapter => ({
+      id: "probe",
+      mount: async () => undefined,
+      dispose: async () => undefined,
+      setState: async () => undefined,
+      setCue: async () => undefined,
+      setViewPreset: async () => undefined,
+      showBubble: async (text) => {
+        bubbles.push(text);
+      },
+      getCapabilities: () => ({ supportsEmotion: false, supportsMotion: false, supportsViewPresets: false, supportsLipSync: false, rendersStateMessage }),
+    });
+    await start({ avatarAdapterFactory: () => adapter(false) });
+    expect(bubbles.at(-1)).toContain("паяльник");
+    await shell?.dispose();
+    shell = null;
+    bubbles.length = 0;
+    await start({ avatarAdapterFactory: () => adapter(true) });
+    expect(bubbles.at(-1)).toBe("");
+  });
+
   it("init is idempotent", async () => {
     const backend = installFakeFetch();
     const { shell } = await start();

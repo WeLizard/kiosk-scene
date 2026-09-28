@@ -50,6 +50,11 @@ export interface AvatarAdapterCapabilities {
   supportsViewPresets: boolean;
   supportsLipSync: boolean;
   supportsPointerFocus?: boolean;
+  /**
+   * The adapter displays `state.message` itself (typewriter/lip-sync inside its own runtime). When it does not,
+   * the shell shows the message through `showBubble`, so an assistant's words are never invisible on a display.
+   */
+  rendersStateMessage?: boolean;
 }
 
 export interface AvatarManifestV1 {

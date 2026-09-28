@@ -86,3 +86,21 @@ def clean_phrase(text: str) -> str:
 
 def capitalize_first(text: str) -> str:
     return text[:1].upper() + text[1:] if text else text
+
+
+MAX_SPOKEN = 1000
+
+
+def speakable(text: str) -> str:
+    """Make a reply pleasant for a TTS voice: no arrows or quote marks, no doubled punctuation, at most
+    `MAX_SPOKEN` characters, cut at a sentence edge. The screen keeps the original text."""
+    import re
+
+    cleaned = str(text).replace("→", ",").replace("«", "").replace("»", "").replace("—", ",")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"([,.;:!?])\1+", r"\1", cleaned)
+    if len(cleaned) <= MAX_SPOKEN:
+        return cleaned
+    cut = cleaned[:MAX_SPOKEN]
+    edge = max(cut.rfind(". "), cut.rfind("; "), cut.rfind(", "))
+    return (cut[: edge + 1] if edge > 200 else cut).strip()

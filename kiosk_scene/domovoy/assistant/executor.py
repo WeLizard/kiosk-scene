@@ -33,10 +33,6 @@ class Outcome:
     session: dict[str, Any] = field(default_factory=dict)   # updates merged into the conversation context
 
 
-def _speakable(text: str) -> str:
-    return text.replace("→", ",").replace("«", "").replace("»", "")
-
-
 class Executor:
     def __init__(self, app: Any) -> None:
         self.app = app

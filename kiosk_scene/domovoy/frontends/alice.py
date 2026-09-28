@@ -11,23 +11,10 @@ import concurrent.futures
 import re
 from typing import Any
 
-from ..text import normalize
+from ..text import normalize, speakable
 
-MAX_TEXT = 1000
 EXIT_WORDS = {"хватит", "выйди", "выход", "закрой навык", "стоп", "все", "всё", "спасибо", "пока", "до свидания", "достаточно"}
 _POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="alice")
-
-
-def speakable(text: str) -> str:
-    """Make a reply pleasant for TTS: no arrows/quotes, no double punctuation, ≤ 1000 chars at a sentence edge."""
-    cleaned = text.replace("→", ",").replace("«", "").replace("»", "").replace("—", ",")
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    cleaned = re.sub(r"([,.;:!?])\1+", r"\1", cleaned)
-    if len(cleaned) <= MAX_TEXT:
-        return cleaned
-    cut = cleaned[:MAX_TEXT]
-    edge = max(cut.rfind(". "), cut.rfind("; "), cut.rfind(", "))
-    return (cut[: edge + 1] if edge > 200 else cut).strip()
 
 
 class AliceFrontend:
