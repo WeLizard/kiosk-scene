@@ -17,6 +17,7 @@ from .providers.stt import SttProvider
 from .providers.telegram import TelegramProvider
 from .secret_store import SecretsStore
 from .services.audit import AuditLog
+from .services.avatar import AvatarState
 from .services.calendar import CalendarService
 from .services.commands import CommandLog, ReviewQueue, SessionStore
 from .services.delivery import DeliveryService
@@ -75,6 +76,7 @@ class Domovoy:
 
         # -- domain --------------------------------------------------------------------------------
         self.audit = AuditLog(self.db, self.clock)
+        self.avatar = AvatarState(self.db, self.clock)
         self.search = SearchService(self.db, self.clock)
         self.locations = LocationService(self.db, self.clock, self.audit, self.search)
         self.items = ItemService(self.db, self.clock, self.audit, self.search, self.locations)
@@ -84,6 +86,7 @@ class Domovoy:
         self.presence = PresenceService(self.ha, self.settings)
         self.outbox = OutboxService(self.db, self.clock, self.settings)
         self.speak = SpeakSender(self.ha, self.settings, self.presence, self.clock, self.health["speak"])
+        self.speak.app_ref = self
         self.outbox.register(self.telegram)
         self.outbox.register(self.speak)
         self.outbox.register(_HaNotifySender(self.ha))

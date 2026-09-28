@@ -155,7 +155,9 @@ class Executor:
         location_id, created, path_text = self._locate(intent, ctx, session, create=True)
         if isinstance(path_text, Outcome):
             return path_text
-        candidates = self.app.items.candidates(intent["name"])
+        # Only a *confident* name match means "move that thing". "программатор stm32" is more specific than an
+        # existing "программатор": it is a different item, so it gets its own record instead of hijacking the other.
+        candidates = [c for c in self.app.items.candidates(intent["name"]) if c["match_score"] >= 0.9]
         if not candidates:
             item, _ = self.app.items.create(ctx, name=intent["name"], quantity=intent.get("quantity"), unit=intent.get("unit", ""),
                                             location_id=location_id, confidence=intent.get("confidence"))

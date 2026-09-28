@@ -61,7 +61,8 @@ class SettingsService:
                 raise ValidationError(f"Invalid value for {key}", fields={key: "Wrong type"})
             self._check(key, value)
         for key, value in patch.items():
-            merged = {**DEFAULTS[key], **value} if isinstance(DEFAULTS[key], dict) else value
+            # Nested settings are patched, not replaced: sending {"ai": {"auto_apply": true}} keeps base_url etc.
+            merged = {**self.get(key), **value} if isinstance(DEFAULTS[key], dict) else value
             self.db.set_setting(f"cfg.{key}", merged)
         return self.all()
 

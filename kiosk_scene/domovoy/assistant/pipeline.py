@@ -109,12 +109,15 @@ class CommandPipeline:
             if not confident and self.llm.available():
                 remaining = None if deadline_s is None else deadline_s - (time.monotonic() - started)
                 if remaining is None or remaining >= 1.5:
+                    app.avatar.thinking(True)
                     try:
                         raw_intents = self.llm.interpret(text, now=now, session=session, deadline=remaining)
                         interpreter = "llm"
                     except ProviderError as exc:
                         deferred_reason = f"Модель недоступна ({exc.code})"
                         raw_intents = raw_intents if raw_intents else None
+                    finally:
+                        app.avatar.thinking(False)
                 else:
                     deferred_reason = "Не хватило времени на модель"
             elif not confident and app.llm.configured():

@@ -129,3 +129,40 @@ describe("createExtensionRuntime", () => {
     expect(seen).toEqual(["offline"]);
   });
 });
+
+describe("services", () => {
+  it("runs background services per mode, follows late-loading extensions and stops them", async () => {
+    const { ServiceRunner } = await import("@kiosk-scene/core");
+    const registry = new ExtensionRegistry();
+    const runtime = createExtensionRuntime({ registry, mode: "kiosk" });
+    const started: string[] = [];
+    const stopped: string[] = [];
+    const errors: string[] = [];
+    const runner = new ServiceRunner(registry, "kiosk", runtime, (id) => errors.push(id));
+    runner.start();
+    await registry.load(makeExtension("demo", (host) => {
+      host.registerService({ id: "demo.sync", title: "Sync", modes: ["kiosk"], start: () => { started.push("sync"); return () => stopped.push("sync"); } });
+      host.registerService({ id: "demo.admin-only", title: "Admin", modes: ["admin"], start: () => { started.push("admin"); return () => undefined; } });
+      host.registerService({ id: "demo.broken", title: "Broken", modes: ["kiosk"], start: () => { throw new Error("nope"); } });
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(started).toEqual(["sync"]);
+    expect(errors).toEqual(["demo.broken"]);
+    await registry.unload("demo");
+    expect(stopped).toEqual(["sync"]);
+    await registry.load(makeExtension("later", (host) => {
+      host.registerService({ id: "later.svc", title: "Later", modes: ["kiosk"], start: () => { started.push("later"); return () => stopped.push("later"); } });
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    runner.stop();
+    expect(started).toEqual(["sync", "later"]);
+    expect(stopped).toEqual(["sync", "later"]);
+  });
+
+  it("exposes refresh() to views", () => {
+    const registry = new ExtensionRegistry();
+    const refresh = vi.fn();
+    createExtensionRuntime({ registry, mode: "kiosk", refresh }).refresh();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+});

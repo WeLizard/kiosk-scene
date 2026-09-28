@@ -418,6 +418,9 @@ def build_router(ctx: "ApiContext") -> Router:
     r.add("GET", "/api/voice/status", lambda req: {"enabled": bool(voice.config().get("enabled")), "stt_configured": app.stt.configured(),
           "trigger_words": voice.config().get("trigger_words"), "window_s": voice.config().get("window_s"), "busy": app.gate.busy})
 
+    # ---- avatar ---------------------------------------------------------------------------------
+    r.add("GET", "/api/avatar/state", lambda req: app.avatar.snapshot())
+
     # ---- realtime -------------------------------------------------------------------------------
     def events(req: Request) -> dict[str, Any]:
         since_raw = req.query.get("since")

@@ -94,6 +94,8 @@ export interface ExtensionRuntime {
   onRealtimeStatus(sourceId: string, listener: (status: RealtimeStatus) => void): Unsubscribe;
   /** Navigate the host (admin router / kiosk carousel) to a registered page. */
   navigate(pageId: string, params?: Record<string, string>): void;
+  /** Ask the host to re-read its data sources now (the kiosk scene refreshes state/control immediately). */
+  refresh(): void;
   /** Extension-scoped configuration from `extension.json`. */
   config: Record<string, unknown>;
 }
@@ -125,6 +127,18 @@ export interface PageDefinition {
   mount(host: HTMLElement, params: Record<string, unknown>, runtime: ExtensionRuntime): MountedView | Promise<MountedView>;
 }
 
+/**
+ * A background service: runs while the host is up, without owning any UI (keeps a realtime subscription alive,
+ * mirrors external state into the scene, ...). `start` returns its stop function.
+ */
+export interface ServiceDefinition {
+  /** Namespaced: `domovoy.avatar-sync`. */
+  id: string;
+  title: string;
+  modes: ExtensionMode[];
+  start(runtime: ExtensionRuntime): Unsubscribe | Promise<Unsubscribe>;
+}
+
 export interface ExtensionHost {
   readonly extensionId: string;
   registerDataProvider(provider: DataProvider): void;
@@ -132,6 +146,7 @@ export interface ExtensionHost {
   registerWidget(widget: WidgetDefinition): void;
   registerPage(page: PageDefinition): void;
   registerRealtimeSource(source: RealtimeSource): void;
+  registerService(service: ServiceDefinition): void;
   config: Record<string, unknown>;
 }
 
@@ -190,6 +205,7 @@ export class ExtensionRegistry {
   private readonly widgets = new Map<string, Owned<WidgetDefinition>>();
   private readonly pages = new Map<string, Owned<PageDefinition>>();
   private readonly realtimeSources = new Map<string, Owned<RealtimeSource>>();
+  private readonly services = new Map<string, Owned<ServiceDefinition>>();
   private readonly listeners = new Set<RegistryListener>();
 
   /**
@@ -270,6 +286,12 @@ export class ExtensionRegistry {
       .sort((left, right) => (left.order ?? 100) - (right.order ?? 100) || left.title.localeCompare(right.title));
   }
 
+  listServices(mode?: ExtensionMode): ServiceDefinition[] {
+    return Array.from(this.services.values())
+      .map((entry) => entry.value)
+      .filter((service) => !mode || service.modes.includes(mode));
+  }
+
   listRealtimeSources(): RealtimeSource[] {
     return Array.from(this.realtimeSources.values()).map((entry) => entry.value);
   }
@@ -324,6 +346,12 @@ export class ExtensionRegistry {
         claim(this.pages, "Page", page);
       },
       registerRealtimeSource: (source) => claim(this.realtimeSources, "Realtime source", source),
+      registerService: (service) => {
+        if (!Array.isArray(service.modes) || !service.modes.length) {
+          throw new ExtensionRegistryError(`Service ${service.id} must declare at least one mode.`);
+        }
+        claim(this.services, "Service", service);
+      },
     };
   }
 
@@ -333,6 +361,7 @@ export class ExtensionRegistry {
       this.actionProviders,
       this.widgets,
       this.pages,
+      this.services,
     ] as Array<Map<string, Owned<unknown>>>;
     for (const store of stores) {
       for (const [key, entry] of Array.from(store.entries())) {
@@ -361,6 +390,7 @@ export function createExtensionRuntime(options: {
   config?: Record<string, unknown>;
   resolveUrl?: (url: string) => string;
   navigate?: (pageId: string, params?: Record<string, string>) => void;
+  refresh?: () => void;
 }): ExtensionRuntime {
   const { registry } = options;
   const missing = <T>(kind: string, id: string): ExtensionResult<T> => ({
@@ -416,5 +446,77 @@ export function createExtensionRuntime(options: {
       return source.onStatus(listener);
     },
     navigate: options.navigate ?? (() => undefined),
+    refresh: options.refresh ?? (() => undefined),
   };
+}
+
+/**
+ * Runs the background services of `mode` and keeps them in sync with the registry (extensions may load late).
+ * A service that throws on start is skipped and reported; it never stops the others or the host.
+ */
+export class ServiceRunner {
+  private readonly running = new Map<string, Unsubscribe>();
+  private readonly starting = new Set<string>();
+  private unsubscribe: Unsubscribe | null = null;
+  private stopped = false;
+
+  constructor(
+    private readonly registry: ExtensionRegistry,
+    private readonly mode: ExtensionMode,
+    private readonly runtime: ExtensionRuntime,
+    private readonly onError: (id: string, error: unknown) => void = () => undefined,
+  ) {}
+
+  start(): void {
+    this.unsubscribe = this.registry.onChange(() => this.sync());
+    this.sync();
+  }
+
+  stop(): void {
+    this.stopped = true;
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    for (const stop of Array.from(this.running.values())) {
+      try {
+        stop();
+      } catch (error) {
+        this.onError("stop", error);
+      }
+    }
+    this.running.clear();
+  }
+
+  private sync(): void {
+    const wanted = new Map(this.registry.listServices(this.mode).map((service) => [service.id, service]));
+    for (const [id, stop] of Array.from(this.running.entries())) {
+      if (!wanted.has(id)) {
+        this.running.delete(id);
+        try {
+          stop();
+        } catch (error) {
+          this.onError(id, error);
+        }
+      }
+    }
+    for (const [id, service] of wanted) {
+      if (this.running.has(id) || this.starting.has(id)) {
+        continue;
+      }
+      this.starting.add(id);
+      void Promise.resolve()
+        .then(() => service.start(this.runtime))
+        .then((stop) => {
+          this.starting.delete(id);
+          if (this.stopped || !this.registry.listServices(this.mode).some((item) => item.id === id)) {
+            stop();
+            return;
+          }
+          this.running.set(id, stop);
+        })
+        .catch((error) => {
+          this.starting.delete(id);
+          this.onError(id, error);
+        });
+    }
+  }
 }

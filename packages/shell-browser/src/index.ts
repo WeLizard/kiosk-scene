@@ -13,6 +13,7 @@ import {
   pickIdleLine,
   resolveAdjacentSceneIndex,
   resolveBaseUrl,
+  ServiceRunner,
   resolveSceneRuntimeConfig,
   resolveSceneSelection,
   resolveUrlAgainst,
@@ -152,6 +153,7 @@ export class BrowserSceneShellApp {
     }
   };
   private unsubscribeRegistry: (() => void) | null = null;
+  private serviceRunner: ServiceRunner | null = null;
 
   // data health
   private cycleConnectivityFailures = 0;
@@ -290,7 +292,12 @@ export class BrowserSceneShellApp {
         locale: this.rendererConfig.assistant.locale || "en-US",
         resolveUrl: (url) => resolveUrlAgainst(window.location.href, url),
         navigate: (pageId) => this.pinPageById(pageId),
+        refresh: () => void this.refreshNow(),
       });
+      this.serviceRunner = new ServiceRunner(this.options.extensions, "kiosk", this.extensionRuntime, (id, error) => {
+        console.warn(`Extension service ${id} failed`, error);
+      });
+      this.serviceRunner.start();
       this.unsubscribeRegistry = this.options.extensions.onChange(() => {
         // A late-loading extension may now provide pages/widgets that were showing a placeholder.
         for (const entry of this.slides.values()) {
@@ -340,6 +347,8 @@ export class BrowserSceneShellApp {
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.unsubscribeRegistry?.();
     this.unsubscribeRegistry = null;
+    this.serviceRunner?.stop();
+    this.serviceRunner = null;
     for (const entry of Array.from(this.slides.values())) {
       this.discardSlide(entry);
     }

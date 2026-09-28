@@ -283,9 +283,10 @@ class RuleInterpreter:
     def _calendar(self, original: str, folded: str, ctx: InterpretContext) -> list[Intent] | None:
         if self._CAL_QUERY.search(folded) and not re.search(r"\b(?:добавь|поставь|запиши|создай|запланируй|занеси)\b", folded):
             return [self._calendar_query(original, folded, ctx)]
-        update = re.match(r"^(?:перенеси|перенести|передвинь|сдвинь|перезапиши|перенесите)\s+(?P<title>.+?)\s+(?:на|в|во)\s+(?P<when>.+)$", folded)
+        update = re.match(r"^(?:перенеси|перенести|передвинь|сдвинь|перезапиши|перенесите)\s+(?P<title>.+?)\s+(?P<whenfull>(?:на|в|во)\s+(?P<when>.+))$", folded)
         if update and not looks_like_place(update.group("when")):
-            when = extract_when(original[update.start("when"):], ctx.now, default_hour=ctx.default_reminder_hour)
+            # keep the preposition: «на пятницу» / «в четверг» need it to be recognised as a weekday
+            when = extract_when(original[update.start("whenfull"):], ctx.now, default_hour=ctx.default_reminder_hour)
             if when.start is not None:
                 title = original[update.start("title"):update.end("title")]
                 return [_intent("update_event", 0.85, original, title=self._event_title(title),

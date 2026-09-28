@@ -81,6 +81,9 @@ class SpeakSender:
         if spoken == 0 and last_error is not None:
             raise last_error
         self.health.ok()
+        avatar = getattr(self.app_ref, "avatar", None) if getattr(self, "app_ref", None) is not None else None
+        if avatar is not None:
+            avatar.say(text, target.get("mood") or "neutral", spoken=True)
         return f"speak:{spoken}"
 
 

@@ -103,6 +103,7 @@ class VoiceGateway:
         mode = reply_mode or self.config().get("reply") or "speak"
         reply = result.get("reply") or ""
         result["spoken"] = False
+        self._avatar_react(result, reply)
         if mode == "speak" and reply and self.app.settings.get("speakers"):
             try:
                 from ..services.context import Ctx
@@ -117,3 +118,16 @@ class VoiceGateway:
             except Exception as exc:  # the answer is still returned in the payload for the screen
                 result["speak_error"] = str(exc)[:200]
         return result
+
+    def _avatar_react(self, result: dict[str, Any], reply: str) -> None:
+        """Voice conversations are visible on the kiosk avatar (words + mouth). Typed web chat is not mirrored there."""
+        if not reply or result.get("status") == "listening" and False:
+            return
+        mood = {"applied": "success", "answered": "neutral", "clarify": "question", "review": "question",
+                "failed": "error", "partial": "error", "rejected": "error", "listening": "greet"}.get(result.get("status") or "", "neutral")
+        try:
+            # when the reply is spoken through `speak`, the speaker path already publishes it; avoid a double update
+            if not (self.config().get("reply") == "speak" and self.app.settings.get("speakers")):
+                self.app.avatar.say(reply, mood, spoken=True)
+        except Exception:  # noqa: BLE001 - the avatar is decoration; never break a command for it
+            pass

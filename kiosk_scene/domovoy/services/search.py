@@ -20,6 +20,8 @@ class SearchService:
     """
 
     KINDS = ("item", "location", "note", "task", "event")
+    # "where is my resistor" is about things far more often than about places: a mild prior, never a filter.
+    KIND_WEIGHT = {"item": 1.25, "note": 1.1, "event": 1.0, "task": 1.0, "location": 0.8}
 
     def __init__(self, db: Database, clock: Clock, embedder: Embedder | None = None) -> None:
         self.db = db
@@ -155,7 +157,8 @@ class SearchService:
         matched: dict[str, list[str]] = {}
         for name, ranking in rankings.items():
             for key, position in ranking:
-                fused[key] = fused.get(key, 0.0) + 1.0 / (60 + position)
+                weight = self.KIND_WEIGHT.get(key.split(":", 1)[0], 1.0)
+                fused[key] = fused.get(key, 0.0) + weight / (60 + position)
                 matched.setdefault(key, []).append(name)
         ordered = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:limit]
         hits = []

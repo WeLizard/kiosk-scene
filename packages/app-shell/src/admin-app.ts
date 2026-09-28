@@ -1,5 +1,6 @@
 import {
   createExtensionRuntime,
+  ServiceRunner,
   type ExtensionRegistry,
   type ExtensionRuntime,
   type MountedView,
@@ -89,6 +90,9 @@ export function mountAdminApp(root: HTMLElement, options: AdminAppOptions): Admi
     resolveUrl: options.resolveUrl,
     navigate: (pageId, params) => navigate(pageId, params),
   });
+
+  const services = new ServiceRunner(registry, "admin", runtime, (id, error) => console.warn(`Extension service ${id} failed`, error));
+  services.start();
 
   const view = h("main", { class: "ks-main-view", id: "ks-view", tabindex: -1 });
   const title = h("h1", { class: "ks-topbar-title" });
@@ -278,6 +282,7 @@ export function mountAdminApp(root: HTMLElement, options: AdminAppOptions): Admi
     navigate,
     dispose() {
       disposed = true;
+      services.stop();
       window.removeEventListener("hashchange", onHashChange);
       unsubscribeRegistry();
       for (const unsubscribe of statusUnsubscribers.splice(0)) {

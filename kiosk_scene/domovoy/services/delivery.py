@@ -16,7 +16,8 @@ class DeliveryService:
     def __init__(self, outbox: OutboxService, contacts: Any, db: Any) -> None:
         self.outbox, self.contacts, self.db = outbox, contacts, db
 
-    def send(self, ctx: Ctx, *, channel: str, recipient: str, text: str, key: str | None = None, room: str | None = None) -> dict[str, Any]:
+    def send(self, ctx: Ctx, *, channel: str, recipient: str, text: str, key: str | None = None, room: str | None = None,
+             mood: str | None = None) -> dict[str, Any]:
         if channel not in CHANNELS:
             raise ValidationError(f"Unknown channel {channel}", fields={"channel": f"One of {', '.join(CHANNELS)}"})
         if channel == "ui":
@@ -24,7 +25,8 @@ class DeliveryService:
                 self.db.emit(conn, "notification", {"text": text, "source": ctx.source})
             return {"channel": "ui", "status": "sent"}
         if channel == "speak":
-            address = json.dumps({"room": room} if room else {}, ensure_ascii=False)
+            target = {k: v for k, v in (("room", room), ("mood", mood)) if v}
+            address = json.dumps(target, ensure_ascii=False)
             return self.outbox.enqueue(ctx, channel="speak", recipient=recipient or "self", address=address, text=text, key=key)
         contact = self._contact(recipient, channel)
         address = self._address(contact, channel)

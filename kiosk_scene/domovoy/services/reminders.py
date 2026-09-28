@@ -195,7 +195,7 @@ class ReminderService:
         key = f"reminder:{reminder_id}:{to_iso(fired_at)[:16]}"
         delivery_note = ""
         try:
-            self.delivery.send(ctx, channel=reminder["channel"], recipient=reminder["recipient"], text=reminder["text"], key=key)
+            self.delivery.send(ctx, channel=reminder["channel"], recipient=reminder["recipient"], text=reminder["text"], key=key, mood="alert")
         except ValidationError as exc:
             # e.g. the contact was deleted or has no address: never lose the reminder – show it on screen and say why.
             delivery_note = f" (доставка не удалась: {exc.message})"

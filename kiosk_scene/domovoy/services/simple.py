@@ -287,7 +287,7 @@ class ContactService:
     def resolve(self, name: str) -> list[dict[str, Any]]:
         """Contacts matching a spoken name (any case), best first. Empty/'мне' resolves to the owner."""
         key = norm_key(name)
-        if not key or key in ("мне", "себе", "меня", "я"):
+        if not key or key in ("self", "мне", "себе", "меня", "я", "me"):
             return [c for c in self.list() if c["is_self"]]
         exact, partial = [], []
         for contact in self.list():
