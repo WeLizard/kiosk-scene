@@ -336,7 +336,7 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         { name: "username", label: "Логин", value: s.caldav.username },
         secretField("caldav_password", "Пароль / пароль приложения", data.secrets.caldav_password),
         { name: "default", label: "Куда добавлять по умолчанию", type: "select", options: [{ value: "local", label: "Локальный календарь" }, { value: "caldav", label: "CalDAV" }], value: s.calendar.default },
-        { name: "ha_calendars", label: "Календари из Home Assistant (только чтение)", type: "textarea", rows: 2, value: lines(s.calendar.ha_calendars), placeholder: "calendar.family", wide: true },
+        { name: "ha_calendars", label: "Календари из Home Assistant", type: "textarea", rows: 2, value: lines(s.calendar.ha_calendars), placeholder: "calendar.family", hint: "По одному на строку. События из них видны; добавлять можно, менять и удалять — нет.", wide: true },
       ], (v) => ({ settings: { caldav: { url: String(v.url).trim(), username: String(v.username).trim() }, calendar: { default: v.default, ha_calendars: splitLines(String(v.ha_calendars)) } }, secrets: { caldav_password: String(v.caldav_password) } }), refresh)));
 
       const llm = section("llm", "Языковая модель (необязательно)", status("llm"), h("div", null, detail("llm"),

@@ -28,10 +28,13 @@ The shell contract for the current Home Assistant deployment is also explicit:
 
 ```text
 apps/demo-generic/            Generic demo app notes
-apps/hosted-runtime/          Hosted runtime entrypoint for the Kiosk Scene add-on
-docs/                         Architecture and compliance docs
+apps/hosted-runtime/          Hosted runtime entrypoints (kiosk + admin) for the Kiosk Scene add-on
+docs/                         Architecture, extension model, Domovoy, voice, deployment and compliance docs
 kiosk_scene/                  Standalone Home Assistant add-on source for Kiosk Scene
-packages/core/                Contracts and runtime boundaries
+kiosk_scene/domovoy/          Domovoy household assistant backend (Python standard library only)
+packages/core/                Contracts, runtime boundaries and the extension registry
+packages/app-shell/           Generic UI kit, HTTP client, long-poll realtime and the admin shell
+packages/domovoy-ui/          Domovoy UI as an extension (11 admin sections, kiosk widgets, microphone)
 packages/adapter-live2d/      Live2D adapter and compatibility bridge
 packages/adapter-unity-webgl/ Unity WebGL adapter boundary
 packages/adapter-static/      Static portrait adapter boundary
@@ -83,6 +86,8 @@ The repository is already runnable:
 - `apps/demo-generic` is a thin Vite wrapper around that shell and selects the avatar backend from `avatar.manifest.json`
 - `apps/hosted-runtime` is the canonical add-on-hosted runtime that boots from `/scene-api/bootstrap`
 - `kiosk_scene` is the standalone HA add-on source that hosts the generic runtime and editor
+- `packages/app-shell` and the extension registry in `packages/core` form a generic frontend/platform layer (kiosk *and* desktop/mobile administration) that extensions plug into — see [docs/extensions.md](./docs/extensions.md)
+- [Domovoy](./docs/domovoy.md), a local household assistant (memory/inventory, calendar, reminders, messaging, voice through Yandex Stations), is the first extension; it is optional (`domovoy_enabled`) and lives entirely outside the platform packages — voice paths in [docs/voice.md](./docs/voice.md)
 
 The next migration step is instance work: move the real `neiri-scene` deployment onto these public contracts and keep the private model/runtime assets outside this repo.
 
@@ -97,9 +102,10 @@ pnpm dev:demo
 Useful commands:
 
 - `pnpm typecheck`
+- `pnpm test` (TypeScript: unit + UI ↔ real backend end-to-end) and `pnpm test:python` (add-on services, Domovoy, nginx wiring)
 - `pnpm validate:demo`
 - `pnpm build:demo`
-- `pnpm build:hosted`
+- `pnpm build:hosted` / `pnpm build:domovoy`
 - `pnpm sync:kiosk-addon-runtime`
 - `pnpm release:kiosk-addon`
 
@@ -116,4 +122,5 @@ The hosted runtime is the add-on-facing variant used by `kiosk_scene`:
 
 - it fetches `/scene-api/bootstrap`
 - it loads the active pack's `renderer.kiosk-scene.json`
-- it is synced into `F:\OPENCLAW\kiosk-scene\kiosk_scene\scene-runtime-seed`
+- it is synced into `kiosk_scene/scene-runtime-seed` (and the Domovoy extension into `kiosk_scene/extensions-seed`)
+- a second entry, `admin.html`, hosts the administration shell for extension pages

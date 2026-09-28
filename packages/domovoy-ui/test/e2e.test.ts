@@ -1,4 +1,9 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import Ajv2020 from "ajv/dist/2020";
+import addFormats from "ajv-formats";
+import { createJsonStateProvider } from "@kiosk-scene/provider-json";
 import { ExtensionRegistry, createExtensionRuntime, type ExtensionRuntime, type MountedView } from "@kiosk-scene/core";
 import extension from "../src/index";
 import { Backend, nodeFetch, pythonAvailable, startBackend } from "./backend";
@@ -206,6 +211,43 @@ describe.skipIf(!pythonAvailable)("Domovoy UI ↔ backend", { timeout: 30_000 },
       const r = await runtime.readData<{ settings: { default_reminder_hour: number } }>("domovoy.api", { path: "api/settings" });
       expect(r.ok && r.data.settings.default_reminder_hour).toBe(8);
     }, { timeout: 5000 });
+  });
+
+  it("AVATAR: what is said by voice is published as valid state.v1 for the scene's JSON provider; typed chat is not mirrored", async () => {
+    const schema = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../schemas/state.schema.json"), "utf8"));
+    const ajv = new Ajv2020({ strict: false });
+    addFormats(ajv);
+    const validate = ajv.compile(schema);
+    const read = async () => {
+      const raw = await (await fetch(`${backend.url}api/avatar/state`)).json();
+      expect(validate(raw), JSON.stringify(validate.errors)).toBe(true);
+      return raw as { revision: number; speaking?: boolean; message?: string };
+    };
+    const before = await read();
+    const post = (p: string, body: unknown) => fetch(`${backend.url}${p}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Domovoy-Client": "test" }, body: JSON.stringify(body) });
+
+    // typed in the web UI: private, the avatar does not announce it on the kiosk
+    await post("api/command", { text: "запомни, что пароль от гаража 0000", session_id: "web-x" });
+    expect((await read()).revision).toBe(before.revision);
+
+    // spoken to the kiosk: the words and "speaking" appear on the avatar
+    const spoken = await (await post("api/voice/command", { text: "домовой, запомни: код домофона 4711", room: "кухня", require_trigger: true })).json();
+    expect(spoken.handled).toBe(true);
+    const after = await read();
+    expect(after.revision).toBeGreaterThan(before.revision);
+    expect(after.speaking).toBe(true);
+    expect(after.message).toMatch(/[Зз]апомнил|[Зз]аписано/);
+
+    // and the scene's own JSON state provider (what the kiosk really uses) understands the document
+    const provider = createJsonStateProvider({ url: `${backend.url}api/avatar/state`, fetchImpl: nodeFetch });
+    const state = await provider.read();
+    expect(state.speaking).toBe(true);
+    expect(state.message).toBe(after.message);
+    // In another room, where nobody addressed Domovoy, a transcript without the trigger word is not for us: dropped,
+    // nothing stored or published. (In the kitchen the follow-up window opened by the last command is still open.)
+    const ignored = await (await post("api/voice/command", { text: "что там по телевизору", room: "спальня", require_trigger: true })).json();
+    expect(ignored).toMatchObject({ handled: false, reason: "no_trigger" });
+    expect((await read()).revision).toBe(after.revision);
   });
 
   it("RESTART: data survives a restart of the service and an open page reconnects by itself", async () => {
