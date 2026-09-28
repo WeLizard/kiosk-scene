@@ -74,3 +74,15 @@ describe("scene runtime config", () => {
     expect(control.cue.cue).toBeNull();
   });
 });
+
+describe("renderer config weather block", () => {
+  it("keeps a valid weather config and drops garbage", async () => {
+    const { sanitizeRendererConfigV1 } = await import("@kiosk-scene/core");
+    const good = sanitizeRendererConfigV1({
+      weather: { entity: "weather.home", location: "Sofia", openMeteo: { latitude: 42.7, longitude: 23.3 } },
+    });
+    expect(good.weather).toEqual({ entity: "weather.home", location: "Sofia", openMeteo: { latitude: 42.7, longitude: 23.3, timezone: undefined } });
+    expect(sanitizeRendererConfigV1({ weather: { openMeteo: { latitude: 999, longitude: 1 } } }).weather).toBeUndefined();
+    expect(sanitizeRendererConfigV1({}).weather).toBeUndefined();
+  });
+});

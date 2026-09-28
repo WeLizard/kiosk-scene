@@ -15,13 +15,6 @@ const sharedDir = path.resolve(
   "kiosk_scene",
   "scene-runtime-shared",
 );
-const defaultWeatherSource = path.resolve(
-  repoRoot,
-  "apps",
-  "demo-generic",
-  "public",
-  "weather.json",
-);
 const defaultWeatherTarget = path.join(targetDir, "weather.json");
 
 if (!fs.existsSync(sourceDir)) {
@@ -36,8 +29,9 @@ fs.cpSync(sourceDir, targetDir, { recursive: true });
 if (fs.existsSync(sharedDir)) {
   fs.cpSync(sharedDir, targetDir, { recursive: true, force: true });
 }
-if (fs.existsSync(defaultWeatherSource)) {
-  fs.cpSync(defaultWeatherSource, defaultWeatherTarget, { force: true });
-}
+// The runtime merges `weather.json` over its placeholder when live sources fail. The demo app ships
+// sample readings for its own showcase; the add-on must never inherit them, or a failed fetch would
+// display invented weather as if it were real. An empty object means "no fallback data".
+fs.writeFileSync(defaultWeatherTarget, "{}\n", "utf8");
 
 console.log(`Synced hosted runtime bundle to ${targetDir}`);

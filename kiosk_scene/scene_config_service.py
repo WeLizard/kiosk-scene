@@ -1647,7 +1647,7 @@ def sanitize_page(page: Any, index: int, used_ids: set[str]) -> dict[str, Any]:
     used_ids.add(page_id)
 
     kind = trim_text(payload.get("kind"), "cards", 24)
-    if kind not in ("overview", "cards", "forecast+cards", "grid"):
+    if kind not in ("overview", "cards", "forecast+cards", "grid", "app"):
         kind = "cards"
     card_style = trim_text(payload.get("cardStyle"), "full", 16)
     if card_style not in ("mini", "full"):

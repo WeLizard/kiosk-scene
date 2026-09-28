@@ -104,3 +104,40 @@ class AvatarPackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExtensionDiscoveryTests(unittest.TestCase):
+    def _make(self, root: Path, ext_id: str, manifest: dict, module: str | None = "ext.js") -> None:
+        ext_dir = root / "extensions" / ext_id
+        ext_dir.mkdir(parents=True)
+        (ext_dir / "extension.json").write_text(json.dumps(manifest), encoding="utf-8")
+        if module:
+            (ext_dir / module).write_text("export default {}", encoding="utf-8")
+
+    def test_valid_extension_is_listed_with_module_url_and_config(self) -> None:
+        with scene_env() as root:
+            host = load_module("scene_host_service")
+            self._make(root, "demo", {"id": "demo", "module": "ext.js", "config": {"apiBase": "/demo-api/"}})
+            found = host.discover_extensions()
+            self.assertEqual(len(found), 1)
+            self.assertEqual(found[0]["id"], "demo")
+            self.assertTrue(found[0]["moduleUrl"].startswith("/scene-extensions/demo/ext.js?v="))
+            self.assertEqual(found[0]["config"], {"apiBase": "/demo-api/"})
+            self.assertEqual(host.build_bootstrap()["extensions"][0]["id"], "demo")
+
+    def test_disabled_and_invalid_extensions_are_skipped(self) -> None:
+        with scene_env() as root:
+            host = load_module("scene_host_service")
+            self._make(root, "off", {"id": "off", "module": "ext.js", "enabled": False})
+            self._make(root, "mismatch", {"id": "other", "module": "ext.js"})
+            self._make(root, "traversal", {"id": "traversal", "module": "../../evil.js"})
+            self._make(root, "nomodule", {"id": "nomodule", "module": "missing.js"}, module=None)
+            self._make(root, "BadId", {"id": "BadId", "module": "ext.js"})
+            (root / "extensions" / "broken").mkdir()
+            (root / "extensions" / "broken" / "extension.json").write_text("{not json", encoding="utf-8")
+            self.assertEqual(host.discover_extensions(), [])
+
+    def test_bootstrap_survives_missing_extensions_dir(self) -> None:
+        with scene_env():
+            host = load_module("scene_host_service")
+            self.assertEqual(host.build_bootstrap()["extensions"], [])

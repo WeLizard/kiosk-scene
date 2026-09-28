@@ -54,6 +54,8 @@ export interface HomeAssistantControlProviderOptions extends HomeAssistantStates
 }
 
 export interface HomeAssistantStatesReaderOptions {
+  /** Called when fetching states fails; the reader still serves its last cached snapshot. */
+  onError?: (error: Error & { status?: number }) => void;
   fetchImpl?: typeof fetch;
   allowApiFallback?: boolean;
   apiUrl?: string;
@@ -370,6 +372,7 @@ export function createHomeAssistantStatesReader(
         return normalized || cache;
       })
       .catch((error: Error & { status?: number }) => {
+        options.onError?.(error);
         if (error?.status === 401 || error?.status === 403) {
           cooldownUntil = Date.now() + authCooldownMs;
         }

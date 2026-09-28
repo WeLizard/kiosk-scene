@@ -21,6 +21,7 @@ export default defineConfig({
   },
   test: {
     environment: "happy-dom",
+    environmentOptions: { happyDOM: { url: "http://kiosk.test/scene-runtime/index.html" } },
     include: ["packages/*/test/**/*.test.ts", "apps/*/test/**/*.test.ts"],
     css: false,
   },

@@ -7,6 +7,17 @@ export interface JsonProviderOptions<TPayload> {
   defaultValue?: TPayload;
   sanitize?: (payload: unknown) => TPayload;
   timestampParam?: string;
+  /**
+   * Called whenever a fetch fails, *even when* `defaultValue` swallows the failure. Lets callers tell
+   * "the file says nothing" apart from "the source is unreachable" (stale data).
+   */
+  onError?: (error: Error & { status?: number }) => void;
+}
+
+function httpError(status: number): Error & { status: number } {
+  const error = new Error(`HTTP ${status}`) as Error & { status: number };
+  error.status = status;
+  return error;
 }
 
 async function fetchJson<TPayload>(options: JsonProviderOptions<TPayload>): Promise<TPayload> {
@@ -28,11 +39,12 @@ async function fetchJson<TPayload>(options: JsonProviderOptions<TPayload>): Prom
       cache: "no-store",
     });
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw httpError(response.status);
     }
     const payload = await response.json();
     return options.sanitize ? options.sanitize(payload) : (payload as TPayload);
   } catch (error) {
+    options.onError?.(error as Error & { status?: number });
     if (options.defaultValue !== undefined) {
       return options.defaultValue;
     }

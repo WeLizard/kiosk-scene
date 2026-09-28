@@ -96,6 +96,13 @@ export function orderScenePages(pages: ScenePageV1[], order: string[]): ScenePag
   return ordered.concat(extras);
 }
 
+const PAGE_KINDS: ReadonlyArray<ScenePageV1["kind"]> = ["overview", "cards", "forecast+cards", "grid", "app"];
+
+/** Unknown kinds degrade to `cards` (same rule as the add-on's Python compiler). */
+export function normalizePageKind(kind: unknown): ScenePageV1["kind"] {
+  return PAGE_KINDS.includes(kind as ScenePageV1["kind"]) ? (kind as ScenePageV1["kind"]) : "cards";
+}
+
 export function mergeScenePage(basePage: ScenePageV1, incomingPage: unknown): ScenePageV1 {
   const merged: ScenePageV1 = { ...basePage };
   if (!isObjectRecord(incomingPage)) {
@@ -106,14 +113,21 @@ export function mergeScenePage(basePage: ScenePageV1, incomingPage: unknown): Sc
     merged.id = trimText(incomingPage.id, 40) || merged.id;
   }
   if (typeof incomingPage.kind === "string") {
-    merged.kind = incomingPage.kind === "forecast+cards"
-      ? "forecast+cards"
-      : incomingPage.kind === "grid"
-        ? "grid"
-        : (incomingPage.kind === "overview" ? "overview" : "cards");
+    merged.kind = normalizePageKind(incomingPage.kind);
   }
   if (typeof incomingPage.layout === "string") {
     merged.kind = incomingPage.layout === "forecast+cards" ? "forecast+cards" : "cards";
+  }
+  if (typeof incomingPage.app === "string") {
+    const app = trimText(incomingPage.app, 96);
+    if (app) {
+      merged.app = app;
+    } else {
+      delete merged.app;
+    }
+  }
+  if (isObjectRecord(incomingPage.props)) {
+    merged.props = { ...incomingPage.props };
   }
   if (typeof incomingPage.cardStyle === "string") {
     merged.cardStyle = incomingPage.cardStyle === "mini" ? "mini" : "full";

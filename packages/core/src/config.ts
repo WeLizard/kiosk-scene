@@ -1,4 +1,4 @@
-import type { AvatarManifestV1, RendererConfigV1 } from "./contracts.js";
+import type { AvatarManifestV1, RendererConfigV1, RendererWeatherConfigV1 } from "./contracts.js";
 import { deepMergeObject, isObjectRecord, trimText } from "./utils.js";
 
 export const DEFAULT_RENDERER_CONFIG_V1: RendererConfigV1 = {
@@ -49,6 +49,32 @@ export const DEFAULT_AVATAR_MANIFEST_V1: AvatarManifestV1 = {
   },
 };
 
+function sanitizeWeatherConfig(value: unknown): RendererWeatherConfigV1 | undefined {
+  if (!isObjectRecord(value)) {
+    return undefined;
+  }
+  const result: RendererWeatherConfigV1 = {};
+  const entity = trimText(value.entity, 255);
+  if (entity) {
+    result.entity = entity;
+  }
+  const location = trimText(value.location, 80);
+  if (location) {
+    result.location = location;
+  }
+  const source = isObjectRecord(value.openMeteo) ? value.openMeteo : null;
+  const latitude = Number(source?.latitude);
+  const longitude = Number(source?.longitude);
+  if (source && Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+    result.openMeteo = {
+      latitude,
+      longitude,
+      timezone: trimText(source.timezone, 64) || undefined,
+    };
+  }
+  return Object.keys(result).length ? result : undefined;
+}
+
 export function sanitizeRendererConfigV1(value: unknown): RendererConfigV1 {
   const merged = deepMergeObject(DEFAULT_RENDERER_CONFIG_V1, isObjectRecord(value) ? value : {});
 
@@ -65,6 +91,7 @@ export function sanitizeRendererConfigV1(value: unknown): RendererConfigV1 {
           .filter(([key, item]) => key && item),
       )
       : {},
+    weather: sanitizeWeatherConfig(merged.weather),
     avatar: {
       manifestUrl: trimText(merged.avatar?.manifestUrl, 1024) || DEFAULT_RENDERER_CONFIG_V1.avatar.manifestUrl,
     },

@@ -2,9 +2,9 @@ import { createLive2dAdapter } from "@kiosk-scene/adapter-live2d";
 import { createStaticAdapter } from "@kiosk-scene/adapter-static";
 import {
   buildAssistantPresentationModel,
+  createExtensionRuntime,
   createPinnedPageControl,
   createViewPresetControl,
-  DEFAULT_ASSISTANT_PRESENTATION_COPY_EN,
   DEFAULT_CONTROL_V1,
   DEFAULT_STATE_V1,
   mergeControlV1,
@@ -12,17 +12,22 @@ import {
   nextIdleDelayMs,
   pickIdleLine,
   resolveAdjacentSceneIndex,
+  resolveBaseUrl,
   resolveSceneRuntimeConfig,
   resolveSceneSelection,
+  resolveUrlAgainst,
   sanitizeAvatarManifestV1,
   sanitizeRendererConfigV1,
   shouldShowIdleMonologue,
   trimText,
+  withTrailingSlash,
   type AssistantPresentationCopy,
   type AssistantPresentationModel,
   type AvatarAdapter,
   type AvatarManifestV1,
   type ControlV1,
+  type ExtensionRuntime,
+  type MountedView,
   type RendererConfigV1,
   type SceneConfigV1,
   type SceneDisplayConfigV1,
@@ -39,499 +44,29 @@ import {
   type HomeAssistantStates,
 } from "@kiosk-scene/provider-ha";
 import { createJsonControlProvider, createJsonLinesProvider, createJsonStateProvider } from "@kiosk-scene/provider-json";
-import { resolveSceneCards } from "@kiosk-scene/widgets-core";
+import { escapeHtml } from "./html.js";
+import {
+  DEFAULT_ICON_FILENAMES,
+  DEFAULT_SCENE_SHELL_COPY_EN,
+  DEFAULT_SCENE_SHELL_LABELS_EN,
+  DEFAULT_SCENE_SHELL_PRESET_LABELS_EN,
+  type SceneShellIconUrls,
+  type SceneShellLabels,
+  type SceneShellOptions,
+  type SceneShellPresetLabels,
+} from "./shell-types.js";
+import {
+  renderAppBody,
+  renderCardsBody,
+  renderGridBody,
+  renderOverviewBody,
+  slideClassFor,
+  type SlideRenderContext,
+} from "./slides.js";
+import { buildWeatherOverview, DEFAULT_WEATHER_OVERVIEW, mergeWeatherSource, type WeatherOverviewPayload, type WeatherOverviewPatch } from "./weather.js";
 
-export interface WeatherForecastDay {
-  name: string;
-  dayNumber: string;
-  monthShort: string;
-  note: string;
-  max: string;
-  min: string;
-  icon: string;
-}
-
-export interface WeatherOverviewPayload {
-  title: string;
-  location: string;
-  todayCaption: string;
-  todayValue: string;
-  todayLabel: string;
-  updatedCaption: string;
-  updatedAt: string;
-  temperature: string;
-  unit: string;
-  condition: string;
-  feelsLike: string;
-  badgeSummary: string;
-  badgeRange: string;
-  metrics: {
-    humidity: string;
-    pressure: string;
-    wind: string;
-    clouds: string;
-  };
-  forecastTitle: string;
-  forecast: WeatherForecastDay[];
-}
-
-export interface WeatherOverviewPatch extends Omit<Partial<WeatherOverviewPayload>, "metrics" | "forecast"> {
-  metrics?: Partial<WeatherOverviewPayload["metrics"]>;
-  forecast?: WeatherForecastDay[];
-}
-
-export interface SceneShellLabels {
-  humidity: string;
-  pressure: string;
-  wind: string;
-  clouds: string;
-  rangeStamp: string;
-  pageStamp: string;
-  noCardsConfigured: string;
-  avatarPresetGroup: string;
-  carouselRegion: string;
-  pagesRegion: string;
-  forecastRangeFallback: string;
-}
-
-export interface SceneShellIconUrls {
-  calendarDays: string;
-  thermometer: string;
-  droplets: string;
-  gauge: string;
-  wind: string;
-  cloud: string;
-  sparkles: string;
-}
-
-export interface SceneShellPresetLabels {
-  full: string;
-  torso: string;
-  head: string;
-}
-
-export interface SceneShellOptions {
-  rendererConfigUrl?: string;
-  weatherUrl?: string;
-  weatherReader?: () => Promise<WeatherOverviewPatch | null>;
-  refreshIntervalMs?: number;
-  iconBaseUrl?: string;
-  copy?: Partial<AssistantPresentationCopy>;
-  labels?: Partial<SceneShellLabels>;
-  iconUrls?: Partial<SceneShellIconUrls>;
-  presetLabels?: Partial<SceneShellPresetLabels>;
-  defaultWeather?: Partial<WeatherOverviewPayload>;
-}
-
-export const DEFAULT_SCENE_SHELL_COPY_EN: AssistantPresentationCopy = {
-  ...DEFAULT_ASSISTANT_PRESENTATION_COPY_EN,
-  offlineLabel: "Offline",
-  busyLabel: "Thinking",
-  speakingLabel: "Speaking",
-  idleLabel: "Waiting",
-  technicalHealthyLabel: "Online",
-  messageCaption: "Monologue",
-  statusCaption: "Status",
-  modeCaption: "Mode",
-  offlineBody: "The assistant is temporarily unreachable.",
-  busyBody: "The assistant is preparing a response.",
-  idleBody: "The assistant is nearby and still running in the background.",
-};
-
-export const DEFAULT_SCENE_SHELL_LABELS_EN: SceneShellLabels = {
-  humidity: "Humidity",
-  pressure: "Pressure",
-  wind: "Wind",
-  clouds: "Clouds",
-  rangeStamp: "Range",
-  pageStamp: "Page",
-  noCardsConfigured: "No cards configured",
-  avatarPresetGroup: "Avatar view presets",
-  carouselRegion: "Scene carousel",
-  pagesRegion: "Display pages",
-  forecastRangeFallback: "Five-day forecast",
-};
-
-export const DEFAULT_SCENE_SHELL_PRESET_LABELS_EN: SceneShellPresetLabels = {
-  full: "Full avatar view",
-  torso: "Torso avatar view",
-  head: "Head avatar view",
-};
-
-const DEFAULT_ICON_FILENAMES: SceneShellIconUrls = {
-  calendarDays: "calendar-days.svg",
-  thermometer: "thermometer.svg",
-  droplets: "droplets.svg",
-  gauge: "gauge.svg",
-  wind: "wind.svg",
-  cloud: "cloud.svg",
-  sparkles: "sparkles.svg",
-};
-
-export const DEFAULT_WEATHER_OVERVIEW: WeatherOverviewPayload = {
-  title: "Weather",
-  location: "Saint Petersburg",
-  todayCaption: "Today",
-  todayValue: "Today",
-  todayLabel: "Wednesday",
-  updatedCaption: "Updated",
-  updatedAt: "07:20",
-  temperature: "3",
-  unit: "C",
-  condition: "Bright sky with high cloud cover",
-  feelsLike: "Feels like 1 C and stays calm through the morning.",
-  badgeSummary: "Current snapshot",
-  badgeRange: "Today and next 5 days",
-  metrics: {
-    humidity: "61%",
-    pressure: "1017 hPa",
-    wind: "12 km/h",
-    clouds: "38%",
-  },
-  forecastTitle: "Weekly rhythm",
-  forecast: [
-    { name: "thu", dayNumber: "07", monthShort: "mar", note: "partly cloudy", max: "4 C", min: "-1 C", icon: "./assets/cloud-sun.svg" },
-    { name: "fri", dayNumber: "08", monthShort: "mar", note: "light rain", max: "5 C", min: "0 C", icon: "./assets/cloud-rain.svg" },
-    { name: "sat", dayNumber: "09", monthShort: "mar", note: "clear break", max: "6 C", min: "1 C", icon: "./assets/sun.svg" },
-    { name: "sun", dayNumber: "10", monthShort: "mar", note: "steady clouds", max: "4 C", min: "0 C", icon: "./assets/cloud.svg" },
-    { name: "mon", dayNumber: "11", monthShort: "mar", note: "soft showers", max: "5 C", min: "2 C", icon: "./assets/cloud-rain.svg" },
-  ],
-};
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function withTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
-}
-
-function resolveIngressRoot(baseUrl: string): string {
-  try {
-    const parsed = new URL(baseUrl, window.location.href);
-    const match = parsed.pathname.match(/^\/api\/hassio_ingress\/[^/]+\//);
-    if (!match) {
-      return "";
-    }
-    return new URL(match[0], parsed.origin).toString();
-  } catch {
-    return "";
-  }
-}
-
-function resolveUrlAgainst(baseUrl: string, candidate: string): string {
-  const normalized = trimText(candidate, 1024);
-  if (!normalized) {
-    return "";
-  }
-  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(normalized)) {
-    return normalized;
-  }
-  const resolvedBase = new URL(baseUrl, window.location.href);
-  if (normalized.startsWith("/")) {
-    const ingressRoot = resolveIngressRoot(resolvedBase.toString());
-    if (ingressRoot) {
-      return new URL(normalized.slice(1), ingressRoot).toString();
-    }
-    return new URL(normalized, resolvedBase.origin).toString();
-  }
-  return new URL(normalized, resolvedBase).toString();
-}
-
-function resolveBaseUrl(candidate: string): string {
-  try {
-    return new URL(".", candidate).toString();
-  } catch {
-    return new URL(".", window.location.href).toString();
-  }
-}
-
-function resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: string): AvatarManifestV1 {
-  const manifestBaseUrl = resolveBaseUrl(manifestUrl);
-  const assetRoot = resolveUrlAgainst(
-    manifestBaseUrl,
-    trimText(manifest.assetRoot, 1024) || "./assets",
-  );
-  const assetBaseUrl = assetRoot ? withTrailingSlash(assetRoot) : manifestBaseUrl;
-  const resolveAvatarAssetUrl = (value: string): string => {
-    const normalized = trimText(value, 1024);
-    if (!normalized) {
-      return "";
-    }
-    return resolveUrlAgainst(assetBaseUrl, normalized);
-  };
-  return {
-    ...manifest,
-    assetRoot,
-    runtimeUrl: resolveUrlAgainst(manifestBaseUrl, manifest.runtimeUrl || ""),
-    entry: resolveAvatarAssetUrl(manifest.entry || ""),
-    modelUrl: resolveAvatarAssetUrl(manifest.modelUrl || ""),
-    fallbackPortrait: resolveAvatarAssetUrl(manifest.fallbackPortrait || ""),
-    motionMapUrl: resolveAvatarAssetUrl(manifest.motionMapUrl || ""),
-    expressionMapUrl: resolveAvatarAssetUrl(manifest.expressionMapUrl || ""),
-    presetThumbs: Object.fromEntries(
-      Object.entries(manifest.presetThumbs || {})
-        .map(([key, value]) => [key, resolveUrlAgainst(manifestBaseUrl, value)])
-        .filter(([, value]) => Boolean(value)),
-    ),
-  };
-}
-
-function buildWeatherOverview(payload?: WeatherOverviewPatch): WeatherOverviewPayload {
-  return {
-    ...DEFAULT_WEATHER_OVERVIEW,
-    ...(payload || {}),
-    metrics: {
-      ...DEFAULT_WEATHER_OVERVIEW.metrics,
-      ...(payload?.metrics || {}),
-    },
-    forecast: Array.isArray(payload?.forecast) && payload.forecast.length
-      ? payload.forecast.map((item) => ({ ...item }))
-      : DEFAULT_WEATHER_OVERVIEW.forecast.map((item) => ({ ...item })),
-  };
-}
-
-function mergeWeatherSource(
-  base: WeatherOverviewPatch,
-  incoming?: WeatherOverviewPatch | null,
-): WeatherOverviewPatch {
-  if (!incoming) {
-    return base;
-  }
-  return {
-    ...base,
-    ...incoming,
-    metrics: {
-      ...(base.metrics || {}),
-      ...(incoming.metrics || {}),
-    },
-    forecast: Array.isArray(incoming.forecast) && incoming.forecast.length
-      ? incoming.forecast.map((item) => ({ ...item }))
-      : (base.forecast || []),
-  };
-}
-
-function formatWeatherNumber(value: unknown, digits = 0): string {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return "--";
-  }
-  const maximumFractionDigits = Math.max(0, digits);
-  return numeric.toLocaleString("ru-RU", {
-    minimumFractionDigits: digits > 0 ? digits : 0,
-    maximumFractionDigits,
-  });
-}
-
-function formatPressureMmHg(value: unknown, unit: unknown): string {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return "--";
-  }
-  const normalizedUnit = trimText(unit, 24).toLowerCase();
-  if (normalizedUnit === "mmhg" || normalizedUnit === "мм рт. ст.") {
-    return `${formatWeatherNumber(numeric)} мм рт. ст.`;
-  }
-  return `${formatWeatherNumber(numeric * 0.750061683, 0)} мм рт. ст.`;
-}
-
-function formatWindMs(value: unknown, unit: unknown): string {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return "--";
-  }
-  const normalizedUnit = trimText(unit, 24).toLowerCase();
-  if (normalizedUnit === "m/s" || normalizedUnit === "м/с") {
-    return `${formatWeatherNumber(numeric, 1)} м/с`;
-  }
-  if (normalizedUnit === "km/h" || normalizedUnit === "км/ч") {
-    return `${formatWeatherNumber(numeric / 3.6, 1)} м/с`;
-  }
-  return `${formatWeatherNumber(numeric, 1)} м/с`;
-}
-
-function formatWeatherTime(value: unknown, locale = "ru-RU"): string {
-  const date = new Date(String(value || ""));
-  if (Number.isNaN(date.getTime())) {
-    return "--:--";
-  }
-  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
-}
-
-function formatTodayDate(value: unknown, locale = "ru-RU"): string {
-  const date = new Date(String(value || ""));
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-  return date.toLocaleDateString(locale, { day: "numeric", month: "long" });
-}
-
-function formatTodayLabel(value: unknown, locale = "ru-RU"): string {
-  const date = new Date(String(value || ""));
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-  return date.toLocaleDateString(locale, { weekday: "long" });
-}
-
-function translateWeatherCondition(condition: unknown, locale = "ru-RU"): string {
-  const normalized = trimText(condition, 64).toLowerCase();
-  if (!normalized) {
-    return locale.startsWith("ru") ? "Неизвестно" : "Unknown";
-  }
-  if (!locale.startsWith("ru")) {
-    return normalized;
-  }
-  const dictionary: Record<string, string> = {
-    "clear-night": "Ясная ночь",
-    cloudy: "Облачно",
-    exceptional: "Экстремально",
-    fog: "Туман",
-    hail: "Град",
-    lightning: "Гроза",
-    "lightning-rainy": "Гроза с дождем",
-    partlycloudy: "Переменная облачность",
-    pouring: "Ливень",
-    rainy: "Дождь",
-    snowy: "Снег",
-    "snowy-rainy": "Снег с дождем",
-    sunny: "Ясно",
-    windy: "Ветрено",
-    "windy-variant": "Ветрено",
-  };
-  return dictionary[normalized] || trimText(condition, 64);
-}
-
-function translateOpenMeteoCode(code: unknown, locale = "ru-RU"): string {
-  const numeric = Number(code);
-  if (!Number.isFinite(numeric)) {
-    return locale.startsWith("ru") ? "Облачно" : "Cloudy";
-  }
-  if (!locale.startsWith("ru")) {
-    if (numeric === 0) return "Clear";
-    if ([1, 2].includes(numeric)) return "Partly cloudy";
-    if (numeric === 3) return "Cloudy";
-    if ([45, 48].includes(numeric)) return "Fog";
-    if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(numeric)) return "Rain";
-    if ([71, 73, 75, 77, 85, 86].includes(numeric)) return "Snow";
-    if ([95, 96, 99].includes(numeric)) return "Thunderstorm";
-    return "Cloudy";
-  }
-  if (numeric === 0) return "Ясно";
-  if ([1, 2].includes(numeric)) return "Переменная облачность";
-  if (numeric === 3) return "Пасмурно";
-  if ([45, 48].includes(numeric)) return "Туман";
-  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(numeric)) return "Морось";
-  if ([71, 73, 75, 77, 85, 86].includes(numeric)) return "Снег";
-  if ([95, 96, 99].includes(numeric)) return "Гроза";
-  return "Облачно";
-}
-
-function weatherIconForCode(code: unknown, iconBaseUrl = "./assets/icons"): string {
-  const numeric = Number(code);
-  const base = withTrailingSlash(iconBaseUrl);
-  if (numeric === 0) return `${base}sun.svg`;
-  if ([1, 2].includes(numeric)) return `${base}cloud-sun.svg`;
-  if ([3].includes(numeric)) return `${base}cloud.svg`;
-  if ([45, 48].includes(numeric)) return `${base}cloud-fog.svg`;
-  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(numeric)) return `${base}cloud-rain.svg`;
-  if ([71, 73, 75, 77, 85, 86].includes(numeric)) return `${base}cloud-snow.svg`;
-  if ([95, 96, 99].includes(numeric)) return `${base}cloud-lightning.svg`;
-  return `${base}cloud.svg`;
-}
-
-export interface HomeAssistantWeatherReaderOptions {
-  weatherEntity: string;
-  openMeteoUrl?: string;
-  locale?: string;
-  iconBaseUrl?: string;
-  allowApiFallback?: boolean;
-  apiUrl?: string;
-  fetchImpl?: typeof fetch;
-}
-
-export function createHomeAssistantWeatherReader(options: HomeAssistantWeatherReaderOptions): () => Promise<WeatherOverviewPatch | null> {
-  const locale = trimText(options.locale, 32) || "ru-RU";
-  const iconBaseUrl = trimText(options.iconBaseUrl, 1024) || "./assets/icons";
-  const statesReader = createHomeAssistantStatesReader({
-    allowApiFallback: options.allowApiFallback,
-    apiUrl: options.apiUrl,
-    fetchImpl: options.fetchImpl,
-  });
-
-  return async () => {
-    const states = await statesReader.read();
-    const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-    const weatherState = states?.[options.weatherEntity];
-
-    let openMeteo: any = null;
-    const openMeteoUrl = trimText(options.openMeteoUrl, 4096);
-    if (openMeteoUrl && typeof fetchImpl === "function") {
-      try {
-        const response = await fetchImpl(`${openMeteoUrl}${openMeteoUrl.includes("?") ? "&" : "?"}ts=${Date.now()}`, { cache: "no-store" });
-        if (response.ok) {
-          openMeteo = await response.json();
-        }
-      } catch {
-        openMeteo = null;
-      }
-    }
-
-    if (!weatherState && !openMeteo?.current) {
-      return null;
-    }
-
-    const updatedAt = trimText(weatherState?.last_changed, 64)
-      || trimText(openMeteo?.current?.time, 64)
-      || new Date().toISOString();
-    const condition = weatherState
-      ? translateWeatherCondition(weatherState.state, locale)
-      : translateOpenMeteoCode(openMeteo?.current?.weather_code, locale);
-    const forecastAll = Array.isArray(openMeteo?.daily?.time)
-      ? openMeteo.daily.time.map((date: string, index: number) => {
-          const localDate = new Date(`${date}T12:00:00+03:00`);
-          return {
-            name: localDate.toLocaleDateString(locale, { weekday: "short" }),
-            dayNumber: localDate.toLocaleDateString(locale, { day: "numeric" }),
-            monthShort: localDate.toLocaleDateString(locale, { month: "short" }),
-            note: trimText(translateOpenMeteoCode(openMeteo.daily.weather_code?.[index], locale), 28),
-            max: `${formatWeatherNumber(openMeteo.daily.temperature_2m_max?.[index])}°`,
-            min: `${formatWeatherNumber(openMeteo.daily.temperature_2m_min?.[index])}° · ${formatWeatherNumber(openMeteo.daily.precipitation_probability_max?.[index])}%`,
-            icon: weatherIconForCode(openMeteo.daily.weather_code?.[index], iconBaseUrl),
-          };
-        })
-      : [];
-    const todayForecast = forecastAll[0] || null;
-    const upcomingForecast = forecastAll.slice(1, 6);
-
-    return {
-      title: locale.startsWith("ru") ? "Погода" : "Weather",
-      todayCaption: locale.startsWith("ru") ? "Сегодня" : "Today",
-      updatedCaption: locale.startsWith("ru") ? "Обновлено" : "Updated",
-      forecastTitle: locale.startsWith("ru") ? "Недельный ритм" : "Weekly rhythm",
-      todayValue: formatTodayDate(new Date().toISOString(), locale),
-      todayLabel: formatTodayLabel(new Date().toISOString(), locale),
-      updatedAt: formatWeatherTime(updatedAt, locale),
-      temperature: formatWeatherNumber(weatherState?.attributes?.temperature ?? openMeteo?.current?.temperature_2m, 1),
-      condition,
-      feelsLike: `${locale.startsWith("ru") ? "Ощущается как" : "Feels like"} ${formatWeatherNumber(weatherState?.attributes?.apparent_temperature ?? openMeteo?.current?.apparent_temperature ?? weatherState?.attributes?.temperature, 1)}°C`,
-      badgeSummary: condition,
-      badgeRange: todayForecast ? `${todayForecast.max} / ${formatWeatherNumber(openMeteo?.daily?.temperature_2m_min?.[0])}° ${locale.startsWith("ru") ? "сегодня" : "today"}` : undefined,
-      metrics: {
-        humidity: `${formatWeatherNumber(weatherState?.attributes?.humidity ?? openMeteo?.current?.relative_humidity_2m)}%`,
-        pressure: formatPressureMmHg(weatherState?.attributes?.pressure ?? openMeteo?.current?.surface_pressure, weatherState?.attributes?.pressure_unit ?? "hPa"),
-        wind: formatWindMs(weatherState?.attributes?.wind_speed ?? openMeteo?.current?.wind_speed_10m, weatherState?.attributes?.wind_speed_unit ?? "km/h"),
-        clouds: `${formatWeatherNumber(weatherState?.attributes?.cloud_coverage ?? openMeteo?.current?.cloud_cover)}%`,
-      },
-      forecast: upcomingForecast,
-    };
-  };
-}
+export * from "./shell-types.js";
+export * from "./weather.js";
 
 interface CarouselDragState {
   pointerId: number;
@@ -542,6 +77,30 @@ interface CarouselDragState {
   locked: boolean;
 }
 
+/** One persistent `<section>` per page plus whatever extension views are mounted inside it. */
+interface SlideEntry {
+  pageId: string;
+  kind: ScenePageV1["kind"];
+  el: HTMLElement;
+  /** Last rendered inner HTML (or app binding) – the slide is only touched when this changes. */
+  signature: string;
+  views: MountedView[];
+  /** Bumped whenever the slide's mounted views are discarded, so late async mounts can bail out. */
+  generation: number;
+  appPropsKey: string;
+}
+
+const EDITABLE_SELECTOR = "input, textarea, select, [contenteditable=''], [contenteditable='true']";
+
+/**
+ * Failures that say "the data source is unreachable" (network error, 5xx). A 4xx means the file is
+ * simply not configured, which must not flag the whole display as stale.
+ */
+function isConnectivityFailure(error: unknown): boolean {
+  const status = (error as { status?: number } | null)?.status;
+  return typeof status !== "number" || status >= 500;
+}
+
 export class BrowserSceneShellApp {
   private readonly root: HTMLElement;
   private readonly options: SceneShellOptions;
@@ -549,6 +108,7 @@ export class BrowserSceneShellApp {
   private readonly carouselShellEl: HTMLElement;
   private readonly carouselTrackEl: HTMLElement;
   private readonly dotsEl: HTMLElement;
+  private readonly staleEl: HTMLElement;
   private readonly presetButtons: HTMLButtonElement[];
   private readonly copy: AssistantPresentationCopy;
   private readonly labels: SceneShellLabels;
@@ -579,6 +139,30 @@ export class BrowserSceneShellApp {
   private lastWeatherRefreshAt = 0;
   private orderedPages: ScenePageV1[] = [];
   private carouselDragState: CarouselDragState | null = null;
+
+  // lifecycle
+  private disposed = false;
+  private initialized = false;
+  private inFlightRefresh: Promise<void> | null = null;
+  private refreshQueued = false;
+  private readonly onVisibilityChange = (): void => {
+    if (!document.hidden) {
+      void this.refreshWeatherIfStale(0);
+      void this.refreshNow();
+    }
+  };
+  private unsubscribeRegistry: (() => void) | null = null;
+
+  // data health
+  private cycleConnectivityFailures = 0;
+  private consecutiveFailedCycles = 0;
+
+  // reconcile state
+  private readonly slides = new Map<string, SlideEntry>();
+  private dotsSignature = "";
+  private lastInteractionAt = 0;
+  private lastRenderedActiveIndex = -1;
+  private extensionRuntime: ExtensionRuntime | null = null;
 
   constructor(root: HTMLElement, options: SceneShellOptions = {}) {
     this.root = root;
@@ -623,6 +207,7 @@ export class BrowserSceneShellApp {
             </div>
           </section>
         </div>
+        <div class="stale-badge" data-stale-badge role="status" aria-live="polite" hidden>${escapeHtml(this.labels.staleNotice)}</div>
       </div>
     `;
 
@@ -630,13 +215,21 @@ export class BrowserSceneShellApp {
     this.carouselShellEl = this.requireEl("[data-carousel-shell]");
     this.carouselTrackEl = this.requireEl("[data-carousel-track]");
     this.dotsEl = this.requireEl("[data-dots]");
+    this.staleEl = this.requireEl("[data-stale-badge]");
     this.presetButtons = Array.from(this.root.querySelectorAll<HTMLButtonElement>("[data-avatar-preset]"));
   }
 
   async init(): Promise<void> {
+    if (this.initialized || this.disposed) {
+      return;
+    }
+    this.initialized = true;
+
     const rendererConfigUrl = resolveUrlAgainst(window.location.href, this.getRendererConfigUrl());
     const rendererConfigBaseUrl = resolveBaseUrl(rendererConfigUrl);
     const rawRendererConfig = sanitizeRendererConfigV1(await this.readJson(rendererConfigUrl));
+    const resolveOptional = (value: string | undefined): string | undefined =>
+      value ? resolveUrlAgainst(rendererConfigBaseUrl, value) : undefined;
     const resolvedRendererConfig = sanitizeRendererConfigV1({
       ...rawRendererConfig,
       links: Object.fromEntries(
@@ -653,32 +246,24 @@ export class BrowserSceneShellApp {
       state: {
         ...rawRendererConfig.state,
         stateUrl: resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.state.stateUrl),
-        apiUrl: rawRendererConfig.state.apiUrl
-          ? resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.state.apiUrl)
-          : undefined,
+        apiUrl: resolveOptional(rawRendererConfig.state.apiUrl),
         idleLinesUrl: resolveUrlAgainst(
           rendererConfigBaseUrl,
           rawRendererConfig.state.idleLinesUrl || "./idle-lines.json",
         ),
-        entityMapUrl: rawRendererConfig.state.entityMapUrl
-          ? resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.state.entityMapUrl)
-          : undefined,
+        entityMapUrl: resolveOptional(rawRendererConfig.state.entityMapUrl),
       },
       control: {
         ...rawRendererConfig.control,
         controlUrl: resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.control.controlUrl),
-        apiUrl: rawRendererConfig.control.apiUrl
-          ? resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.control.apiUrl)
-          : undefined,
-        entityMapUrl: rawRendererConfig.control.entityMapUrl
-          ? resolveUrlAgainst(rendererConfigBaseUrl, rawRendererConfig.control.entityMapUrl)
-          : undefined,
+        apiUrl: resolveOptional(rawRendererConfig.control.apiUrl),
+        entityMapUrl: resolveOptional(rawRendererConfig.control.entityMapUrl),
       },
     });
 
     this.rendererConfig = resolvedRendererConfig;
     const manifestUrl = this.rendererConfig.avatar.manifestUrl;
-    this.avatarManifest = resolveAvatarManifestUrls(
+    this.avatarManifest = this.resolveAvatarManifestUrls(
       sanitizeAvatarManifestV1(await this.readJson(manifestUrl)),
       manifestUrl,
     );
@@ -698,6 +283,26 @@ export class BrowserSceneShellApp {
     this.remoteControl = await this.readRemoteControl();
     this.currentControl = mergeControlV1(this.remoteControl, this.uiControl);
 
+    if (this.options.extensions) {
+      this.extensionRuntime = createExtensionRuntime({
+        registry: this.options.extensions,
+        mode: "kiosk",
+        locale: this.rendererConfig.assistant.locale || "en-US",
+        resolveUrl: (url) => resolveUrlAgainst(window.location.href, url),
+        navigate: (pageId) => this.pinPageById(pageId),
+      });
+      this.unsubscribeRegistry = this.options.extensions.onChange(() => {
+        // A late-loading extension may now provide pages/widgets that were showing a placeholder.
+        for (const entry of this.slides.values()) {
+          entry.signature = "";
+        }
+        void this.refreshNow();
+      });
+    }
+
+    if (this.disposed) {
+      return;
+    }
     this.avatarAdapter = this.createAvatarAdapter();
     await this.avatarAdapter.mount({
       host: this.avatarMountEl,
@@ -708,24 +313,22 @@ export class BrowserSceneShellApp {
     this.bindCarouselControls();
     this.syncPresetButtonsFromManifest();
     this.lastAutoRotateAt = Date.now();
-    await this.refresh();
+    await this.refreshNow();
 
-    if (this.refreshIntervalHandle) {
-      window.clearInterval(this.refreshIntervalHandle);
-    }
     this.refreshIntervalHandle = window.setInterval(() => {
-      void this.refresh();
+      if (!document.hidden) {
+        void this.refreshNow();
+      }
     }, this.options.refreshIntervalMs ?? 3000);
 
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) {
-        void this.refreshWeatherIfStale(0);
-        void this.refresh();
-      }
-    });
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
   }
 
   async dispose(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
     if (this.refreshIntervalHandle) {
       window.clearInterval(this.refreshIntervalHandle);
       this.refreshIntervalHandle = null;
@@ -734,8 +337,45 @@ export class BrowserSceneShellApp {
       window.clearTimeout(this.idleTimer);
       this.idleTimer = null;
     }
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    this.unsubscribeRegistry?.();
+    this.unsubscribeRegistry = null;
+    for (const entry of Array.from(this.slides.values())) {
+      this.discardSlide(entry);
+    }
+    this.slides.clear();
     await this.avatarAdapter?.dispose();
     this.avatarAdapter = null;
+  }
+
+  /**
+   * Refreshes state, control, weather and the carousel. Overlapping calls are coalesced: at most one
+   * refresh is running and one more is queued, so a slow network can never stack up requests or let an
+   * older response overwrite a newer one.
+   */
+  refreshNow(): Promise<void> {
+    if (this.disposed) {
+      return Promise.resolve();
+    }
+    if (this.inFlightRefresh) {
+      this.refreshQueued = true;
+      return this.inFlightRefresh;
+    }
+    this.inFlightRefresh = (async () => {
+      try {
+        do {
+          this.refreshQueued = false;
+          try {
+            await this.runRefreshCycle();
+          } catch (error) {
+            console.warn("Scene refresh failed", error);
+          }
+        } while (this.refreshQueued && !this.disposed);
+      } finally {
+        this.inFlightRefresh = null;
+      }
+    })();
+    return this.inFlightRefresh;
   }
 
   private getRendererConfigUrl(): string {
@@ -751,13 +391,32 @@ export class BrowserSceneShellApp {
       button.addEventListener("click", () => {
         const preset = button.dataset.avatarPreset as ViewPreset;
         this.uiControl = createViewPresetControl(this.uiControl, preset || "full");
-        void this.refresh();
+        void this.refreshNow();
       });
     }
   }
 
+  private noteInteraction(): void {
+    this.lastInteractionAt = Date.now();
+  }
+
+  /** True while somebody is using an interactive slide; auto-rotation must not pull the page away. */
+  private isUserInteracting(): boolean {
+    const hold = this.options.interactionHoldMs ?? 45_000;
+    if (Date.now() - this.lastInteractionAt < hold) {
+      return true;
+    }
+    const focused = document.activeElement;
+    return focused instanceof Element && this.carouselShellEl.contains(focused) && focused.matches(EDITABLE_SELECTOR);
+  }
+
   private bindCarouselControls(): void {
     this.carouselShellEl.addEventListener("keydown", (event) => {
+      this.noteInteraction();
+      // Arrow keys belong to the field when typing (cursor movement, selects, sliders).
+      if (event.target instanceof Element && event.target.matches(EDITABLE_SELECTOR)) {
+        return;
+      }
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         this.stepPage(-1);
@@ -768,8 +427,18 @@ export class BrowserSceneShellApp {
         this.stepPage(1);
       }
     });
+    this.carouselShellEl.addEventListener("focusin", () => this.noteInteraction());
+
+    this.dotsEl.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-slide-index]") : null;
+      if (target) {
+        this.noteInteraction();
+        this.pinPageByIndex(Number(target.dataset.slideIndex) || 0);
+      }
+    });
 
     this.carouselShellEl.addEventListener("pointerdown", (event) => {
+      this.noteInteraction();
       if (event.button !== 0 || this.orderedPages.length < 2 || this.isCarouselInteractiveTarget(event.target)) {
         return;
       }
@@ -847,11 +516,22 @@ export class BrowserSceneShellApp {
     }
   }
 
-  private async refresh(): Promise<void> {
+  private async runRefreshCycle(): Promise<void> {
+    this.cycleConnectivityFailures = 0;
     await this.refreshWeatherIfStale();
-    this.currentState = await this.readAssistantState();
-    this.hassStates = await this.readSceneStates();
-    this.remoteControl = await this.readRemoteControl(this.currentControl);
+    const [state, states, remoteControl] = await Promise.all([
+      this.readAssistantState(),
+      this.readSceneStates(),
+      this.readRemoteControl(this.currentControl),
+    ]);
+    if (this.disposed) {
+      return;
+    }
+    this.currentState = state;
+    this.hassStates = states;
+    this.remoteControl = remoteControl;
+    this.updateDataHealth();
+
     this.uiControl = mergeControlV1(DEFAULT_CONTROL_V1, this.uiControl);
     this.currentControl = mergeControlV1(this.remoteControl, this.uiControl);
 
@@ -866,6 +546,9 @@ export class BrowserSceneShellApp {
     const runtimeScene = this.sceneRuntimeConfig;
     this.applyDisplayConfig(runtimeScene);
     const orderedPages = runtimeScene.pages;
+    if (this.isUserInteracting() && !(this.currentControl.page.mode === "pinned")) {
+      this.lastAutoRotateAt = Date.now();
+    }
     const selection = resolveSceneSelection({
       control: this.currentControl,
       rotation: runtimeScene.rotation,
@@ -880,262 +563,269 @@ export class BrowserSceneShellApp {
     this.currentPreset = this.currentControl.viewPreset || this.currentPreset || "full";
     this.updatePresetButtons();
 
-    if (!this.avatarAdapter) {
-      throw new Error("Avatar adapter is not initialized.");
-    }
+    // The carousel is rendered first and independently: a misbehaving avatar backend must never
+    // freeze the information deck.
+    this.renderCarousel(orderedPages, presentation);
+    await this.pushAvatarState(presentation);
+  }
 
-    await this.avatarAdapter.setState(presentation.state);
-    await this.avatarAdapter.setCue(this.currentControl.cue);
-    await this.avatarAdapter.setViewPreset(this.currentPreset);
+  private async pushAvatarState(presentation: AssistantPresentationModel): Promise<void> {
+    const adapter = this.avatarAdapter;
+    if (!adapter) {
+      return;
+    }
+    const attempt = async (label: string, run: () => Promise<void>): Promise<void> => {
+      try {
+        await run();
+      } catch (error) {
+        console.warn(`Avatar adapter ${label} failed`, error);
+      }
+    };
+    await attempt("setState", () => adapter.setState(presentation.state));
+    await attempt("setCue", () => adapter.setCue(this.currentControl.cue));
+    await attempt("setViewPreset", () => adapter.setViewPreset(this.currentPreset));
     // Only send bubble when state has no message — otherwise the state-driven
     // typewriter/lip-sync in the iframe handles the text display.
     // Sending a bubble with speak:false would override the active typewriter.
     const hasStateMessage = Boolean(trimText(presentation.state.message, 180));
-    await this.avatarAdapter.showBubble(hasStateMessage ? "" : presentation.body, {
+    await attempt("showBubble", () => adapter.showBubble(hasStateMessage ? "" : presentation.body, {
       ttlMs: 0,
       speak: false,
       typewriter: false,
-    });
+    }));
+  }
 
-    this.renderCarousel(orderedPages, presentation);
+  private updateDataHealth(): void {
+    if (this.cycleConnectivityFailures > 0) {
+      this.consecutiveFailedCycles += 1;
+    } else {
+      this.consecutiveFailedCycles = 0;
+    }
+    const stale = this.consecutiveFailedCycles >= (this.options.staleAfterFailures ?? 2);
+    this.staleEl.hidden = !stale;
+    this.root.dataset.stale = stale ? "true" : "false";
+  }
+
+  private recordProviderFailure(error: unknown): void {
+    if (isConnectivityFailure(error)) {
+      this.cycleConnectivityFailures += 1;
+    }
+  }
+
+  private renderContext(): SlideRenderContext {
+    return {
+      labels: this.labels,
+      locale: this.rendererConfig.assistant.locale || "en-US",
+      assistantName: this.rendererConfig.assistant.name,
+      weather: this.weatherData || DEFAULT_WEATHER_OVERVIEW,
+      states: this.hassStates,
+      iconUrl: (key) => this.resolveIconUrl(key),
+    };
   }
 
   private renderCarousel(pages: ScenePageV1[], presentation: AssistantPresentationModel): void {
     this.orderedPages = pages.slice();
-    this.carouselTrackEl.innerHTML = pages.map((page, index) => {
-      if (page.kind === "overview") {
-        return this.renderOverviewSlide(page, presentation, index);
+    const context = this.renderContext();
+    const seen = new Set<string>();
+
+    pages.forEach((page, index) => {
+      seen.add(page.id);
+      let entry = this.slides.get(page.id);
+      if (entry && entry.kind !== page.kind) {
+        this.discardSlide(entry);
+        entry.el.remove();
+        this.slides.delete(page.id);
+        entry = undefined;
       }
-      if (page.kind === "grid") {
-        return this.renderGridSlide(page, index, pages.length);
+      if (!entry) {
+        const el = document.createElement("section");
+        el.dataset.slideId = page.id;
+        el.dataset.scenePageId = page.id;
+        entry = { pageId: page.id, kind: page.kind, el, signature: "\u0000", views: [], generation: 0, appPropsKey: "" };
+        this.slides.set(page.id, entry);
       }
-      return this.renderDynamicSlide(page, index, pages.length);
-    }).join("");
+      entry.el.className = slideClassFor(page);
+      entry.el.dataset.slideOrder = String(index);
+
+      if (page.kind === "app") {
+        this.syncAppSlide(entry, page);
+      } else {
+        const body = page.kind === "overview"
+          ? renderOverviewBody(context, presentation)
+          : page.kind === "grid"
+            ? renderGridBody(context, page, index, pages.length)
+            : renderCardsBody(context, page, index, pages.length);
+        this.applySlideHtml(entry, body, page);
+      }
+    });
+
+    for (const [pageId, entry] of Array.from(this.slides.entries())) {
+      if (!seen.has(pageId)) {
+        this.discardSlide(entry);
+        entry.el.remove();
+        this.slides.delete(pageId);
+      }
+    }
+
+    // Keep DOM order equal to page order without recreating nodes (moving a node keeps its mounted views).
+    pages.forEach((page, index) => {
+      const el = this.slides.get(page.id)?.el;
+      if (el && this.carouselTrackEl.children[index] !== el) {
+        this.carouselTrackEl.insertBefore(el, this.carouselTrackEl.children[index] ?? null);
+      }
+    });
 
     this.updateCarouselPosition();
+    this.renderDots(pages);
+    this.notifyActiveSlide(pages);
+  }
 
-    this.dotsEl.innerHTML = pages.map((page, index) => `
+  private applySlideHtml(entry: SlideEntry, body: string, page: ScenePageV1): void {
+    if (entry.signature === body) {
+      return;
+    }
+    this.disposeViews(entry);
+    entry.signature = body;
+    entry.el.innerHTML = body;
+    for (const slot of Array.from(entry.el.querySelectorAll<HTMLElement>("[data-widget-slot]"))) {
+      const cardIndex = Number(slot.dataset.sceneCardIndex);
+      const card = page.cards?.[cardIndex];
+      void this.mountWidget(entry, slot, trimText(card?.widget, 96), (card?.props ?? {}) as Record<string, unknown>);
+    }
+  }
+
+  private syncAppSlide(entry: SlideEntry, page: ScenePageV1): void {
+    const appId = trimText(page.app, 96);
+    const propsKey = JSON.stringify(page.props ?? {});
+    const registry = this.options.extensions;
+    const definition = appId && registry ? registry.getPage(appId) : null;
+    const available = Boolean(definition && definition.modes.includes("kiosk"));
+    const signature = `app:${appId}:${available ? "ok" : "missing"}`;
+
+    if (entry.signature === signature) {
+      if (entry.appPropsKey !== propsKey) {
+        entry.appPropsKey = propsKey;
+        for (const view of entry.views) {
+          view.update?.((page.props ?? {}) as Record<string, unknown>);
+        }
+      }
+      return;
+    }
+    this.disposeViews(entry);
+    entry.signature = signature;
+    entry.appPropsKey = propsKey;
+
+    if (!available || !definition || !this.extensionRuntime) {
+      entry.el.innerHTML = `
+        <div class="app-slide slide-body">
+          <div class="slide-top"><div><h1 class="headline">${escapeHtml(trimText(page.title, 64) || appId)}</h1></div></div>
+          <div class="empty">${escapeHtml(this.labels.extensionUnavailable)}${appId ? ` (${escapeHtml(appId)})` : ""}</div>
+        </div>`;
+      return;
+    }
+
+    entry.el.innerHTML = renderAppBody();
+    const host = entry.el.querySelector<HTMLElement>("[data-app-host]");
+    if (!host) {
+      return;
+    }
+    const generation = entry.generation;
+    const runtime = this.extensionRuntime;
+    void (async () => {
+      try {
+        const view = await definition.mount(host, (page.props ?? {}) as Record<string, unknown>, runtime);
+        if (entry.generation !== generation || this.disposed) {
+          view.dispose();
+          return;
+        }
+        entry.views.push(view);
+      } catch (error) {
+        if (entry.generation === generation) {
+          host.textContent = this.labels.extensionUnavailable;
+        }
+        console.warn(`Extension page ${appId} failed to mount`, error);
+      }
+    })();
+  }
+
+  private async mountWidget(
+    entry: SlideEntry,
+    slot: HTMLElement,
+    widgetId: string,
+    props: Record<string, unknown>,
+  ): Promise<void> {
+    const definition = widgetId ? this.options.extensions?.getWidget(widgetId) : null;
+    if (!definition || !this.extensionRuntime) {
+      slot.classList.add("is-unavailable");
+      slot.textContent = this.labels.extensionUnavailable;
+      return;
+    }
+    const generation = entry.generation;
+    try {
+      const view = await definition.mount(slot, props, this.extensionRuntime);
+      if (entry.generation !== generation || this.disposed) {
+        view.dispose();
+        return;
+      }
+      entry.views.push(view);
+    } catch (error) {
+      if (entry.generation === generation) {
+        slot.classList.add("is-unavailable");
+        slot.textContent = this.labels.extensionUnavailable;
+      }
+      console.warn(`Widget ${widgetId} failed to mount`, error);
+    }
+  }
+
+  private disposeViews(entry: SlideEntry): void {
+    entry.generation += 1;
+    for (const view of entry.views.splice(0)) {
+      try {
+        view.dispose();
+      } catch (error) {
+        console.warn("Extension view dispose failed", error);
+      }
+    }
+  }
+
+  private discardSlide(entry: SlideEntry): void {
+    this.disposeViews(entry);
+  }
+
+  private renderDots(pages: ScenePageV1[]): void {
+    const signature = pages
+      .map((page, index) => `${index}:${page.id}:${trimText(page.title, 40)}`)
+      .join("|");
+    if (signature !== this.dotsSignature) {
+      this.dotsSignature = signature;
+      this.dotsEl.innerHTML = pages.map((page, index) => `
       <button
-        class="carousel-dot ${index === this.activeIndex ? "is-active" : ""}"
+        class="carousel-dot"
         type="button"
         data-slide-index="${index}"
         data-scene-page-id="${escapeHtml(page.id)}"
         aria-label="${escapeHtml(trimText(page.title, 40) || trimText(page.id, 40) || `${this.labels.pageStamp} ${index + 1}`)}"
       ></button>
     `).join("");
-
-    for (const dot of Array.from(this.dotsEl.querySelectorAll<HTMLButtonElement>("[data-slide-index]"))) {
-      dot.addEventListener("click", () => {
-        this.pinPageByIndex(Number(dot.dataset.slideIndex) || 0);
-      }, { once: true });
     }
+    this.updateDotState();
   }
 
-  private renderOverviewSlide(page: ScenePageV1, presentation: AssistantPresentationModel, index: number): string {
-    const assistantName = trimText(this.rendererConfig.assistant.name, 40) || "Assistant";
-    const weather = this.weatherData || DEFAULT_WEATHER_OVERVIEW;
-    const forecastMarkup = weather.forecast.slice(0, 5).map((day) => this.renderForecastDay(day)).join("");
-
-    return `
-      <section class="slide slide-overview" data-slide-id="${escapeHtml(page.id)}" data-scene-page-id="${escapeHtml(page.id)}" data-slide-order="${index}">
-        <div class="weather-panel slide-body">
-          <div class="weather-top">
-            <div>
-              <h1 class="headline">${escapeHtml(weather.title)}</h1>
-              <p class="subline">${escapeHtml(weather.location)}</p>
-            </div>
-            <div class="weather-top-meta">
-              <div class="stamp today-card">
-                <span class="caption">${escapeHtml(weather.todayCaption)}</span>
-                <span class="value">${escapeHtml(weather.todayValue)}</span>
-                <span class="meta">${escapeHtml(weather.todayLabel)}</span>
-              </div>
-              <div class="stamp">
-                <span class="caption">${escapeHtml(weather.updatedCaption)}</span>
-                <span class="value">${escapeHtml(weather.updatedAt)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="current">
-            <div class="hero">
-              <div class="temp-row">
-                <span class="temp">${escapeHtml(weather.temperature)}</span>
-                <span class="unit">°${escapeHtml(weather.unit)}</span>
-              </div>
-              <div class="condition">${escapeHtml(weather.condition)}</div>
-              <div class="feels">${escapeHtml(weather.feelsLike)}</div>
-              <div class="hero-badges">
-                <div class="hero-badge"><img class="icon" src="${escapeHtml(this.resolveIconUrl("thermometer"))}" alt=""><span>${escapeHtml(weather.badgeSummary)}</span></div>
-                <div class="hero-badge"><img class="icon" src="${escapeHtml(this.resolveIconUrl("calendarDays"))}" alt=""><span>${escapeHtml(weather.badgeRange)}</span></div>
-              </div>
-            </div>
-            <div class="neiri-card">
-              <div class="neiri-top">
-                <div class="neiri-caption">
-                  <strong>${escapeHtml(presentation.caption)}</strong>
-                  <div class="neiri-label">${escapeHtml(presentation.label)}</div>
-                </div>
-                <div class="neiri-mark"><img src="${escapeHtml(this.resolveIconUrl("sparkles"))}" alt="${escapeHtml(assistantName)}"></div>
-              </div>
-              <div class="neiri-meta">${escapeHtml(presentation.body)}</div>
-            </div>
-          </div>
-
-          <div class="metrics">
-            <div class="metric"><div class="metric-header"><span>${escapeHtml(this.labels.humidity)}</span><i><img src="${escapeHtml(this.resolveIconUrl("droplets"))}" alt=""></i></div><strong>${escapeHtml(weather.metrics.humidity)}</strong></div>
-            <div class="metric"><div class="metric-header"><span>${escapeHtml(this.labels.pressure)}</span><i><img src="${escapeHtml(this.resolveIconUrl("gauge"))}" alt=""></i></div><strong>${escapeHtml(weather.metrics.pressure)}</strong></div>
-            <div class="metric"><div class="metric-header"><span>${escapeHtml(this.labels.wind)}</span><i><img src="${escapeHtml(this.resolveIconUrl("wind"))}" alt=""></i></div><strong>${escapeHtml(weather.metrics.wind)}</strong></div>
-            <div class="metric"><div class="metric-header"><span>${escapeHtml(this.labels.clouds)}</span><i><img src="${escapeHtml(this.resolveIconUrl("cloud"))}" alt=""></i></div><strong>${escapeHtml(weather.metrics.clouds)}</strong></div>
-          </div>
-
-          <div class="forecast">
-            <div class="forecast-head">
-              <h2>${escapeHtml(weather.forecastTitle)}</h2>
-              <p></p>
-            </div>
-            <div class="forecast-grid">${forecastMarkup}</div>
-          </div>
-        </div>
-      </section>
-    `;
-  }
-
-  private renderDynamicSlide(page: ScenePageV1, index: number, pageCount: number): string {
-    const cards = resolveSceneCards(
-      page.cards || [],
-      this.hassStates,
-      this.rendererConfig.assistant.locale || "en-US",
-    );
-    const weatherRange = this.resolveForecastRange();
-    const stampCaption = trimText(page.stampCaption, 24)
-      || (page.kind === "forecast+cards" ? this.labels.rangeStamp : this.labels.pageStamp);
-    const stampValue = trimText(page.stampValue, 32)
-      || (page.kind === "forecast+cards" ? weatherRange : `${index + 1} / ${pageCount}`);
-    const cardsHtml = page.cardStyle === "mini"
-      ? cards.map((card, cardIndex) => `
-          <article class="mini-card" data-scene-card-index="${cardIndex}" data-scene-page-id="${escapeHtml(page.id)}">
-            <span class="caption">${escapeHtml(card.caption)}</span>
-            <strong>${escapeHtml(card.value)}</strong>
-          </article>
-        `).join("")
-      : cards.map((card, cardIndex) => `
-          <article class="home-card" data-scene-card-index="${cardIndex}" data-scene-page-id="${escapeHtml(page.id)}">
-            <span class="caption">${escapeHtml(card.caption)}</span>
-            <strong>${escapeHtml(card.value)}</strong>
-            <small>${escapeHtml(card.hint)}</small>
-          </article>
-        `).join("");
-    const forecastMarkup = page.kind === "forecast+cards"
-      ? `<div class="dynamic-forecast-grid">${this.weatherData.forecast.slice(0, 5).map((day) => this.renderForecastDay(day)).join("")}</div>`
-      : "";
-    const cardGridClass = page.cardStyle === "mini" ? "dynamic-cards-grid is-mini" : "dynamic-cards-grid is-full";
-    const title = trimText(page.title, 64) || trimText(page.id, 64) || `${this.labels.pageStamp} ${index + 1}`;
-    const subtitle = trimText(page.subtitle, 140);
-
-    return `
-      <section class="slide slide-dynamic" data-slide-id="${escapeHtml(page.id)}" data-scene-page-id="${escapeHtml(page.id)}" data-slide-order="${index}">
-        <div class="dynamic-slide slide-body" data-dynamic-layout="${escapeHtml(page.kind)}" data-dynamic-card-style="${escapeHtml(page.cardStyle || "full")}">
-          <div class="slide-top">
-            <div>
-              <h1 class="headline">${escapeHtml(title)}</h1>
-              ${subtitle ? `<p class="subline">${escapeHtml(subtitle)}</p>` : ""}
-            </div>
-            <div class="stamp compact-stamp">
-              <span class="caption">${escapeHtml(stampCaption)}</span>
-              <span class="value">${escapeHtml(stampValue)}</span>
-            </div>
-          </div>
-          ${forecastMarkup}
-          <div class="${cardGridClass}">
-            ${cardsHtml || `<div class="empty">${escapeHtml(this.labels.noCardsConfigured)}</div>`}
-          </div>
-        </div>
-      </section>
-    `;
-  }
-
-  private renderGridSlide(page: ScenePageV1, index: number, pageCount: number): string {
-    const cards = resolveSceneCards(
-      page.cards || [],
-      this.hassStates,
-      this.rendererConfig.assistant.locale || "en-US",
-    );
-    const rawCards = page.cards || [];
-    const cols = page.gridColumns || 4;
-    const rows = page.gridRows || 3;
-    const stampCaption = trimText(page.stampCaption, 24) || this.labels.pageStamp;
-    const stampValue = trimText(page.stampValue, 32) || `${index + 1} / ${pageCount}`;
-    const title = trimText(page.title, 64) || trimText(page.id, 64) || `${this.labels.pageStamp} ${index + 1}`;
-    const subtitle = trimText(page.subtitle, 140);
-
-    const cardsHtml = cards.map((card, cardIndex) => {
-      const raw = rawCards[cardIndex] || {};
-      const col = Number(raw.col);
-      const row = Number(raw.row);
-      const w = Math.max(1, Number(raw.w) || 1);
-      const h = Math.max(1, Number(raw.h) || 1);
-      const hasPosition = Number.isFinite(col) && Number.isFinite(row);
-      const gridStyle = hasPosition
-        ? `grid-column: ${col + 1} / span ${w}; grid-row: ${row + 1} / span ${h};`
-        : "";
-      return `
-        <article class="grid-card" style="${gridStyle}" data-scene-card-index="${cardIndex}" data-scene-page-id="${escapeHtml(page.id)}">
-          <span class="caption">${escapeHtml(card.caption)}</span>
-          <strong>${escapeHtml(card.value)}</strong>
-          <small>${escapeHtml(card.hint)}</small>
-        </article>
-      `;
-    }).join("");
-
-    return `
-      <section class="slide slide-dynamic" data-slide-id="${escapeHtml(page.id)}" data-scene-page-id="${escapeHtml(page.id)}" data-slide-order="${index}">
-        <div class="dynamic-slide slide-body" data-dynamic-layout="grid">
-          <div class="slide-top">
-            <div>
-              <h1 class="headline">${escapeHtml(title)}</h1>
-              ${subtitle ? `<p class="subline">${escapeHtml(subtitle)}</p>` : ""}
-            </div>
-            <div class="stamp compact-stamp">
-              <span class="caption">${escapeHtml(stampCaption)}</span>
-              <span class="value">${escapeHtml(stampValue)}</span>
-            </div>
-          </div>
-          <div class="grid-cards-container" style="--grid-cols: ${cols}; --grid-rows: ${rows};">
-            ${cardsHtml || `<div class="empty">${escapeHtml(this.labels.noCardsConfigured)}</div>`}
-          </div>
-        </div>
-      </section>
-    `;
-  }
-
-  private renderForecastDay(day: WeatherForecastDay): string {
-    return `
-      <article class="day">
-        <div class="day-head">
-          <div class="icon"><img src="${escapeHtml(day.icon)}" alt=""></div>
-          <div class="day-date">
-            <span class="name">${escapeHtml(day.name)}</span>
-            <span class="meta"><span class="day-number">${escapeHtml(day.dayNumber)}</span><span class="day-month">${escapeHtml(day.monthShort)}</span></span>
-          </div>
-        </div>
-        <div class="temps">
-          <strong>${escapeHtml(day.max)}</strong>
-          <small>${escapeHtml(day.min)}</small>
-        </div>
-        <div class="day-note">${escapeHtml(day.note)}</div>
-      </article>
-    `;
-  }
-
-  private resolveForecastRange(): string {
-    const forecast = this.weatherData.forecast || [];
-    if (!forecast.length) {
-      return this.labels.forecastRangeFallback;
+  /** Tells mounted extension views whether their slide is on screen so they can pause background work. */
+  private notifyActiveSlide(pages: ScenePageV1[]): void {
+    if (this.lastRenderedActiveIndex === this.activeIndex) {
+      return;
     }
-    const first = forecast[0];
-    const last = forecast[forecast.length - 1];
-    return `${trimText(first.dayNumber, 4)} ${trimText(first.monthShort, 8)} → ${trimText(last.dayNumber, 4)} ${trimText(last.monthShort, 8)}`;
+    this.lastRenderedActiveIndex = this.activeIndex;
+    pages.forEach((page, index) => {
+      const el = this.slides.get(page.id)?.el;
+      if (!el) {
+        return;
+      }
+      const active = index === this.activeIndex;
+      el.dataset.active = active ? "true" : "false";
+      el.dispatchEvent(new CustomEvent("ks-active-change", { detail: { active } }));
+    });
   }
 
   private resolveIconUrl(key: keyof SceneShellIconUrls): string {
@@ -1167,7 +857,13 @@ export class BrowserSceneShellApp {
 
   private updateDotState(): void {
     for (const dot of Array.from(this.dotsEl.querySelectorAll<HTMLButtonElement>("[data-slide-index]"))) {
-      dot.classList.toggle("is-active", Number(dot.dataset.slideIndex) === this.activeIndex);
+      const active = Number(dot.dataset.slideIndex) === this.activeIndex;
+      dot.classList.toggle("is-active", active);
+      if (active) {
+        dot.setAttribute("aria-current", "true");
+      } else {
+        dot.removeAttribute("aria-current");
+      }
     }
   }
 
@@ -1175,7 +871,7 @@ export class BrowserSceneShellApp {
     if (!(target instanceof Element)) {
       return false;
     }
-    return Boolean(target.closest("button, a, input, select, textarea, label"));
+    return Boolean(target.closest("button, a, input, select, textarea, label, [data-no-swipe], [contenteditable]"));
   }
 
   private clearDragState(pointerId: number, keepCapture: boolean): void {
@@ -1199,6 +895,13 @@ export class BrowserSceneShellApp {
     this.pinPageByIndex(nextIndex);
   }
 
+  private pinPageById(pageId: string): void {
+    const index = this.orderedPages.findIndex((page) => page.app === pageId || page.id === pageId);
+    if (index >= 0) {
+      this.pinPageByIndex(index);
+    }
+  }
+
   private pinPageByIndex(index: number): void {
     const orderedPages = this.orderedPages.length
       ? this.orderedPages
@@ -1213,7 +916,8 @@ export class BrowserSceneShellApp {
     this.lastAutoRotateAt = Date.now();
     this.updateCarouselPosition();
     this.updateDotState();
-    void this.refresh();
+    this.notifyActiveSlide(orderedPages);
+    void this.refreshNow();
   }
 
   private syncIdleMonologue(state: StateV1): void {
@@ -1232,13 +936,13 @@ export class BrowserSceneShellApp {
       this.lastIdleIndex = next.index;
     }
 
-    if (!this.idleTimer) {
+    if (!this.idleTimer && !this.disposed) {
       this.idleTimer = window.setTimeout(() => {
         this.idleTimer = null;
         const next = pickIdleLine(this.idleLines, this.lastIdleIndex);
         this.currentIdleLine = next.line;
         this.lastIdleIndex = next.index;
-        void this.refresh();
+        void this.refreshNow();
       }, nextIdleDelayMs(18_000, 18_000));
     }
   }
@@ -1280,6 +984,7 @@ export class BrowserSceneShellApp {
     return createHomeAssistantStatesReader({
       allowApiFallback: this.rendererConfig.state.haApiFallback === true,
       apiUrl: this.rendererConfig.state.apiUrl || this.rendererConfig.control.apiUrl,
+      onError: (error) => this.recordProviderFailure(error),
     });
   }
 
@@ -1287,6 +992,7 @@ export class BrowserSceneShellApp {
     const jsonFallback = async (): Promise<StateV1> => createJsonStateProvider({
       url: this.rendererConfig.state.stateUrl,
       defaultValue: this.currentState ?? DEFAULT_STATE_V1,
+      onError: (error) => this.recordProviderFailure(error),
     }).read();
 
     if (this.rendererConfig.state.provider !== "ha" || !this.entityMap || !this.haStatesReader) {
@@ -1311,6 +1017,7 @@ export class BrowserSceneShellApp {
     const jsonFallback = async (): Promise<ControlV1> => createJsonControlProvider({
       url: this.rendererConfig.control.controlUrl,
       defaultValue,
+      onError: (error) => this.recordProviderFailure(error),
     }).read();
 
     if (this.rendererConfig.control.provider !== "ha" || !this.controlEntityMap || !this.haStatesReader) {
@@ -1348,7 +1055,43 @@ export class BrowserSceneShellApp {
     }
   }
 
+  private resolveAvatarManifestUrls(manifest: AvatarManifestV1, manifestUrl: string): AvatarManifestV1 {
+    const manifestBaseUrl = resolveBaseUrl(manifestUrl);
+    const assetRoot = resolveUrlAgainst(
+      manifestBaseUrl,
+      trimText(manifest.assetRoot, 1024) || "./assets",
+    );
+    const assetBaseUrl = assetRoot ? withTrailingSlash(assetRoot) : manifestBaseUrl;
+    const resolveAvatarAssetUrl = (value: string): string => {
+      const normalized = trimText(value, 1024);
+      return normalized ? resolveUrlAgainst(assetBaseUrl, normalized) : "";
+    };
+    return {
+      ...manifest,
+      assetRoot,
+      runtimeUrl: resolveUrlAgainst(manifestBaseUrl, manifest.runtimeUrl || ""),
+      entry: resolveAvatarAssetUrl(manifest.entry || ""),
+      modelUrl: resolveAvatarAssetUrl(manifest.modelUrl || ""),
+      fallbackPortrait: resolveAvatarAssetUrl(manifest.fallbackPortrait || ""),
+      motionMapUrl: resolveAvatarAssetUrl(manifest.motionMapUrl || ""),
+      expressionMapUrl: resolveAvatarAssetUrl(manifest.expressionMapUrl || ""),
+      presetThumbs: Object.fromEntries(
+        Object.entries(manifest.presetThumbs || {})
+          .map(([key, value]) => [key, resolveUrlAgainst(manifestBaseUrl, value)])
+          .filter(([, value]) => Boolean(value)),
+      ),
+    };
+  }
+
   private createAvatarAdapter(): AvatarAdapter {
+    const custom = this.options.avatarAdapterFactory?.({
+      manifest: this.avatarManifest,
+      rendererConfig: this.rendererConfig,
+    });
+    if (custom) {
+      return custom;
+    }
+
     if (this.avatarManifest.adapter === "live2d") {
       return createLive2dAdapter({
         manifest: this.avatarManifest,

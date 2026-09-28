@@ -52,6 +52,9 @@ SHARED_PRESET_BASE_URL = (
     os.environ.get("SCENE_SHARED_PRESET_BASE_URL", "../../scene-runtime/assets").strip()
     or "../../scene-runtime/assets"
 )
+EXTENSIONS_DIR = Path(os.environ.get("SCENE_EXTENSIONS_DIR", str(SCENE_ROOT / "extensions")))
+EXTENSION_URL_PREFIX = os.environ.get("SCENE_EXTENSIONS_URL_PREFIX", "/scene-extensions").rstrip("/")
+MAX_EXTENSION_MANIFEST_BYTES = 16 * 1024
 AVATAR_UPLOADS_DIR = SCENE_ROOT / ".avatar-upload-sessions"
 HOME_ASSISTANT_API_URL = (
     os.environ.get("SCENE_HOME_ASSISTANT_API_URL", "http://supervisor/core/api").strip().rstrip("/")
@@ -117,6 +120,54 @@ def resolve_runtime_scene_config_name(pack_dir: Path) -> str:
     return "scene.default.json"
 
 
+EXTENSION_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
+EXTENSION_MODULE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.m?js$")
+
+
+def discover_extensions() -> list[dict[str, Any]]:
+    """Frontend extensions installed under `<scene root>/extensions/<id>/extension.json`.
+
+    The host stays generic: it only validates the manifest shape and turns it into a module URL
+    plus an opaque `config` object that the browser hands to the extension. A broken manifest is
+    skipped (and logged) instead of failing the bootstrap.
+    """
+    found: list[dict[str, Any]] = []
+    if not EXTENSIONS_DIR.is_dir():
+        return found
+    for ext_dir in sorted(item for item in EXTENSIONS_DIR.iterdir() if item.is_dir()):
+        manifest_path = ext_dir / "extension.json"
+        try:
+            if not manifest_path.is_file() or manifest_path.stat().st_size > MAX_EXTENSION_MANIFEST_BYTES:
+                continue
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if not isinstance(manifest, dict) or manifest.get("enabled", True) is False:
+                continue
+            ext_id = str(manifest.get("id") or ext_dir.name)
+            module = str(manifest.get("module") or "")
+            if ext_id != ext_dir.name or not EXTENSION_ID_RE.match(ext_id):
+                logging.warning("Extension %s: id must equal its directory name and match %s", ext_dir.name, EXTENSION_ID_RE.pattern)
+                continue
+            if not EXTENSION_MODULE_RE.match(module):
+                logging.warning("Extension %s: invalid module file name %r", ext_id, module)
+                continue
+            module_path = (ext_dir / module).resolve()
+            if not module_path.is_file() or not module_path.is_relative_to(ext_dir.resolve()):
+                logging.warning("Extension %s: module %s not found inside its directory", ext_id, module)
+                continue
+            config = manifest.get("config")
+            found.append(
+                {
+                    "id": ext_id,
+                    "title": str(manifest.get("title") or ext_id),
+                    "moduleUrl": f"{EXTENSION_URL_PREFIX}/{quote(ext_id)}/{quote(module)}?v={int(module_path.stat().st_mtime)}",
+                    "config": config if isinstance(config, dict) else {},
+                }
+            )
+        except (OSError, ValueError) as exc:
+            logging.warning("Skipping extension in %s: %s", ext_dir, exc)
+    return found
+
+
 def build_bootstrap() -> dict[str, Any]:
     pack_id = load_active_pack_id()
     pack_dir = PACKS_DIR / pack_id
@@ -130,6 +181,8 @@ def build_bootstrap() -> dict[str, Any]:
         "packBaseUrl": pack_base_url,
         "apiBaseUrl": f"{PATH_PREFIX}/",
         "sceneEditorUrl": "/scene-editor/",
+        "adminUrl": "/admin/",
+        "extensions": discover_extensions(),
         "sceneEditorFormUrl": "/scene-editor-form/",
         "sceneEditorApiUrl": "/scene-editor-form/api/config",
         "files": {
