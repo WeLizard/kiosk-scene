@@ -1,13 +1,11 @@
 name: Kiosk Scene
-version: "0.11.0"
+version: "0.11.1"
 slug: kiosk_scene
 description: Хостинг kiosk-scene и (по желанию) домашнего ассистента Домовой как add-on Home Assistant.
 url: https://github.com/WeLizard/kiosk-scene
 arch:
   - amd64
   - aarch64
-  - armv7
-build_from: "homeassistant/amd64-base:latest"
 startup: services
 boot: auto
 init: false
