@@ -78,7 +78,8 @@ jobs:
 }
 OPTIONS_EOF
 
-          # Build image            docker build --no-cache \
+          # Build image
+          docker build --no-cache \
             --build-arg BUILD_VERSION="$VERSION" \
             --build-arg BUILD_ARCH=amd64 \
             --build-arg GIT_SHA="${{ github.sha }}" \
