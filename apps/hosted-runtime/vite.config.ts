@@ -3,18 +3,30 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkg = (name: string, entry = "src/index.ts"): string => path.resolve(__dirname, "../../packages", name, entry);
 
 export default defineConfig({
   base: "./",
   resolve: {
     alias: {
-      "@kiosk-scene/core": path.resolve(__dirname, "../../packages/core/src/index.ts"),
-      "@kiosk-scene/adapter-live2d": path.resolve(__dirname, "../../packages/adapter-live2d/src/index.ts"),
-      "@kiosk-scene/provider-ha": path.resolve(__dirname, "../../packages/provider-ha/src/index.ts"),
-      "@kiosk-scene/provider-json": path.resolve(__dirname, "../../packages/provider-json/src/index.ts"),
-      "@kiosk-scene/adapter-static": path.resolve(__dirname, "../../packages/adapter-static/src/index.ts"),
+      "@kiosk-scene/core": pkg("core"),
+      "@kiosk-scene/adapter-live2d": pkg("adapter-live2d"),
+      "@kiosk-scene/provider-ha": pkg("provider-ha"),
+      "@kiosk-scene/provider-json": pkg("provider-json"),
+      "@kiosk-scene/adapter-static": pkg("adapter-static"),
       "@kiosk-scene/shell-browser": path.resolve(__dirname, "../../packages/shell-browser/src"),
-      "@kiosk-scene/widgets-core": path.resolve(__dirname, "../../packages/widgets-core/src/index.ts")
+      "@kiosk-scene/widgets-core": pkg("widgets-core"),
+      "@kiosk-scene/app-shell/styles": pkg("app-shell", "src/styles.css"),
+      "@kiosk-scene/app-shell": pkg("app-shell"),
     }
-  }
+  },
+  build: {
+    rollupOptions: {
+      // Two entries share one chunk graph: the kiosk display and the desktop/mobile administration shell.
+      input: {
+        index: path.resolve(__dirname, "index.html"),
+        admin: path.resolve(__dirname, "admin.html"),
+      },
+    },
+  },
 });

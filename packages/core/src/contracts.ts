@@ -7,6 +7,8 @@ export interface RendererConfigV1 {
     locale?: string;
   };
   links?: Record<string, string>;
+  /** Optional weather sources for the overview page. Nothing is assumed when omitted. */
+  weather?: RendererWeatherConfigV1;
   avatar: {
     manifestUrl: string;
   };
@@ -29,12 +31,30 @@ export interface RendererConfigV1 {
   };
 }
 
+export interface RendererWeatherConfigV1 {
+  /** Home Assistant `weather.*` entity used for current conditions. */
+  entity?: string;
+  /** Human-readable place name shown under the weather title. */
+  location?: string;
+  /** Open-Meteo forecast source; `timezone` defaults to `auto`. */
+  openMeteo?: {
+    latitude: number;
+    longitude: number;
+    timezone?: string;
+  };
+}
+
 export interface AvatarAdapterCapabilities {
   supportsEmotion: boolean;
   supportsMotion: boolean;
   supportsViewPresets: boolean;
   supportsLipSync: boolean;
   supportsPointerFocus?: boolean;
+  /**
+   * The adapter displays `state.message` itself (typewriter/lip-sync inside its own runtime). When it does not,
+   * the shell shows the message through `showBubble`, so an assistant's words are never invisible on a display.
+   */
+  rendersStateMessage?: boolean;
 }
 
 export interface AvatarManifestV1 {
@@ -86,6 +106,10 @@ export interface SceneAvatarV1 {
 export interface SceneCardV1 {
   type?: string;
   entity?: string;
+  /** Extension widget id (namespaced) for cards with `type: "widget"`. */
+  widget?: string;
+  /** Opaque properties handed to the extension widget. */
+  props?: Record<string, unknown>;
   col?: number;
   row?: number;
   w?: number;
@@ -95,8 +119,12 @@ export interface SceneCardV1 {
 
 export interface ScenePageV1 {
   id: string;
-  kind: "overview" | "cards" | "forecast+cards" | "grid";
+  kind: "overview" | "cards" | "forecast+cards" | "grid" | "app";
   title: string;
+  /** Extension page id (namespaced) mounted into the slide when `kind` is `"app"`. */
+  app?: string;
+  /** Opaque properties handed to the extension page. */
+  props?: Record<string, unknown>;
   subtitle?: string;
   slot?: number;
   cardStyle?: "mini" | "full";

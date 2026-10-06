@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import math
 import os
+import tempfile
+import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,6 +27,8 @@ ACTIVE_PACK_FILE = Path(
 DEFAULT_PACK_ID = os.environ.get("SCENE_DEFAULT_PACK_ID", "neiri").strip() or "neiri"
 EXPLICIT_SCENE_CONFIG_PATH = os.environ.get("SCENE_EDITOR_CONFIG_PATH", "").strip()
 DISPLAY_SCENE_CONFIG_FILENAME = "scene.display.json"
+MAX_CONFIG_BODY_BYTES = int(os.environ.get("SCENE_EDITOR_MAX_BODY_BYTES", str(2 * 1024 * 1024)))
+_config_write_lock = threading.Lock()
 LEGACY_SCENE_CONFIG_PATHS = (
     Path("/config/www/neiri-scene/scene.default.json"),
     Path("/config/www/live2d/neiri-slides.json"),
@@ -1611,9 +1617,9 @@ def normalize_non_negative_number(value: Any, fallback: int) -> int:
         numeric = float(value)
     except (TypeError, ValueError):
         return fallback
-    if not numeric == numeric:  # NaN
+    if not math.isfinite(numeric):
         return fallback
-    return max(0, int(round(numeric)))
+    return max(0, int(math.floor(numeric + 0.5)))  # half-up, like JS Math.round
 
 
 def normalize_display_scale(value: Any, fallback: float = 1.0) -> float:
@@ -1621,7 +1627,7 @@ def normalize_display_scale(value: Any, fallback: float = 1.0) -> float:
         numeric = float(value)
     except (TypeError, ValueError):
         return fallback
-    if not numeric == numeric:
+    if not math.isfinite(numeric):
         return fallback
     return min(1.0, max(0.75, numeric))
 
@@ -1641,7 +1647,7 @@ def sanitize_page(page: Any, index: int, used_ids: set[str]) -> dict[str, Any]:
     used_ids.add(page_id)
 
     kind = trim_text(payload.get("kind"), "cards", 24)
-    if kind not in ("overview", "cards", "forecast+cards", "grid"):
+    if kind not in ("overview", "cards", "forecast+cards", "grid", "app"):
         kind = "cards"
     card_style = trim_text(payload.get("cardStyle"), "full", 16)
     if card_style not in ("mini", "full"):
@@ -1741,7 +1747,9 @@ def compile_scene_display_config(config: dict[str, Any]) -> dict[str, Any]:
         dwell_seconds = float(rotation.get("defaultDwellSeconds", DEFAULT_SCENE_CONFIG["rotation"]["defaultDwellSeconds"]))
     except (TypeError, ValueError):
         dwell_seconds = float(DEFAULT_SCENE_CONFIG["rotation"]["defaultDwellSeconds"])
-    dwell_ms = max(5000, int(round(dwell_seconds * 1000)))
+    if not math.isfinite(dwell_seconds):
+        dwell_seconds = float(DEFAULT_SCENE_CONFIG["rotation"]["defaultDwellSeconds"])
+    dwell_ms = max(5000, int(math.floor(dwell_seconds * 1000 + 0.5)))
 
     pack_id = avatar.get("packId")
     normalized_pack_id = trim_text(pack_id, "", 120) if isinstance(pack_id, str) else ""
@@ -1793,14 +1801,34 @@ def resolve_display_scene_config_path(primary_path: Path) -> Path:
     return primary_path.with_name(DISPLAY_SCENE_CONFIG_FILENAME)
 
 
-def write_json_atomic(path: Path, payload: Any) -> None:
+def serialize_json(payload: Any) -> str:
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    """Write via a unique temp file in the same directory, fsync, then rename."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_suffix(path.suffix + ".tmp")
-    temp_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    os.replace(temp_path, path)
+    handle, temp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_name, path)
+    except BaseException:
+        try:
+            os.unlink(temp_name)
+        except OSError:
+            pass
+        raise
+
+
+def write_json_atomic(path: Path, payload: Any) -> None:
+    write_text_atomic(path, serialize_json(payload))
+
+
+def source_digest(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def resolve_legacy_scene_config_paths(primary_path: Path) -> tuple[Path, ...]:
@@ -1831,12 +1859,12 @@ def render_editor_html() -> bytes:
 
 
 def load_scene_config() -> tuple[dict[str, Any], Path, str | None]:
+    """Read-only: never touches the pack directory."""
     primary_path = resolve_primary_scene_config_path()
     if primary_path.exists():
         config = normalize_scene_config(
             json.loads(primary_path.read_text(encoding="utf-8"))
         )
-        write_json_atomic(resolve_display_scene_config_path(primary_path), compile_scene_display_config(config))
         return config, primary_path, None
 
     for legacy_path in resolve_legacy_scene_config_paths(primary_path):
@@ -1844,23 +1872,21 @@ def load_scene_config() -> tuple[dict[str, Any], Path, str | None]:
             config = normalize_scene_config(
                 json.loads(legacy_path.read_text(encoding="utf-8"))
             )
-            write_json_atomic(resolve_display_scene_config_path(primary_path), compile_scene_display_config(config))
             return config, primary_path, str(legacy_path)
 
-    config = normalize_scene_config(json.loads(json.dumps(DEFAULT_SCENE_CONFIG)))
-    write_json_atomic(resolve_display_scene_config_path(primary_path), compile_scene_display_config(config))
-    return (
-        config,
-        primary_path,
-        None,
-    )
+    return normalize_scene_config(clone_json(DEFAULT_SCENE_CONFIG)), primary_path, None
 
 
 def save_scene_config(config: Any) -> tuple[dict[str, Any], Path]:
     normalized = normalize_scene_config(config)
     primary_path = resolve_primary_scene_config_path()
-    write_json_atomic(primary_path, normalized)
-    write_json_atomic(resolve_display_scene_config_path(primary_path), compile_scene_display_config(normalized))
+    source_text = serialize_json(normalized)
+    # Compile first: if the payload cannot be compiled nothing is written.
+    display = compile_scene_display_config(normalized)
+    display["sourceSha256"] = source_digest(source_text)
+    with _config_write_lock:
+        write_text_atomic(primary_path, source_text)
+        write_json_atomic(resolve_display_scene_config_path(primary_path), display)
     return normalized, primary_path
 
 
@@ -1888,7 +1914,14 @@ class SceneConfigHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def read_json_body(self) -> Any:
-        length = int(self.headers.get("Content-Length", "0") or "0")
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+        except ValueError as exc:
+            raise ValueError("Invalid Content-Length header") from exc
+        if length < 0:
+            raise ValueError("Invalid Content-Length header")
+        if length > MAX_CONFIG_BODY_BYTES:
+            raise OverflowError(f"Request body is too large ({length} > {MAX_CONFIG_BODY_BYTES})")
         raw = self.rfile.read(length) if length else b"{}"
         if not raw:
             raw = b"{}"
@@ -1943,7 +1976,13 @@ class SceneConfigHandler(BaseHTTPRequestHandler):
             return
         try:
             payload = self.read_json_body()
-        except json.JSONDecodeError:
+        except OverflowError as exc:
+            self.send_json(
+                {"success": False, "error": str(exc)},
+                status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+            return
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
             self.send_json(
                 {"success": False, "error": "Invalid JSON payload"},
                 status=HTTPStatus.BAD_REQUEST,

@@ -48,4 +48,11 @@ if (!hasRuntimeScript || !hasRuntimeStyles) {
   process.exit(1);
 }
 
+const domovoyModule = path.resolve(repoRoot, "kiosk_scene", "extensions-seed", "domovoy", "domovoy.js");
+if (!fs.existsSync(domovoyModule) || fs.statSync(domovoyModule).size < 10_000) {
+  console.error("Kiosk add-on extension seed is missing or empty: extensions-seed/domovoy/domovoy.js");
+  console.error("Run `pnpm release:kiosk-addon` before shipping the add-on.");
+  process.exit(1);
+}
+
 console.log(`Validated kiosk add-on runtime seed at ${runtimeSeedDir}`);

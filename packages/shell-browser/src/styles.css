@@ -1372,3 +1372,56 @@ body::after {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ---------- extension slides, widgets, connection state ---------- */
+
+.stale-badge {
+  position: absolute;
+  top: calc(var(--scene-safe-top, 0px) + 10px);
+  right: calc(var(--scene-safe-right, 0px) + 14px);
+  z-index: 20;
+  max-width: min(60vw, 420px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.2;
+  color: #7a4b00;
+  background: rgba(255, 236, 200, 0.94);
+  border: 1px solid rgba(154, 97, 0, 0.3);
+  box-shadow: 0 6px 18px rgba(83, 109, 128, 0.16);
+  pointer-events: none;
+}
+
+.stale-badge[hidden] {
+  display: none;
+}
+
+.slide-app .app-slide {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  /* keep the last row clear of the page dots that float over the bottom edge */
+  padding-bottom: 64px;
+}
+
+.forecast-empty {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.widget-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.widget-card.is-unavailable {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}

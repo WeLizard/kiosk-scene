@@ -9,4 +9,6 @@ export const live2dCapabilities: AvatarAdapterCapabilities = {
   supportsViewPresets: true,
   supportsLipSync: true,
   supportsPointerFocus: true,
+  // avatar.html runs the typewriter and mouth animation from `state.message` itself
+  rendersStateMessage: true,
 };

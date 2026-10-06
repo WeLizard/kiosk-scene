@@ -3,7 +3,8 @@
     "target": "ES2022",
     "lib": [
       "ES2022",
-      "DOM"
+      "DOM",
+      "DOM.Iterable"
     ],
     "module": "ES2022",
     "moduleResolution": "Bundler",
@@ -35,6 +36,18 @@
       ],
       "@kiosk-scene/widgets-core": [
         "packages/widgets-core/src/index.ts"
+      ],
+      "@kiosk-scene/app-shell": [
+        "packages/app-shell/src/index.ts"
+      ],
+      "@kiosk-scene/app-shell/*": [
+        "packages/app-shell/src/*"
+      ],
+      "@kiosk-scene/domovoy-ui": [
+        "packages/domovoy-ui/src/index.ts"
+      ],
+      "@kiosk-scene/domovoy-ui/*": [
+        "packages/domovoy-ui/src/*"
       ]
     },
     "strict": true,

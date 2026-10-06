@@ -92,9 +92,10 @@
   <main>
     <section class="card">
       <h1 id="landing-title">Kiosk Scene</h1>
-      <p id="landing-subtitle">Отдельный Home Assistant add-on, который хостит <code>kiosk-scene</code>, активные scene-pack и редактор сцены через ingress.</p>
+      <p id="landing-subtitle">Отдельный Home Assistant add-on, который хостит <code>kiosk-scene</code>, активные scene-pack, редактор сцены и (по желанию) домашнего ассистента «Домовой».</p>
       <div class="row">
         <a href="./scene/" id="link-open-scene">Открыть сцену</a>
+        <a href="./admin/" id="link-open-admin">Открыть администрирование</a>
         <a href="./scene-editor/" class="secondary" id="link-open-editor">Открыть редактор сцены</a>
         <a href="./health" class="secondary" id="link-health">Проверка сервиса</a>
       </div>
@@ -113,8 +114,9 @@
       const copy = {
         ru: {
           title: "Kiosk Scene",
-          subtitle: "Отдельный Home Assistant add-on, который хостит <code>kiosk-scene</code>, активные scene-pack и редактор сцены через ingress.",
+          subtitle: "Отдельный Home Assistant add-on, который хостит <code>kiosk-scene</code>, активные scene-pack, редактор сцены и (по желанию) домашнего ассистента «Домовой».",
           openScene: "Открыть сцену",
+          openAdmin: "Открыть администрирование",
           openEditor: "Открыть редактор сцены",
           health: "Проверка сервиса",
           runtimeTitle: "Runtime",
@@ -125,8 +127,9 @@
         },
         en: {
           title: "Kiosk Scene",
-          subtitle: "A dedicated Home Assistant add-on that hosts <code>kiosk-scene</code>, active scene packs, and the ingress scene editor.",
+          subtitle: "A dedicated Home Assistant add-on that hosts <code>kiosk-scene</code>, active scene packs, the scene editor and (optionally) the Domovoy household assistant.",
           openScene: "Open Scene",
+          openAdmin: "Open Administration",
           openEditor: "Open Scene Editor",
           health: "Health",
           runtimeTitle: "Runtime",
@@ -141,6 +144,7 @@
       document.getElementById("landing-title").textContent = copy.title;
       document.getElementById("landing-subtitle").innerHTML = copy.subtitle;
       document.getElementById("link-open-scene").textContent = copy.openScene;
+      document.getElementById("link-open-admin").textContent = copy.openAdmin;
       document.getElementById("link-open-editor").textContent = copy.openEditor;
       document.getElementById("link-health").textContent = copy.health;
       document.getElementById("runtime-title").textContent = copy.runtimeTitle;

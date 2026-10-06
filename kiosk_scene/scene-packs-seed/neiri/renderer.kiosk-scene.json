@@ -24,5 +24,14 @@
     "provider": "ha",
     "controlUrl": "./neiri-control.json",
     "entityMapUrl": "./control-entity-map.json"
+  },
+  "weather": {
+    "entity": "weather.forecast_home_assistant",
+    "location": "Санкт-Петербург",
+    "openMeteo": {
+      "latitude": 60.0712,
+      "longitude": 30.3923,
+      "timezone": "Europe/Moscow"
+    }
   }
 }

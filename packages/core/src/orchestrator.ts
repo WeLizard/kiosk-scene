@@ -68,7 +68,9 @@ export function resolveSceneSelection(input: SceneSelectionInput): SceneSelectio
   }
 
   const page = input.control.page;
-  if (page.mode === "pinned" && page.target) {
+  // A pin that points at a page which is not part of the rotation is ignored
+  // instead of silently snapping to the first page.
+  if (page.mode === "pinned" && page.target && order.includes(page.target)) {
     return {
       nextIndex: pageIndexForId(input.rotation, page.target),
       nextAutoRotateAt: now,

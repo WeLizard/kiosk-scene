@@ -1,7 +1,7 @@
 name: Kiosk Scene
-version: "0.10.61"
+version: "0.11.0"
 slug: kiosk_scene
-description: Хостинг kiosk-scene как отдельного add-on Home Assistant.
+description: Хостинг kiosk-scene и (по желанию) домашнего ассистента Домовой как add-on Home Assistant.
 url: https://github.com/WeLizard/kiosk-scene
 arch:
   - amd64
@@ -22,6 +22,15 @@ map:
 options:
   timezone: "Europe/Sofia"
   active_pack_id: "neiri"
+  domovoy_enabled: false
+  domovoy_kiosk_mic: false
+  domovoy_kiosk_room: ""
+  domovoy_trusted_networks: []
 schema:
   timezone: str?
   active_pack_id: str?
+  domovoy_enabled: bool?
+  domovoy_kiosk_mic: bool?
+  domovoy_kiosk_room: str?
+  domovoy_trusted_networks:
+    - str
