@@ -7,6 +7,7 @@ arch:
   - amd64
   - aarch64
   - armv7
+build_from: "homeassistant/amd64-base:latest"
 startup: services
 boot: auto
 init: false
