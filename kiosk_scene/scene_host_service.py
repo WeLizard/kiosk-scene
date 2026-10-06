@@ -999,15 +999,20 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         path = parsed.path.rstrip("/") or "/"
         if path == "/health":
-            self.send_json(
-                {
-                    "status": "ok",
-                    "sceneRoot": str(SCENE_ROOT),
-                    "runtimeDir": str(RUNTIME_DIR),
-                    "packsDir": str(PACKS_DIR),
-                    "activePackId": load_active_pack_id(),
-                }
-            )
+            version_info = "unknown"
+            try:
+                with open("/etc/kiosk_scene_version.txt", "r") as f:
+                    version_info = f.read().strip()
+            except Exception:
+                pass
+            self.send_json({
+                "status": "ok",
+                "sceneRoot": str(SCENE_ROOT),
+                "runtimeDir": str(RUNTIME_DIR),
+                "packsDir": str(PACKS_DIR),
+                "activePackId": load_active_pack_id(),
+                "version": version_info,
+            })
             return
         if path == f"{PATH_PREFIX}/bootstrap":
             self.send_json(build_bootstrap())
