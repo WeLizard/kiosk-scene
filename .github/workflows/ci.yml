@@ -64,40 +64,45 @@ jobs:
           test -n "$VERSION"
           test "$VERSION" = "0.11.3"
           echo "Version: $VERSION"
+
           # Prepare options.json
           mkdir -p .ci-data
-          printf '%s\n' \
-            '{' \
-            '  "timezone": "Europe/Moscow",' \
-            '  "active_pack_id": "neiri",' \
-            '  "domovoy_enabled": true,' \
-            '  "domovoy_kiosk_mic": false,' \
-            '  "domovoy_kiosk_room": "",' \
-            '  "domovoy_trusted_networks": []' \
-            '}' > .ci-data/options.json
+          cat > .ci-data/options.json <<'OPTIONS_EOF'
+{
+  "timezone": "Europe/Moscow",
+  "active_pack_id": "neiri",
+  "domovoy_enabled": true,
+  "domovoy_kiosk_mic": false,
+  "domovoy_kiosk_room": "",
+  "domovoy_trusted_networks": []
+}
+OPTIONS_EOF
 
-          # Build image
-          docker build --no-cache \
+          # Build image            docker build --no-cache \
             --build-arg BUILD_VERSION="$VERSION" \
             --build-arg BUILD_ARCH=amd64 \
-            --build-arg GIT_SHA=${{ github.sha }} \
+            --build-arg GIT_SHA="${{ github.sha }}" \
             -t kiosk-scene-ci ./kiosk_scene
+
           # Runtime file checks
           docker run --rm kiosk-scene-ci grep -q "Открыть администрирование" /opt/kiosk-scene/www/index.html
           docker run --rm kiosk-scene-ci test -f /opt/kiosk-scene/scene-runtime-seed/admin.html
           docker run --rm kiosk-scene-ci test -f /opt/kiosk-scene/extensions-seed/domovoy/domovoy.js
           docker run --rm kiosk-scene-ci cat /etc/kiosk_scene_version.txt
+
           # Start container with options volume and expose nginx port 48123
           CONTAINER_ID=$(docker run -d \
             -p 48123:48123 \
             -v "$PWD/.ci-data:/data:ro" \
             kiosk-scene-ci)
+
           # Ensure container is cleaned up on exit
           cleanup() {
             docker logs "$CONTAINER_ID" || true
             docker rm -f "$CONTAINER_ID" >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
+
           # Wait for add-on to become ready (max 30 seconds)
           TIMEOUT=30
           ELAPSED=0
@@ -110,13 +115,13 @@ jobs:
               exit 1
             fi
           done
+
           # HTTP integrity checks via nginx
           echo "Checking /health endpoint..."
-          curl -fsS http://localhost:48123/health | jq -e '.status == "ok" and .version | test("Kiosk Scene version")'
+          curl -fsS http://localhost:48123/health | jq -e '.status == "ok" and (.version | test("Kiosk Scene version"))'
           echo "Checking /admin/ endpoint..."
           curl -fsS http://localhost:48123/admin/ -L | grep -q "KioskScene"
           echo "Checking /scene-api/bootstrap endpoint..."
           curl -fsS http://localhost:48123/scene-api/bootstrap | jq -e '.success == true'
           echo "Checking /domovoy-api/health endpoint..."
           curl -fsS http://localhost:48123/domovoy-api/health | jq -e '.status == "ok"'
-
