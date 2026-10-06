@@ -49,3 +49,29 @@ jobs:
             echo "::error::The committed add-on seeds are stale. Run 'pnpm release:kiosk-addon' and commit the result."
             exit 1
           fi
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and test add-on
+        run: |
+          docker build --no-cache \
+            --build-arg BUILD_VERSION=${{ github.ref_name }} \
+            --build-arg GIT_SHA=${{ github.sha }} \
+            -t kiosk-scene-ci ./kiosk_scene
+          # Runtime file checks
+          docker run --rm kiosk-scene-ci grep -q "Открыть администрирование" /opt/kiosk-scene/www/index.html
+          docker run --rm kiosk-scene-ci test -f /opt/kiosk-scene/scene-runtime-seed/admin.html
+          docker run --rm kiosk-scene-ci test -f /opt/kiosk-scene/extensions-seed/domovoy/domovoy.js
+          docker run --rm kiosk-scene-ci cat /etc/kiosk_scene_version.txt
+          # Start container in background for HTTP checks (assumes host has curl and jq)
+          CONTAINER_ID=$(docker run -d -p 48097:48097 kiosk-scene-ci)
+          sleep 5
+          curl -s http://localhost:48097/health | jq -e '.version'
+          curl -s http://localhost:48097/admin/ | grep -q "Открыть администрирование"
+          curl -s http://localhost:48097/scene-api/bootstrap | jq -e '.'
+          docker stop $CONTAINER_ID
