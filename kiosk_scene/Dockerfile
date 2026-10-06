@@ -7,9 +7,6 @@ LABEL io.hass.type="app"
 LABEL io.hass.arch="${BUILD_ARCH}"
 RUN echo "Kiosk Scene version ${BUILD_VERSION} (commit ${GIT_SHA})" > /etc/kiosk_scene_version.txt
 
-RUN echo "Kiosk Scene version ${BUILD_VERSION} (commit ${GIT_SHA})" > /etc/kiosk_scene_version.txt
-
-
 RUN apk update && apk add --no-cache \
     bash \
     ca-certificates \
