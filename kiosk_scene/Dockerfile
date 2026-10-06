@@ -1,10 +1,12 @@
 FROM ghcr.io/home-assistant/base:3.24
+ARG BUILD_VERSION=unknown
+ARG BUILD_ARCH=unknown
+ARG GIT_SHA=unknown
 LABEL io.hass.version="${BUILD_VERSION}"
 LABEL io.hass.type="app"
 LABEL io.hass.arch="${BUILD_ARCH}"
-ARG BUILD_VERSION
-ARG BUILD_ARCH
-ARG GIT_SHA=unknown
+RUN echo "Kiosk Scene version ${BUILD_VERSION} (commit ${GIT_SHA})" > /etc/kiosk_scene_version.txt
+
 RUN echo "Kiosk Scene version ${BUILD_VERSION} (commit ${GIT_SHA})" > /etc/kiosk_scene_version.txt
 
 

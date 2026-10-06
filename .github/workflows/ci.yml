@@ -60,23 +60,26 @@ jobs:
       - name: Build and test add-on
         run: |
           # Extract version from config.yaml
-          VERSION=$(grep -oP '(?<=version: ").*?(?=" )' kiosk_scene/config.yaml)
+          VERSION=$(sed -n 's/^version: "\(.*\)"/\1/p' kiosk_scene/config.yaml)
+          test -n "$VERSION"
+          test "$VERSION" = "0.11.3"
           echo "Version: $VERSION"
           # Prepare options.json
           mkdir -p .ci-data
-          cat > .ci-data/options.json <<'EOF'
-{
-  "timezone": "Europe/Moscow",
-  "active_pack_id": "neiri",
-  "domovoy_enabled": true,
-  "domovoy_kiosk_mic": false,
-  "domovoy_kiosk_room": "",
-  "domovoy_trusted_networks": []
-}
-EOF
+          printf '%s\n' \
+            '{' \
+            '  "timezone": "Europe/Moscow",' \
+            '  "active_pack_id": "neiri",' \
+            '  "domovoy_enabled": true,' \
+            '  "domovoy_kiosk_mic": false,' \
+            '  "domovoy_kiosk_room": "",' \
+            '  "domovoy_trusted_networks": []' \
+            '}' > .ci-data/options.json
+
           # Build image
           docker build --no-cache \
             --build-arg BUILD_VERSION="$VERSION" \
+            --build-arg BUILD_ARCH=amd64 \
             --build-arg GIT_SHA=${{ github.sha }} \
             -t kiosk-scene-ci ./kiosk_scene
           # Runtime file checks
@@ -113,6 +116,6 @@ EOF
           curl -fsS http://localhost:48123/admin/ -L | grep -q "KioskScene"
           echo "Checking /scene-api/bootstrap endpoint..."
           curl -fsS http://localhost:48123/scene-api/bootstrap | jq -e '.success == true'
-          echo "Checking /domovoy-api/api/state endpoint..."
-          curl -fsS http://localhost:48123/domovoy-api/api/state | jq -e '.'
+          echo "Checking /domovoy-api/health endpoint..."
+          curl -fsS http://localhost:48123/domovoy-api/health | jq -e '.status == "ok"'
 
