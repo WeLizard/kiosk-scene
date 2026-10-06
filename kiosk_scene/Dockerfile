@@ -1,4 +1,10 @@
 FROM ghcr.io/home-assistant/base:3.24
+LABEL io.hass.version="0.11.2"
+LABEL io.hass.type="app"
+LABEL io.hass.arch="amd64|aarch64"
+ARG ADDON_VERSION=0.11.2
+ARG GIT_SHA=unknown
+RUN echo "Kiosk Scene version ${ADDON_VERSION} (commit ${GIT_SHA})" > /etc/kiosk_scene_version.txt
 
 RUN apk update && apk add --no-cache \
     bash \
