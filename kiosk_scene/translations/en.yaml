@@ -1,0 +1,19 @@
+configuration:
+  timezone:
+    name: Time zone
+    description: IANA time zone used by the scene and by Domovoy (for example Europe/Moscow).
+  active_pack_id:
+    name: Active scene pack
+    description: Scene pack shown by default.
+  domovoy_enabled:
+    name: Enable Domovoy
+    description: Starts the Domovoy household assistant (inventory, memory, reminders, calendar) and its admin UI.
+  domovoy_kiosk_mic:
+    name: Kiosk microphone
+    description: Let the kiosk browser listen for "Domovoy ..." on its microphone. Needs HTTPS or localhost, and a speech-to-text server (Integrations page).
+  domovoy_kiosk_room:
+    name: Kiosk room
+    description: Room name of the kiosk (for example "kitchen"), so answers are spoken on the nearest speaker.
+  domovoy_trusted_networks:
+    name: Trusted LAN addresses
+    description: Devices or subnets (for example 192.168.1.40 or 192.168.1.0/24) that may use Domovoy without a token — typically the kiosk. The Home Assistant panel never needs one.

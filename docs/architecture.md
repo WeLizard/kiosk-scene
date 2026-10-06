@@ -4,12 +4,27 @@
 
 `kiosk-scene` is the scene layer between a kiosk runtime and avatar-specific rendering backends.
 
-The architecture is intentionally split into four concerns:
+The architecture is intentionally split into five concerns:
 
 1. kiosk runtime
 2. scene core
 3. avatar adapter
 4. instance pack
+5. extensions (pages, widgets, providers and services that bring their own data — see [extensions.md](./extensions.md))
+
+On top of the scene core sits a generic **app layer**: `packages/app-shell` (UI kit, HTTP client, long-poll realtime,
+admin shell) and the extension registry in `packages/core`. It lets the same codebase serve two surfaces — the kiosk
+display and a desktop/mobile administration UI — without either knowing what an extension does. The household assistant
+[Domovoy](./domovoy.md) is an extension; nothing household-specific exists in the platform packages.
+
+```
+packages/core            contracts, scene/state/control logic, extension registry      (generic)
+packages/app-shell       UI kit, HTTP, realtime, admin shell                            (generic)
+packages/shell-browser   kiosk shell: carousel, app slides, widgets, avatar host        (generic)
+packages/widgets-core    shared widget contracts                                        (generic)
+packages/domovoy-ui      Domovoy pages, widgets, services, kiosk microphone            (extension)
+kiosk_scene/domovoy      Domovoy backend (Python stdlib, SQLite)                        (extension backend)
+```
 
 ## Boundaries
 
@@ -85,6 +100,15 @@ The current Live2D path is intentionally pragmatic: `packages/adapter-live2d` ho
 Apps such as `apps/demo-generic`, `apps/hosted-runtime`, and instance wrappers such as `neiri-scene/app` should stay thin and configure this shell rather than forking its runtime logic.
 
 `apps/hosted-runtime` is the canonical hosted entrypoint for the standalone `Kiosk Scene` add-on: it loads `/scene-api/bootstrap`, resolves the active pack URLs, and then boots the generic shell.
+
+### Reliability rules of the kiosk shell
+
+* rendering is reconciled per slide: an unchanged slide is never torn down by a refresh, extension pages are mounted once;
+* refreshes are coalesced (overlapping requests never stack), listeners are removed on `dispose`;
+* the display shows an explicit "no connection" badge after repeated connectivity failures and never invents data: a
+  missing weather source renders "no data" and an empty forecast renders "Forecast unavailable";
+* scene config is written atomically and compiled before it is saved; a display config carries the digest of its
+  source so a stale compiled file is detected.
 
 ### Instance pack
 

@@ -1,5 +1,5 @@
 import type { ControlProvider, ControlV1, StateProvider, StateV1, ViewPreset } from "@kiosk-scene/core";
-import { DEFAULT_CONTROL_V1, sanitizeControlV1, sanitizeStateV1, trimText } from "@kiosk-scene/core";
+import { DEFAULT_CONTROL_V1, fetchWithTimeout, sanitizeControlV1, sanitizeStateV1, trimText } from "@kiosk-scene/core";
 
 export interface HomeAssistantEntityMap {
   online: string;
@@ -54,6 +54,8 @@ export interface HomeAssistantControlProviderOptions extends HomeAssistantStates
 }
 
 export interface HomeAssistantStatesReaderOptions {
+  /** Called when fetching states fails; the reader still serves its last cached snapshot. */
+  onError?: (error: Error & { status?: number }) => void;
   fetchImpl?: typeof fetch;
   allowApiFallback?: boolean;
   apiUrl?: string;
@@ -349,7 +351,7 @@ export function createHomeAssistantStatesReader(
       headers.Authorization = `Bearer ${token}`;
     }
 
-    inFlight = fetchImpl(explicitApiUrl || "/api/states", {
+    inFlight = fetchWithTimeout(fetchImpl, explicitApiUrl || "/api/states", {
       cache: "no-store",
       headers,
     })
@@ -370,6 +372,7 @@ export function createHomeAssistantStatesReader(
         return normalized || cache;
       })
       .catch((error: Error & { status?: number }) => {
+        options.onError?.(error);
         if (error?.status === 401 || error?.status === 403) {
           cooldownUntil = Date.now() + authCooldownMs;
         }

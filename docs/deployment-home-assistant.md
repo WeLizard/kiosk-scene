@@ -51,3 +51,35 @@ Recommended order:
 - scene orchestration logic
 - assistant-specific messaging rules
 - hosted scene config ownership
+
+## Domovoy (optional)
+
+Set `domovoy_enabled: true` in the add-on options to start the Domovoy household assistant next to the scene. Nothing
+changes for installations that leave it off.
+
+| Option | Meaning |
+| --- | --- |
+| `domovoy_enabled` | start the service, load the extension, show the administration UI |
+| `domovoy_kiosk_mic` / `domovoy_kiosk_room` | let the kiosk browser listen for «домовой …» ([docs/voice.md](./voice.md)); the room name picks the nearest speaker |
+| `domovoy_trusted_networks` | LAN addresses / subnets (IPv4/IPv6, validated at start; invalid entries are skipped with a warning) that may use the API without a token — normally just the kiosk. The Home Assistant panel never needs a token |
+
+Paths added by the add-on:
+
+* `/admin/` — administration UI (also linked from the add-on panel), opens `scene-runtime/admin.html`
+* `/domovoy-api/` — Domovoy REST + change feed (proxied to `127.0.0.1:48099`)
+* `/scene-extensions/<id>/` — extension modules, listed in `/scene-api/bootstrap`
+* `/config/kiosk-scene/domovoy/` — database, `secrets.json` (0600) and nightly backups; it is inside `/config`, so it
+  is part of Home Assistant's own backups
+* `/config/kiosk-scene/extensions/<id>/` — installed extension module + generated `extension.json`
+
+Who is trusted: requests arriving through Home Assistant ingress (`172.30.32.2`) or from the add-on host itself are
+trusted; every other LAN client needs the API token (Integrations → Доступ) or must be listed in
+`domovoy_trusted_networks`. nginx decides this and overwrites the `X-Domovoy-Origin` header on every request.
+
+Home Assistant access uses the supervisor token automatically (`homeassistant_api: true`), but only for the supervisor's
+own address. A small default set of control services works out of the box (lights, switches, fans, covers, scenes); the
+owner extends the list in Integrations. Locks, alarm panels, shell/python scripts and the supervisor API are never
+callable by Domovoy.
+
+Add scene pages/widgets by editing the pack's scene file: a page `{"id": "domovoy", "kind": "app", "app": "domovoy.today"}`
+and cards `{"type": "widget", "widget": "domovoy.next-event"}`, `domovoy.shopping`, `domovoy.today`, `domovoy.command`.

@@ -1150,6 +1150,10 @@
     }
 
     window.addEventListener('message', (event) => {
+      // Only the embedding scene (or this window itself) may drive the avatar; other frames/tabs may not.
+      if (event && event.source && event.source !== window.parent && event.source !== window) {
+        return;
+      }
       const payload = event && event.data;
       if (!payload) {
         return;

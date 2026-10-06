@@ -30,7 +30,7 @@
           "minItems": 1
         },
         "defaultDwellSeconds": {
-          "type": "integer",
+          "type": "number",
           "minimum": 5
         }
       }
@@ -107,7 +107,9 @@
             "enum": [
               "overview",
               "cards",
-              "forecast+cards"
+              "forecast+cards",
+              "grid",
+              "app"
             ]
           },
           "title": {
@@ -136,8 +138,40 @@
           "cards": {
             "type": "array",
             "items": {
-              "type": "object"
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "widget": {
+                  "type": "string",
+                  "description": "Extension widget id for cards with type 'widget'.",
+                  "pattern": "^[a-z][a-z0-9-]{1,31}\\.[a-z0-9][a-z0-9._-]{0,63}$"
+                },
+                "props": {
+                  "type": "object"
+                }
+              }
             }
+          },
+          "gridColumns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "gridRows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "app": {
+            "type": "string",
+            "description": "Extension page id (namespaced, e.g. domovoy.today) mounted into this slide when kind is 'app'.",
+            "pattern": "^[a-z][a-z0-9-]{1,31}\\.[a-z0-9][a-z0-9._-]{0,63}$"
+          },
+          "props": {
+            "type": "object",
+            "description": "Opaque properties handed to the extension page."
           }
         }
       }

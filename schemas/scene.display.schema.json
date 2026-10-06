@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://welizard.dev/schemas/kiosk-scene/scene.display.schema.json",
+  "title": "kiosk-scene compiled scene display config v1",
+  "type": "object",
+  "required": [
+    "version",
+    "kind",
+    "rotation",
+    "display",
+    "pages"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "scene.display"
+    },
+    "sourceSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rotation": {
+      "type": "object",
+      "required": [
+        "order",
+        "defaultDwellMs"
+      ],
+      "properties": {
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "defaultDwellMs": {
+          "type": "number",
+          "minimum": 5000
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "required": [
+        "safeAreaPx",
+        "layoutPaddingPx",
+        "layoutGapPx",
+        "globalScale"
+      ],
+      "properties": {
+        "safeAreaPx": {
+          "type": "object",
+          "required": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "properties": {
+            "top": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "right": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bottom": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "left": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "layoutPaddingPx": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "layoutGapPx": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "globalScale": {
+          "type": "number",
+          "minimum": 0.75,
+          "maximum": 1
+        }
+      }
+    },
+    "avatar": {
+      "type": "object",
+      "properties": {
+        "packId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "kind": {
+            "enum": [
+              "overview",
+              "cards",
+              "forecast+cards",
+              "grid",
+              "app"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
