@@ -135,13 +135,20 @@ class TaskService:
             raise NotFoundError("Task not found")
         return self._public(row)
 
-    def list(self, *, list_name: str | None = None, include_done: bool = False, limit: int = 500) -> list[dict[str, Any]]:
+    def list(self, *, list_name: str | None = None, include_done: bool = False, limit: int = 500,
+             exclude_list: str | None = None, due_through: str | None = None) -> list[dict[str, Any]]:
         clauses, params = ["deleted_at IS NULL"], []
         if list_name:
             clauses.append("list = ?")
             params.append(list_name)
         if not include_done:
             clauses.append("done_at IS NULL")
+        if exclude_list:
+            clauses.append("list != ?")
+            params.append(exclude_list)
+        if due_through:
+            clauses.append("(due_date IS NULL OR due_date <= ?)")
+            params.append(due_through)
         with self.db.read() as conn:
             rows = conn.execute(
                 f"SELECT * FROM tasks WHERE {' AND '.join(clauses)} ORDER BY done_at IS NOT NULL, due_date IS NULL, due_date, id DESC LIMIT ?",

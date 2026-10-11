@@ -293,7 +293,8 @@ class Messaging(AppCase):
         self.assertEqual(report["reminders"], 1)                                                     # the other jobs still ran
 
     def test_unknown_telegram_chats_become_link_requests(self) -> None:
-        self.tg.updates = [{"update_id": 5, "message": {"chat": {"id": 555, "first_name": "Борис"}, "text": "/start"}}]
+        self.tg.updates = [{"update_id": 5, "message": {"chat": {"id": 555, "type": "private", "first_name": "Борис"},
+                                                     "from": {"id": 555, "is_bot": False}, "text": "/start"}}]
         Scheduler(self.app, interval=1).tick()
         requests = self.app.db.get_setting("telegram.link_requests")
         self.assertEqual((requests[0]["chat_id"], requests[0]["name"]), ("555", "Борис"))

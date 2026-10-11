@@ -25,7 +25,8 @@ class Storage(AppCase):
         self.restart()
         self.restart()
         with self.app.db.read() as conn:
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0], 1)
+            from domovoy.db import MIGRATIONS
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0], len(MIGRATIONS))
             self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
 

@@ -98,6 +98,8 @@ class Domovoy:
         self.sessions = SessionStore(self.db, self.clock)
         self.review = ReviewQueue(self.db, self.clock)
         self.refresh_embedder()
+        from .frontends.telegram import TelegramFrontend
+        self.telegram_frontend = TelegramFrontend(self)
 
     # ---- runtime configuration -----------------------------------------------------------------
 

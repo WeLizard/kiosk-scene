@@ -69,10 +69,12 @@ class OutboxService:
             return int(cursor.rowcount)
 
     def process_due(self, limit: int = 20) -> int:
+        telegram_enabled = bool(self.settings.get("telegram").get("enabled"))
         with self.db.read() as conn:
             rows = conn.execute(
-                "SELECT id FROM outbox WHERE status = 'queued' AND next_attempt_at <= ? ORDER BY id LIMIT ?",
-                (self.clock.now_iso(), limit),
+                "SELECT id FROM outbox WHERE status = 'queued' AND next_attempt_at <= ? "
+                "AND (? OR channel != 'telegram') ORDER BY id LIMIT ?",
+                (self.clock.now_iso(), telegram_enabled, limit),
             ).fetchall()
         handled = 0
         for row in rows:
@@ -88,6 +90,9 @@ class OutboxService:
 
     def _deliver(self, outbox_id: int) -> bool:
         with self.db.write() as conn:
+            pending = conn.execute("SELECT channel FROM outbox WHERE id = ?", (outbox_id,)).fetchone()
+            if pending and pending["channel"] == "telegram" and not self.settings.get("telegram").get("enabled"):
+                return False
             claimed = conn.execute(
                 "UPDATE outbox SET status = 'sending', attempts = attempts + 1 WHERE id = ? AND status = 'queued'", (outbox_id,)
             ).rowcount
@@ -137,13 +142,14 @@ class OutboxService:
         if fallback in (None, "", "none", "speak"):
             return
         key = f"{row['idempotency_key'] or row['id']}:fallback"
-        if fallback == "ui":
+        address = self._fallback_address(row, fallback) if fallback != "ui" else ""
+        if fallback == "ui" or not address or (fallback == "telegram" and not self.settings.get("telegram").get("enabled")):
             with self.db.write() as conn:
                 self.db.emit(conn, "notification", {"text": row["text"], "source": "speak-fallback"})
             return
         try:
             self.enqueue(Ctx(actor="system", source="outbox", command_id=row["command_id"]), channel=fallback,
-                         recipient=row["recipient"], address=self._fallback_address(row, fallback), text=row["text"], key=key)
+                         recipient=row["recipient"], address=address, text=row["text"], key=key)
         except ValidationError:
             pass
 

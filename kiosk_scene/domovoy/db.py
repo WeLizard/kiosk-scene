@@ -225,6 +225,15 @@ MIGRATIONS: list[tuple[int, str]] = [
         );
         """,
     ),
+    (2, """
+        CREATE TABLE telegram_updates (
+          update_id INTEGER PRIMARY KEY,
+          chat_id TEXT,
+          status TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          completed_at TEXT
+        );
+    """),
 ]
 
 FTS_STATEMENT = (
