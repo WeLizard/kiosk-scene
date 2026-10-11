@@ -18,7 +18,7 @@ class Settings:
 
     data_dir: Path = field(default_factory=lambda: Path(os.environ.get("DOMOVOY_DATA_DIR", "/config/kiosk-scene/domovoy")))
     host: str = os.environ.get("DOMOVOY_BIND", "127.0.0.1")
-    port: int = _int("DOMOVOY_PORT", 48099)
+    port: int = _int("DOMOVOY_PORT", 48199)
     timezone: str = os.environ.get("DOMOVOY_TIMEZONE") or os.environ.get("TZ") or "UTC"
     language: str = os.environ.get("DOMOVOY_LANGUAGE", "ru")
     scheduler_interval_s: float = float(os.environ.get("DOMOVOY_SCHEDULER_INTERVAL", "5") or 5)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -20,6 +21,21 @@ from .helpers import ADDON_DIR, load_module, scene_env
 RUN_SH = (ADDON_DIR / "run.sh").read_text(encoding="utf-8")
 NGINX = shutil.which("nginx")
 TOOLS = all(shutil.which(t) for t in ("bash", "jq", "rsync"))
+
+
+class ShippedDomovoyPort(unittest.TestCase):
+    def test_service_and_nginx_use_the_same_internal_port(self) -> None:
+        nginx = (ADDON_DIR / "nginx.conf").read_text(encoding="utf-8")
+        config = (ADDON_DIR / "domovoy" / "config.py").read_text(encoding="utf-8")
+        service_port = re.search(r'export DOMOVOY_PORT="(\d+)"', RUN_SH)
+        proxy_port = re.search(r'proxy_pass http://127\.0\.0\.1:(\d+)/;', nginx)
+        default_port = re.search(r'_int\("DOMOVOY_PORT", (\d+)\)', config)
+        self.assertIsNotNone(service_port)
+        self.assertIsNotNone(proxy_port)
+        self.assertIsNotNone(default_port)
+        self.assertEqual(service_port.group(1), proxy_port.group(1))
+        self.assertEqual(service_port.group(1), default_port.group(1))
+        self.assertNotEqual(service_port.group(1), "48099")
 
 
 def free_port() -> int:
@@ -60,7 +76,7 @@ def run_block(root: Path, *, enabled: str = "true", mic: str = "false", room: st
 def nginx_conf(root: Path, *, listen: int, domovoy_port: int, origin_conf: Path) -> Path:
     text = (ADDON_DIR / "nginx.conf").read_text(encoding="utf-8")
     text = text.replace("/etc/nginx/domovoy-origin.conf", str(origin_conf)).replace("listen 48123;", f"listen {listen};")
-    text = text.replace("127.0.0.1:48099", f"127.0.0.1:{domovoy_port}").replace("/config/kiosk-scene", str(root / "config" / "kiosk-scene"))
+    text = text.replace("127.0.0.1:48199", f"127.0.0.1:{domovoy_port}").replace("/config/kiosk-scene", str(root / "config" / "kiosk-scene"))
     text = text.replace("access_log /dev/stdout;", f"access_log {root / 'access.log'};").replace("error_log /dev/stderr notice;", f"error_log {root / 'error.log'} notice;")
     path = root / "nginx.conf"
     path.write_text(text, encoding="utf-8")

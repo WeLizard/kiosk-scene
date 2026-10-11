@@ -66,7 +66,7 @@ changes for installations that leave it off.
 Paths added by the add-on:
 
 * `/admin/` — administration UI (also linked from the add-on panel), opens `scene-runtime/admin.html`
-* `/domovoy-api/` — Domovoy REST + change feed (proxied to `127.0.0.1:48099`)
+* `/domovoy-api/` — Domovoy REST + change feed (proxied to `127.0.0.1:48199`)
 * `/scene-extensions/<id>/` — extension modules, listed in `/scene-api/bootstrap`
 * `/config/kiosk-scene/domovoy/` — database, `secrets.json` (0600) and nightly backups; it is inside `/config`, so it
   is part of Home Assistant's own backups

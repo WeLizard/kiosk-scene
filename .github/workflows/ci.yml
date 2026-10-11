@@ -62,7 +62,7 @@ jobs:
           # Extract version from config.yaml
           VERSION=$(sed -n 's/^version: "\(.*\)"/\1/p' kiosk_scene/config.yaml)
           test -n "$VERSION"
-          test "$VERSION" = "0.11.3"
+          test "$VERSION" = "0.11.4"
           echo "Version: $VERSION"
 
           # Prepare options.json

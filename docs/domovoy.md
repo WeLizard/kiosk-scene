@@ -9,7 +9,7 @@ optional OpenAI-compatible model only fills the gaps — its output is never tru
 It is an *extension* of KioskScene ([docs/extensions.md](./extensions.md)): the platform packages contain nothing
 household-specific.
 
-* backend: `kiosk_scene/domovoy/` (Python standard library only, port 48099, behind nginx at `/domovoy-api/`)
+* backend: `kiosk_scene/domovoy/` (Python standard library only, port 48199, behind nginx at `/domovoy-api/`)
 * UI: `packages/domovoy-ui/` → `kiosk_scene/extensions-seed/domovoy/domovoy.js`
 * enable it in the add-on options (`domovoy_enabled: true`); data lives in `/config/kiosk-scene/domovoy/`
 
