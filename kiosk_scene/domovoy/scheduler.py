@@ -88,29 +88,13 @@ class Scheduler:
         return self.app.outbox.process_due()
 
     def _job_telegram(self) -> int:
-        if not self.app.telegram.configured() or time.monotonic() - self._last_telegram < 15:
+        if not self.app.settings.get("telegram").get("enabled") or not self.app.telegram.configured() or time.monotonic() - self._last_telegram < 15:
             return 0
         self._last_telegram = time.monotonic()
-        offset = self.app.db.get_setting("telegram.offset", None)
-        updates = self.app.telegram.get_updates(offset, timeout=0)
-        if not updates:
-            return 0
-        links = list(self.app.db.get_setting("telegram.link_requests", []) or [])
-        known_ids = {str((c["channels"].get("telegram") or {}).get("chat_id", "")) for c in self.app.contacts.list()}
-        for update in updates:
-            message = update.get("message") or {}
-            chat = message.get("chat") or {}
-            chat_id = str(chat.get("id", ""))
-            if chat_id and chat_id not in known_ids and not any(l["chat_id"] == chat_id for l in links):
-                links.append({
-                    "chat_id": chat_id, "name": " ".join(filter(None, [chat.get("first_name"), chat.get("last_name")])) or chat.get("username", ""),
-                    "username": chat.get("username", ""), "at": self.app.clock.now_iso(),
-                })
-        self.app.db.set_setting("telegram.link_requests", links[-20:])
-        self.app.db.set_setting("telegram.offset", int(updates[-1]["update_id"]) + 1)
-        with self.app.db.write() as conn:
-            self.app.db.emit(conn, "contacts.changed", {"link_requests": len(links)})
-        return len(updates)
+        handled = self.app.telegram_frontend.poll()
+        if handled:
+            self.last_activity_at = time.monotonic()
+        return handled
 
     def _job_embeddings(self) -> int:
         if time.monotonic() - self.last_activity_at < 10:

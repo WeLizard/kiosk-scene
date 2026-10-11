@@ -90,7 +90,7 @@ Everything is optional and shown with an honest status (works / degraded / not a
 | --- | --- |
 | Home Assistant | inside the add-on the supervisor token is used automatically — and only ever sent to the supervisor's own address, never to an address typed into the settings. Without any configuration the assistant may call a small default set (turn on/off/toggle for lights, switches and fans, open/close covers, activate scenes); the owner adds more in Integrations. `lock.*`, `alarm_control_panel.*`, `shell_command.*`, `python_script.*`, `hassio.*` and `homeassistant.stop/restart` are refused for every caller, speakers and notifications included |
 | Calendar | built-in local calendar; CalDAV (read/create/update/delete, edits patch the VEVENT so attendees and alarms survive); Home Assistant calendars can be read and can receive new events. One source failing shows a warning, never an empty page |
-| Telegram | bot token; people link themselves by writing to the bot, the owner attaches the chat to a contact |
+| Telegram | bot token; `/start` in a private chat requests linking; the owner attaches the chat to a contact marked **Я / is_self** to allow commands. Other contacts are message recipients only. `/help`, `/today`, `/shopping` and ordinary Russian text use the existing pipeline and durable outbox. Groups, bots, non-text updates and unmatched senders cannot issue commands. Disabling Telegram pauses polling and queued Telegram deliveries without consuming retries |
 | Language model | any OpenAI-compatible server (`/chat/completions`, `/embeddings`), local or cloud; not required |
 | Speech to text | any OpenAI-compatible `/audio/transcriptions` server, only for the kiosk microphone |
 
@@ -120,6 +120,13 @@ an address typed into the settings can never be used to make the add-on hand a s
 * Providers are isolated: a dead CalDAV or Telegram degrades that feature, records the error for the status page, and
   never breaks `/api/today`. Circuit breakers stop hammering a provider that is down.
 * Scheduler jobs are isolated from each other; a failing job is logged and retried on the next tick.
+* Telegram commands claim `update_id` durably before execution. Completed replies and the next offset are committed
+  together; replaying an update does not execute it or enqueue a second reply. If a restart interrupts processing,
+  its state becomes **uncertain** and the owner receives a request to check the result and Activity before sending
+  the command again. A command can contain partially completed local or external actions; it is never replayed
+  automatically. Replies still follow the outbox's at-least-once delivery contract: a provider acceptance immediately
+  before a crash can result in another delivery. The inbox belongs to the configured bot; switching to another bot
+  is not supported as an automatic inbox reset. The inbox is kept in SQLite backups, not JSON data exports.
 * Heavy local work (LLM, STT, embeddings) goes through a single-slot **resource gate**: on a fanless mini PC that also
   runs HA and a WebGL kiosk, a busy model makes callers degrade (send to review, drop the audio segment) instead of
   queueing everything behind it.
