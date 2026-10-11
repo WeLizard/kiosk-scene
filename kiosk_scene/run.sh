@@ -23,7 +23,7 @@ export TZ="$TZNAME"
 export PYTHONUNBUFFERED=1
 
 export SCENE_ROOT="/config/kiosk-scene"
-export SCENE_RUNTIME_DIR="${SCENE_ROOT}/scene-runtime"
+export SCENE_RUNTIME_DIR="/opt/kiosk-scene/scene-runtime"
 export SCENE_PACKS_DIR="${SCENE_ROOT}/scene-packs"
 export SCENE_AVATAR_PACKS_DIR="${SCENE_ROOT}/avatar-packs"
 export SCENE_ACTIVE_PACK_FILE="${SCENE_ROOT}/active-pack.json"
@@ -34,19 +34,14 @@ export SCENE_EDITOR_HOST="127.0.0.1"
 export SCENE_EDITOR_PORT="48098"
 export SCENE_EDITOR_PATH_PREFIX="/scene-editor-form"
 
-IMAGE_SCENE_RUNTIME_SEED_DIR="/opt/kiosk-scene/scene-runtime-seed"
 IMAGE_SCENE_PACKS_SEED_DIR="/opt/kiosk-scene/scene-packs-seed"
 LEGACY_SCENE_ROOT="/config/openclaw-scene"
 LEGACY_NEIRI_SCENE_DIR="/config/www/neiri-scene"
 LEGACY_LIVE2D_DIR="/config/www/live2d"
 DEFAULT_PACK_DIR="${SCENE_PACKS_DIR}/${SCENE_DEFAULT_PACK_ID}"
 
-mkdir -p "$SCENE_RUNTIME_DIR" "$SCENE_PACKS_DIR" "$DEFAULT_PACK_DIR"
+mkdir -p "$SCENE_PACKS_DIR" "$DEFAULT_PACK_DIR"
 mkdir -p "$SCENE_AVATAR_PACKS_DIR"
-
-if [ -d "${LEGACY_SCENE_ROOT}/scene-runtime" ] && [ ! -f "${SCENE_RUNTIME_DIR}/index.html" ]; then
-  rsync -a --ignore-existing "${LEGACY_SCENE_ROOT}/scene-runtime/" "${SCENE_RUNTIME_DIR}/" 2>/dev/null || true
-fi
 
 if [ -d "${LEGACY_SCENE_ROOT}/scene-packs" ]; then
   rsync -a --ignore-existing "${LEGACY_SCENE_ROOT}/scene-packs/" "${SCENE_PACKS_DIR}/" 2>/dev/null || true
@@ -58,15 +53,6 @@ fi
 
 if [ ! -f "$SCENE_ACTIVE_PACK_FILE" ]; then
   printf '{\n  "id": "%s"\n}\n' "$SCENE_DEFAULT_PACK_ID" > "$SCENE_ACTIVE_PACK_FILE"
-fi
-
-if [ -d "$IMAGE_SCENE_RUNTIME_SEED_DIR" ]; then
-  if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete "$IMAGE_SCENE_RUNTIME_SEED_DIR/" "$SCENE_RUNTIME_DIR/" 2>/dev/null || true
-  else
-    rm -rf "${SCENE_RUNTIME_DIR:?}/"*
-    cp -r "$IMAGE_SCENE_RUNTIME_SEED_DIR/." "$SCENE_RUNTIME_DIR/" 2>/dev/null || true
-  fi
 fi
 
 # Seed scene-packs from Docker image (--ignore-existing preserves user edits)
@@ -132,9 +118,9 @@ echo "INFO: Active pack file: ${SCENE_ACTIVE_PACK_FILE}"
 echo "INFO: Default pack id: ${SCENE_DEFAULT_PACK_ID}"
 echo "INFO: Direct scene URL: http://homeassistant.local:48123/scene/"
 if [ -f "${SCENE_RUNTIME_DIR}/index.html" ]; then
-  echo "INFO: Runtime seed ready: ${SCENE_RUNTIME_DIR}/index.html"
+  echo "INFO: Image runtime ready: ${SCENE_RUNTIME_DIR}/index.html"
 else
-  echo "WARNING: Runtime seed missing: ${SCENE_RUNTIME_DIR}/index.html"
+  echo "WARNING: Image runtime missing: ${SCENE_RUNTIME_DIR}/index.html"
 fi
 
 python3 /scene_host_service.py &

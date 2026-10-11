@@ -87,7 +87,7 @@ OPTIONS_EOF
 
           # Runtime file checks
           docker run --rm kiosk-scene-ci grep -q "Открыть администрирование" /opt/kiosk-scene/www/index.html
-          docker run --rm kiosk-scene-ci test -f /opt/kiosk-scene/scene-runtime-seed/admin.html
+          docker run --rm kiosk-scene-ci test -f /opt/kiosk-scene/scene-runtime/admin.html
           docker run --rm kiosk-scene-ci test -f /opt/kiosk-scene/extensions-seed/domovoy/domovoy.js
           docker run --rm kiosk-scene-ci cat /etc/kiosk_scene_version.txt
 

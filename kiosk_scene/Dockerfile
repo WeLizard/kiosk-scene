@@ -16,14 +16,14 @@ RUN apk update && apk add --no-cache \
     rsync \
     tzdata
 
-RUN mkdir -p /run/nginx /opt/kiosk-scene/www /opt/kiosk-scene/scene-runtime-seed /opt/kiosk-scene/scene-packs-seed /opt/kiosk-scene/extensions-seed
+RUN mkdir -p /run/nginx /opt/kiosk-scene/www /opt/kiosk-scene/scene-runtime /opt/kiosk-scene/scene-packs-seed /opt/kiosk-scene/extensions-seed
 
 COPY run.sh /run.sh
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY landing.html /opt/kiosk-scene/www/index.html
 COPY scene_host_service.py /scene_host_service.py
 COPY scene_config_service.py /scene_config_service.py
-COPY scene-runtime-seed /opt/kiosk-scene/scene-runtime-seed
+COPY scene-runtime-seed /opt/kiosk-scene/scene-runtime
 COPY scene-packs-seed /opt/kiosk-scene/scene-packs-seed
 COPY extensions-seed /opt/kiosk-scene/extensions-seed
 COPY domovoy_service.py /opt/domovoy/domovoy_service.py

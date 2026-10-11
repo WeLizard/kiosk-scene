@@ -13,7 +13,7 @@ What this add-on owns:
 - `/admin/` (administration UI for extensions such as Domovoy)
 - `/domovoy-api/` (optional Domovoy service, `domovoy_enabled`)
 - `/scene-extensions/` (extension modules)
-- `/config/kiosk-scene/scene-runtime/`
+- `/scene-runtime/` (served from the add-on image at `/opt/kiosk-scene/scene-runtime/`)
 - `/config/kiosk-scene/scene-packs/<pack-id>/`
 - `/config/kiosk-scene/avatar-packs/<avatar-id>/`
 
@@ -44,7 +44,8 @@ pnpm test && pnpm test:python
 
 After syncing, `kiosk_scene/scene-runtime-seed/` contains the hosted runtime bundle and
 `kiosk_scene/extensions-seed/` the extension modules that the add-on seeds into persistent HA storage on start. Both are
-committed build outputs: CI rebuilds them and fails when they differ from the sources.
+committed build outputs: CI rebuilds them and fails when they differ from the sources. The runtime is served directly
+from the image. Older files under `/config/kiosk-scene/scene-runtime/` are left untouched but are no longer served.
 
 Domovoy (optional): see [docs/domovoy.md](../docs/domovoy.md), [docs/voice.md](../docs/voice.md) and the options in
 [docs/deployment-home-assistant.md](../docs/deployment-home-assistant.md).
