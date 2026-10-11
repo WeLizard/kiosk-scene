@@ -3,21 +3,21 @@ function Ce(e, a) {
     t == null || t === !1 || (Array.isArray(t) ? Ce(e, t) : t instanceof Node ? e.appendChild(t) : e.appendChild(document.createTextNode(String(t))));
 }
 function n(e, a, ...t) {
-  const s = document.createElement(e);
-  for (const [i, o] of Object.entries(a ?? {}))
+  const i = document.createElement(e);
+  for (const [s, o] of Object.entries(a ?? {}))
     if (!(o == null || o === !1))
-      if (i === "class")
-        s.className = String(o);
-      else if (i === "style")
-        typeof o == "string" ? s.setAttribute("style", o) : Object.assign(s.style, o);
-      else if (i === "dataset")
+      if (s === "class")
+        i.className = String(o);
+      else if (s === "style")
+        typeof o == "string" ? i.setAttribute("style", o) : Object.assign(i.style, o);
+      else if (s === "dataset")
         for (const [r, u] of Object.entries(o))
-          u !== void 0 && (s.dataset[r] = String(u));
-      else if (i === "aria")
+          u !== void 0 && (i.dataset[r] = String(u));
+      else if (s === "aria")
         for (const [r, u] of Object.entries(o))
-          u !== void 0 && s.setAttribute(`aria-${r}`, String(u));
-      else i.startsWith("on") && typeof o == "function" ? s.addEventListener(i.slice(2).toLowerCase(), o) : i === "value" || i === "checked" || i === "disabled" || i === "selected" ? s[i] = o : o === !0 ? s.setAttribute(i, "") : s.setAttribute(i, String(o));
-  return Ce(s, t), s;
+          u !== void 0 && i.setAttribute(`aria-${r}`, String(u));
+      else s.startsWith("on") && typeof o == "function" ? i.addEventListener(s.slice(2).toLowerCase(), o) : s === "value" || s === "checked" || s === "disabled" || s === "selected" ? i[s] = o : o === !0 ? i.setAttribute(s, "") : i.setAttribute(s, String(o));
+  return Ce(i, t), i;
 }
 function bt(e) {
   for (; e.firstChild; )
@@ -36,8 +36,8 @@ class I {
     }
     this.callbacks.push(a);
   }
-  listen(a, t, s) {
-    a.addEventListener(t, s), this.add(() => a.removeEventListener(t, s));
+  listen(a, t, i) {
+    a.addEventListener(t, i), this.add(() => a.removeEventListener(t, i));
   }
   get isDisposed() {
     return this.disposed;
@@ -55,22 +55,22 @@ class I {
 }
 function Je(e, a) {
   let t = null;
-  const s = (...i) => {
+  const i = (...s) => {
     t && clearTimeout(t), t = setTimeout(() => {
-      t = null, e(...i);
+      t = null, e(...s);
     }, a);
   };
-  return s.cancel = () => {
+  return i.cancel = () => {
     t && (clearTimeout(t), t = null);
-  }, s;
+  }, i;
 }
 function vt(e) {
   return e.endsWith("/") ? e : `${e}/`;
 }
 function gt(e, a) {
-  const t = a && typeof a == "object" ? a : {}, i = (t.error && typeof t.error == "object" ? t.error : null) ?? t, o = typeof i.message == "string" ? i.message : typeof t.error == "string" ? t.error : `Request failed (HTTP ${e})`, r = i.fields && typeof i.fields == "object" ? Object.fromEntries(Object.entries(i.fields).map(([u, c]) => [u, String(c)])) : void 0;
+  const t = a && typeof a == "object" ? a : {}, s = (t.error && typeof t.error == "object" ? t.error : null) ?? t, o = typeof s.message == "string" ? s.message : typeof t.error == "string" ? t.error : `Request failed (HTTP ${e})`, r = s.fields && typeof s.fields == "object" ? Object.fromEntries(Object.entries(s.fields).map(([u, c]) => [u, String(c)])) : void 0;
   return {
-    code: typeof i.code == "string" ? i.code : `http_${e}`,
+    code: typeof s.code == "string" ? s.code : `http_${e}`,
     message: o,
     fields: r,
     retryable: e >= 500 || e === 429 || e === 408
@@ -78,13 +78,13 @@ function gt(e, a) {
 }
 function ht(e) {
   const a = e.fetchImpl ?? ((...o) => globalThis.fetch(...o)), t = vt(e.baseUrl);
-  function s(o, r) {
+  function i(o, r) {
     const u = new URL(o.replace(/^\/+/, ""), new URL(t, globalThis.location?.href ?? "http://localhost/"));
     for (const [c, l] of Object.entries(r ?? {}))
       l != null && l !== "" && u.searchParams.set(c, String(l));
     return u.toString();
   }
-  async function i(o, r = {}) {
+  async function s(o, r = {}) {
     const u = new AbortController(), c = r.timeoutMs ?? e.timeoutMs ?? 15e3, l = setTimeout(() => u.abort(new DOMException("Request timed out", "TimeoutError")), c), d = () => u.abort(r.signal?.reason);
     r.signal?.addEventListener("abort", d, { once: !0 }), r.signal?.aborted && d();
     try {
@@ -92,7 +92,7 @@ function ht(e) {
       m && (p.Authorization = `Bearer ${m}`);
       let h;
       r.rawBody !== void 0 ? h = r.rawBody : r.body !== void 0 && (p["Content-Type"] = "application/json", h = JSON.stringify(r.body));
-      const g = await a(s(o, r.query), {
+      const g = await a(i(o, r.query), {
         method: r.method ?? (h === void 0 ? "GET" : "POST"),
         headers: p,
         body: h,
@@ -126,7 +126,7 @@ function ht(e) {
       clearTimeout(l), r.signal?.removeEventListener("abort", d);
     }
   }
-  return { request: i, url: s };
+  return { request: s, url: i };
 }
 const $e = "*";
 function yt(e) {
@@ -136,7 +136,7 @@ function wt(e, a) {
   return e === $e || a === e || a.startsWith(`${e}.`);
 }
 function xt(e) {
-  const a = e.path ?? "events", t = e.waitSeconds ?? 25, s = (e.graceSeconds ?? 10) * 1e3, i = e.minBackoffMs ?? 1e3, o = e.maxBackoffMs ?? 3e4, r = e.random ?? Math.random, u = /* @__PURE__ */ new Map(), c = /* @__PURE__ */ new Set();
+  const a = e.path ?? "events", t = e.waitSeconds ?? 25, i = (e.graceSeconds ?? 10) * 1e3, s = e.minBackoffMs ?? 1e3, o = e.maxBackoffMs ?? 3e4, r = e.random ?? Math.random, u = /* @__PURE__ */ new Map(), c = /* @__PURE__ */ new Set();
   let l = "connecting", d = null, p = !1, m = !1, h = 0, g = null, v = null, y = !1;
   function f(C) {
     if (l !== C) {
@@ -173,10 +173,10 @@ function xt(e) {
         let C = !1;
         const V = setTimeout(() => {
           C = !0, g?.abort(new DOMException("poll timeout", "TimeoutError"));
-        }, t * 1e3 + s), O = await e.http.request(a, {
+        }, t * 1e3 + i), O = await e.http.request(a, {
           query: { since: d ?? void 0, timeout: d === null ? 0 : t },
           signal: g.signal,
-          timeoutMs: t * 1e3 + s
+          timeoutMs: t * 1e3 + i
         });
         if (clearTimeout(V), g = null, m)
           break;
@@ -184,7 +184,7 @@ function xt(e) {
           continue;
         if (!O.ok || !yt(O.data)) {
           h += 1, f(h >= 3 ? "offline" : "reconnecting");
-          const X = Math.min(o, i * 2 ** Math.min(h - 1, 10));
+          const X = Math.min(o, s * 2 ** Math.min(h - 1, 10));
           await x(X / 2 + r() * (X / 2)), y = !0;
           continue;
         }
@@ -270,17 +270,17 @@ function Pe(e, a) {
 let Qe = 0;
 function le(e) {
   const a = `ks-field-${Qe += 1}`, t = e.type ?? "text";
-  let s;
+  let i;
   if (t === "textarea")
-    s = n("textarea", { id: a, name: e.name, rows: e.rows ?? 3, placeholder: e.placeholder, required: e.required, value: String(e.value ?? "") });
+    i = n("textarea", { id: a, name: e.name, rows: e.rows ?? 3, placeholder: e.placeholder, required: e.required, value: String(e.value ?? "") });
   else if (t === "select") {
     const u = n(
       "select",
       { id: a, name: e.name, required: e.required },
       (e.options ?? []).map((c) => n("option", { value: c.value, selected: String(e.value ?? "") === c.value }, c.label))
     );
-    u.value = String(e.value ?? e.options?.[0]?.value ?? ""), s = u;
-  } else t === "checkbox" ? s = n("input", { id: a, name: e.name, type: "checkbox", checked: e.value === !0 }) : s = n("input", {
+    u.value = String(e.value ?? e.options?.[0]?.value ?? ""), i = u;
+  } else t === "checkbox" ? i = n("input", { id: a, name: e.name, type: "checkbox", checked: e.value === !0 }) : i = n("input", {
     id: a,
     name: e.name,
     type: t,
@@ -292,25 +292,25 @@ function le(e) {
     step: e.step,
     autocomplete: e.autocomplete ?? "off"
   });
-  const i = n("small", { class: "ks-field-error", id: `${a}-error`, role: "alert" }), o = n("label", { for: a }, e.label, e.required ? n("span", { class: "ks-required", aria: { hidden: !0 } }, " *") : null), r = n(
+  const s = n("small", { class: "ks-field-error", id: `${a}-error`, role: "alert" }), o = n("label", { for: a }, e.label, e.required ? n("span", { class: "ks-required", aria: { hidden: !0 } }, " *") : null), r = n(
     "div",
     { class: `ks-field${t === "checkbox" ? " ks-field-check" : ""}${e.wide ? " ks-field-wide" : ""}` },
-    t === "checkbox" ? [s, o] : [o, s],
+    t === "checkbox" ? [i, o] : [o, i],
     e.hint ? n("small", { class: "ks-field-hint" }, e.hint) : null,
-    i
+    s
   );
   return {
     el: r,
-    input: s,
+    input: i,
     name: e.name,
-    value: () => t === "checkbox" ? s.checked : s.value,
+    value: () => t === "checkbox" ? i.checked : i.value,
     setError(u) {
-      i.textContent = u ?? "", r.classList.toggle("has-error", !!u), u ? (s.setAttribute("aria-invalid", "true"), s.setAttribute("aria-describedby", i.id)) : (s.removeAttribute("aria-invalid"), s.removeAttribute("aria-describedby"));
+      s.textContent = u ?? "", r.classList.toggle("has-error", !!u), u ? (i.setAttribute("aria-invalid", "true"), i.setAttribute("aria-describedby", s.id)) : (i.removeAttribute("aria-invalid"), i.removeAttribute("aria-describedby"));
     }
   };
 }
 function ce(e, a) {
-  const t = Object.fromEntries(e.map((u) => [u.name, le(u)])), s = n("div", { class: "ks-form-error", role: "alert", hidden: !0 }), i = T(a.submitLabel ?? N.save, { variant: "primary", type: "submit" }), o = n("form", { class: "ks-form", novalidate: !0 }, s, n("div", { class: "ks-form-grid" }, Object.values(t).map((u) => u.el)), n("div", { class: "ks-form-actions" }, i, a.extraActions)), r = {
+  const t = Object.fromEntries(e.map((u) => [u.name, le(u)])), i = n("div", { class: "ks-form-error", role: "alert", hidden: !0 }), s = T(a.submitLabel ?? N.save, { variant: "primary", type: "submit" }), o = n("form", { class: "ks-form", novalidate: !0 }, i, n("div", { class: "ks-form-grid" }, Object.values(t).map((u) => u.el)), n("div", { class: "ks-form-actions" }, s, a.extraActions)), r = {
     el: o,
     fields: t,
     values: () => Object.fromEntries(Object.values(t).map((u) => [u.name, u.value()])),
@@ -318,10 +318,10 @@ function ce(e, a) {
       for (const l of Object.values(t))
         l.setError(u?.fields?.[l.name] ?? null);
       const c = u && (!u.fields || Object.keys(u.fields).length === 0) ? u.message : "";
-      s.textContent = c, s.hidden = !c;
+      i.textContent = c, i.hidden = !c;
     },
     setBusy(u) {
-      i.disabled = u, o.toggleAttribute("aria-busy", u);
+      s.disabled = u, o.toggleAttribute("aria-busy", u);
     }
   };
   return o.addEventListener("submit", (u) => {
@@ -341,24 +341,24 @@ function qe(e, a, t) {
     n(
       "table",
       { class: "ks-table" },
-      n("thead", null, n("tr", null, e.map((s) => n("th", { scope: "col", class: s.className }, s.header)))),
-      n("tbody", null, a.map((s) => n("tr", null, e.map((i) => n("td", { class: i.className, dataset: { label: i.header } }, i.render(s))))))
+      n("thead", null, n("tr", null, e.map((i) => n("th", { scope: "col", class: i.className }, i.header)))),
+      n("tbody", null, a.map((i) => n("tr", null, e.map((s) => n("td", { class: s.className, dataset: { label: s.header } }, s.render(i))))))
     )
   ) : t ?? Ye(N.nothingHere);
 }
-const se = [];
+const ie = [];
 function ue(e, a) {
   const t = document.activeElement;
-  let s = () => {
+  let i = () => {
   };
-  const i = new Promise((m) => {
-    s = m;
+  const s = new Promise((m) => {
+    i = m;
   }), o = new I(), r = (m) => {
     if (o.isDisposed)
       return;
     o.dispose();
-    const h = se.indexOf(d);
-    h >= 0 && se.splice(h, 1), d.remove(), t?.focus?.(), s(m);
+    const h = ie.indexOf(d);
+    h >= 0 && ie.splice(h, 1), d.remove(), t?.focus?.(), i(m);
   }, u = typeof a == "function" ? a(r) : a, c = `ks-dialog-title-${Qe += 1}`, l = n(
     "div",
     { class: "ks-dialog", role: "dialog", aria: { modal: !0, labelledby: c }, tabindex: -1 },
@@ -369,7 +369,7 @@ function ue(e, a) {
     m.target === d && r(void 0);
   });
   const p = (m) => {
-    if (se[se.length - 1] === d) {
+    if (ie[ie.length - 1] === d) {
       if (m.key === "Escape") {
         m.stopPropagation(), r(void 0);
         return;
@@ -385,7 +385,7 @@ function ue(e, a) {
       }
     }
   };
-  return document.addEventListener("keydown", p, !0), o.add(() => document.removeEventListener("keydown", p, !0)), document.body.appendChild(d), se.push(d), (l.querySelector("input, select, textarea, button.ks-btn-primary") ?? l).focus(), { el: d, close: r, closed: i };
+  return document.addEventListener("keydown", p, !0), o.add(() => document.removeEventListener("keydown", p, !0)), document.body.appendChild(d), ie.push(d), (l.querySelector("input, select, textarea, button.ks-btn-primary") ?? l).focus(), { el: d, close: r, closed: s };
 }
 function et(e) {
   return ue(
@@ -403,40 +403,40 @@ function et(e) {
     )
   ).closed.then((t) => t === !0);
 }
-let ie = null;
+let se = null;
 function D(e, a = "neutral", t = 4500) {
-  (!ie || !ie.isConnected) && (ie = n("div", { class: "ks-toasts", role: "status", aria: { live: "polite" } }), document.body.appendChild(ie));
-  const s = n("div", { class: `ks-toast ks-toast-${a}` }, e);
-  ie.appendChild(s), setTimeout(() => s.remove(), t);
+  (!se || !se.isConnected) && (se = n("div", { class: "ks-toasts", role: "status", aria: { live: "polite" } }), document.body.appendChild(se));
+  const i = n("div", { class: `ks-toast ks-toast-${a}` }, e);
+  se.appendChild(i), setTimeout(() => i.remove(), t);
 }
 function R(e) {
-  let a = 0, t = null, s = !1, i = !1;
+  let a = 0, t = null, i = !1, s = !1;
   const o = n("div", { class: "ks-stale-banner", role: "alert", hidden: !0 }), r = n("div", { class: "ks-async-content" });
   _(e.host, o, r);
   const u = () => {
-    if (i)
+    if (s)
       return;
     t?.abort(), t = new AbortController();
     const c = a += 1;
-    (!s || e.keepStale === !1) && _(r, Xe()), e.load(t.signal).then((l) => {
-      if (!(i || c !== a)) {
+    (!i || e.keepStale === !1) && _(r, Xe()), e.load(t.signal).then((l) => {
+      if (!(s || c !== a)) {
         if (l.ok) {
           try {
             const d = e.render(l.data, u);
-            s = !0, o.hidden = !0, _(r, d);
+            i = !0, o.hidden = !0, _(r, d);
           } catch (d) {
             console.error("View render failed", d), _(r, Pe({ code: "render_failed", message: N.renderFailed, retryable: !0 }, u));
           }
           return;
         }
-        l.error.code !== "aborted" && (s ? (o.hidden = !1, _(o, `${N.olderData} — ${l.error.message} `, T(N.retry, { variant: "ghost", onClick: u }))) : _(r, Pe(l.error, u)));
+        l.error.code !== "aborted" && (i ? (o.hidden = !1, _(o, `${N.olderData} — ${l.error.message} `, T(N.retry, { variant: "ghost", onClick: u }))) : _(r, Pe(l.error, u)));
       }
     });
   };
   return u(), {
     refresh: u,
     dispose() {
-      i = !0, t?.abort();
+      s = !0, t?.abort();
     }
   };
 }
@@ -514,19 +514,19 @@ function qt(e) {
   });
   return { http: a, data: {
     id: tt,
-    async read(i, o) {
-      const r = String(i?.path ?? "");
-      return /^(api\/|events)/.test(r) ? a.request(r, { query: i.query, signal: o?.signal }) : { ok: !1, error: { code: "bad_path", message: `Refusing to read ${r}` } };
+    async read(s, o) {
+      const r = String(s?.path ?? "");
+      return /^(api\/|events)/.test(r) ? a.request(r, { query: s.query, signal: o?.signal }) : { ok: !1, error: { code: "bad_path", message: `Refusing to read ${r}` } };
     }
   }, actions: {
     id: at,
     describe() {
-      return Object.entries(Ie).map(([i, o]) => ({ id: i, title: o.title, destructive: o.destructive }));
+      return Object.entries(Ie).map(([s, o]) => ({ id: s, title: o.title, destructive: o.destructive }));
     },
-    async invoke(i, o, r) {
-      const u = Ie[i];
+    async invoke(s, o, r) {
+      const u = Ie[s];
       if (!u)
-        return { ok: !1, error: { code: "unknown_action", message: `Unknown action ${i}` } };
+        return { ok: !1, error: { code: "unknown_action", message: `Unknown action ${s}` } };
       const c = o ?? {};
       return a.request(u.path(c), {
         method: u.method,
@@ -610,7 +610,7 @@ function ne(e) {
 function Z() {
   return nt || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
-function st(e, a) {
+function it(e, a) {
   const t = new Intl.DateTimeFormat("en-CA", {
     timeZone: a,
     hourCycle: "h23",
@@ -621,22 +621,22 @@ function st(e, a) {
     minute: "2-digit",
     second: "2-digit"
   });
-  return Object.fromEntries(t.formatToParts(e).map((s) => [s.type, s.value]));
+  return Object.fromEntries(t.formatToParts(e).map((i) => [i.type, i.value]));
 }
 function te(e, a = Z()) {
   const t = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(e);
   if (!t)
     throw new Error(`Invalid local time: ${e}`);
-  const [s, i, o, r, u] = t.slice(1).map(Number), c = Date.UTC(s, i - 1, o, r, u);
+  const [i, s, o, r, u] = t.slice(1).map(Number), c = Date.UTC(i, s - 1, o, r, u);
   let l = c;
   for (let d = 0; d < 2; d += 1) {
-    const p = st(new Date(l), a), m = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute));
+    const p = it(new Date(l), a), m = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute));
     l += c - m;
   }
   return new Date(l).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 function ee(e, a = Z()) {
-  const t = st(new Date(e), a);
+  const t = it(new Date(e), a);
   return `${t.year}-${t.month}-${t.day}T${t.hour}:${t.minute}`;
 }
 function L(e, a = Z()) {
@@ -652,10 +652,10 @@ function Y(e, a = Z()) {
   return ee(e, a).slice(0, 10);
 }
 function Oe(e, a = Date.now()) {
-  const t = new Date(e).getTime() - a, s = Math.abs(t), i = Math.round(s / 6e4), o = i < 1 ? "сейчас" : i < 60 ? `${i} мин` : i < 2880 ? `${Math.round(i / 60)} ч` : `${Math.round(i / 1440)} дн`;
-  return i < 1 ? o : t < 0 ? `${o} назад` : `через ${o}`;
+  const t = new Date(e).getTime() - a, i = Math.abs(t), s = Math.round(i / 6e4), o = s < 1 ? "сейчас" : s < 60 ? `${s} мин` : s < 2880 ? `${Math.round(s / 60)} ч` : `${Math.round(s / 1440)} дн`;
+  return s < 1 ? o : t < 0 ? `${o} назад` : `через ${o}`;
 }
-function it(e) {
+function st(e) {
   if (!e)
     return "";
   const a = e.window ? ` (${e.window.from}–${e.window.to})` : "";
@@ -665,7 +665,7 @@ function be(e) {
   if (!e)
     return "";
   const a = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"], t = e.interval > 1 ? `каждые ${e.interval} ` : "каждый ";
-  return e.freq === "weekly" && e.byweekday?.length ? `по ${e.byweekday.map((s) => a[s]).join(", ")}` : { daily: `${t}день`, weekly: `${t}неделю`, monthly: `${t}месяц`, yearly: `${t}год` }[e.freq] ?? "повторяется";
+  return e.freq === "weekly" && e.byweekday?.length ? `по ${e.byweekday.map((i) => a[i]).join(", ")}` : { daily: `${t}день`, weekly: `${t}неделю`, monthly: `${t}месяц`, yearly: `${t}год` }[e.freq] ?? "повторяется";
 }
 function je(e, a = "") {
   return e == null ? "" : `${Number.isInteger(e) ? String(e) : String(Math.round(e * 1e3) / 1e3)} ${a}`.trim();
@@ -683,6 +683,10 @@ const ze = ["ui", "telegram", "speak", "ha_notify"], he = ["tasks", "shopping", 
   add_note: { title: "Заметка", fields: [{ name: "title", label: "Заголовок", kind: "str" }, { name: "text", label: "Текст", kind: "str" }] },
   query_memory: { title: "Вспомнить", fields: [{ name: "query", label: "Запрос", kind: "str" }] },
   create_reminder: { title: "Напоминание", fields: [{ name: "text", label: "О чём", kind: "str" }, { name: "when", label: "Когда", kind: "iso" }, { name: "channel", label: "Как", kind: "enum", options: ze }, { name: "recipient", label: "Кому", kind: "str" }, { name: "trigger", label: "Условие", kind: "json" }, { name: "recurrence", label: "Повтор", kind: "json" }] },
+  query_reminders: { title: "Активные напоминания", fields: [] },
+  complete_reminder: { title: "Выполнить напоминание", fields: [{ name: "reminder_id", label: "Номер", kind: "num" }] },
+  snooze_reminder: { title: "Отложить напоминание", fields: [{ name: "reminder_id", label: "Номер", kind: "num" }, { name: "minutes", label: "Минут", kind: "num" }] },
+  delete_reminder: { title: "Удалить напоминание", fields: [{ name: "reminder_id", label: "Номер", kind: "num" }] },
   create_event: { title: "Событие в календаре", fields: [{ name: "title", label: "Название", kind: "str" }, { name: "start", label: "Начало", kind: "iso" }, { name: "end", label: "Конец", kind: "iso" }, { name: "location", label: "Где", kind: "str" }] },
   update_event: { title: "Перенести/изменить событие", fields: [{ name: "title", label: "Какое событие", kind: "str" }, { name: "new_title", label: "Новое название", kind: "str" }, { name: "new_start", label: "Новое начало", kind: "iso" }, { name: "new_end", label: "Новый конец", kind: "iso" }] },
   delete_event: { title: "Удалить событие", fields: [{ name: "title", label: "Какое событие", kind: "str" }] },
@@ -708,42 +712,42 @@ function rt(e, a = (t) => t) {
   const t = ge[String(e.type)];
   if (!t)
     return String(e.type);
-  const s = t.fields.filter((i) => e[i.name] !== void 0 && e[i.name] !== null && e[i.name] !== "" && e[i.name] !== !1).map((i) => `${i.label.replace(/ \(.*\)$/, "")}: ${i.kind === "iso" ? a(String(e[i.name])) : ot(i, e[i.name])}`);
-  return s.length ? `${t.title} — ${s.join("; ")}` : t.title;
+  const i = t.fields.filter((s) => e[s.name] !== void 0 && e[s.name] !== null && e[s.name] !== "" && e[s.name] !== !1).map((s) => `${s.label.replace(/ \(.*\)$/, "")}: ${s.kind === "iso" ? a(String(e[s.name])) : ot(s, e[s.name])}`);
+  return i.length ? `${t.title} — ${i.join("; ")}` : t.title;
 }
 function Dt(e, a, t) {
-  const s = ge[String(e.type)], i = { ...e };
-  for (const o of s?.fields ?? []) {
+  const i = ge[String(e.type)], s = { ...e };
+  for (const o of i?.fields ?? []) {
     if (!(o.name in a) || o.kind === "json")
       continue;
     const r = a[o.name];
     if (o.kind === "bool") {
-      r === !0 ? i[o.name] = !0 : delete i[o.name];
+      r === !0 ? s[o.name] = !0 : delete s[o.name];
       continue;
     }
     const u = String(r).trim();
     if (!u)
-      delete i[o.name];
+      delete s[o.name];
     else if (o.kind === "num") {
       const c = Number(u.replace(",", "."));
-      i[o.name] = Number.isFinite(c) ? c : u;
-    } else o.kind === "path" ? i[o.name] = u.split(/→|->|>/).map((c) => c.trim()).filter(Boolean) : o.kind === "list" ? i[o.name] = u.split(",").map((c) => c.trim()).filter(Boolean) : o.kind === "iso" ? i[o.name] = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(u) ? t(u) : u : i[o.name] = u;
+      s[o.name] = Number.isFinite(c) ? c : u;
+    } else o.kind === "path" ? s[o.name] = u.split(/→|->|>/).map((c) => c.trim()).filter(Boolean) : o.kind === "list" ? s[o.name] = u.split(",").map((c) => c.trim()).filter(Boolean) : o.kind === "iso" ? s[o.name] = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(u) ? t(u) : u : s[o.name] = u;
   }
-  return i;
+  return s;
 }
-function $(e, a, t, s) {
-  return e.readData(tt, { path: a, query: t }, { signal: s });
+function $(e, a, t, i) {
+  return e.readData(tt, { path: a, query: t }, { signal: i });
 }
 function lt(e, a, t) {
   return e.invokeAction(at, a, t);
 }
-async function A(e, a, t, s = {}) {
-  if (s.confirm && !await et({ title: s.confirm.title, message: s.confirm.message, confirmLabel: s.confirm.label ?? b.delete, destructive: !0 }))
+async function A(e, a, t, i = {}) {
+  if (i.confirm && !await et({ title: i.confirm.title, message: i.confirm.message, confirmLabel: i.confirm.label ?? b.delete, destructive: !0 }))
     return { ok: !1, error: { code: "cancelled", message: "cancelled" } };
-  const i = await lt(e, a, t);
-  return i.ok ? s.success && D(s.success, "good") : D(i.error.message, "bad", 7e3), i;
+  const s = await lt(e, a, t);
+  return s.ok ? i.success && D(i.success, "good") : D(s.error.message, "bad", 7e3), s;
 }
-function B(e, a, t, s, i = 250, o) {
+function B(e, a, t, i, s = 250, o) {
   let r = !1;
   const u = () => {
     const d = document.activeElement;
@@ -753,8 +757,8 @@ function B(e, a, t, s, i = 250, o) {
       r = !0;
       return;
     }
-    r = !1, s();
-  }, l = Je(c, i);
+    r = !1, i();
+  }, l = Je(c, s);
   if (a.add(() => l.cancel()), o) {
     const d = (p) => {
       !r || p.relatedTarget instanceof Node && o.contains(p.relatedTarget) || window.setTimeout(() => {
@@ -783,12 +787,12 @@ function M(e, a, t) {
 function ve(e) {
   return j(Q(e), de(e));
 }
-function P(e, a, t, s = "") {
-  return n("li", { class: s }, n("div", { class: "ks-grow" }, n("div", { class: "ks-title" }, e), a ? n("div", { class: "ks-sub" }, a) : null), t ?? null);
+function P(e, a, t, i = "") {
+  return n("li", { class: i }, n("div", { class: "ks-grow" }, n("div", { class: "ks-title" }, e), a ? n("div", { class: "ks-sub" }, a) : null), t ?? null);
 }
-function w(e, a, t = "secondary", s) {
-  const i = T(e, { variant: t, onClick: a, title: s });
-  return i.classList.add("ks-btn-sm"), i;
+function w(e, a, t = "secondary", i) {
+  const s = T(e, { variant: t, onClick: a, title: i });
+  return s.classList.add("ks-btn-sm"), s;
 }
 function G(e, ...a) {
   return n("div", { class: "ks-row ks-row-spread dv-head" }, n("h2", { class: "dv-page-title" }, e), n("div", { class: "ks-row" }, a));
@@ -796,24 +800,24 @@ function G(e, ...a) {
 function q(e = b.empty) {
   return n("p", { class: "ks-muted" }, e);
 }
-function K(e, a, t, s = {}) {
+function K(e, a, t, i = {}) {
   return ue(e, (o) => {
     const r = ce(a, {
-      submitLabel: s.submitLabel ?? b.save,
+      submitLabel: i.submitLabel ?? b.save,
       extraActions: [T(b.cancel, { onClick: () => o(!1) })],
       onSubmit: async (u, c) => {
         const l = await t(u);
         l.ok ? o(!0) : c.showErrors(l.error);
       }
     });
-    return n("div", null, s.note ?? null, r.el);
+    return n("div", null, i.note ?? null, r.el);
   }).closed.then((o) => o === !0);
 }
 function Mt(e) {
   const a = {};
   for (const t of e.split(/\r?\n/)) {
-    const s = t.indexOf(":"), i = (s >= 0 ? t.slice(0, s) : t).trim(), o = s >= 0 ? t.slice(s + 1).trim() : "";
-    i && (a[i] = o);
+    const i = t.indexOf(":"), s = (i >= 0 ? t.slice(0, i) : t).trim(), o = i >= 0 ? t.slice(i + 1).trim() : "";
+    s && (a[s] = o);
   }
   return a;
 }
@@ -831,12 +835,12 @@ function It(e) {
   return Number.isFinite(a) ? a : null;
 }
 async function me(e, a) {
-  const [t, s] = await Promise.all([e, a]);
-  return t.ok ? s.ok ? { ok: !0, data: [t.data, s.data] } : s : t;
+  const [t, i] = await Promise.all([e, a]);
+  return t.ok ? i.ok ? { ok: !0, data: [t.data, i.data] } : i : t;
 }
 const zt = [["audit", "Изменения"], ["commands", "Команды"], ["outbox", "Отправка сообщений"]];
 function Nt(e, a, t) {
-  const s = new I(), i = n("div"), o = n("div", { class: "ks-row dv-chips", role: "tablist" });
+  const i = new I(), s = n("div"), o = n("div", { class: "ks-row dv-chips", role: "tablist" });
   let r = "audit", u = null;
   const c = () => {
     u?.dispose(), De(o, () => _(o, zt.map(
@@ -844,7 +848,7 @@ function Nt(e, a, t) {
         r = d, c();
       } }, p)
     ))), r === "audit" ? u = R({
-      host: i,
+      host: s,
       load: (d) => $(t, "api/audit", { limit: 100 }, d),
       render: ({ audit: d }, p) => d.length ? n("ul", { class: "ks-list" }, d.map(
         (m) => P(
@@ -856,7 +860,7 @@ function Nt(e, a, t) {
         )
       )) : q("Изменений пока не было.")
     }) : r === "commands" ? u = R({
-      host: i,
+      host: s,
       load: (d) => $(t, "api/commands", { limit: 100 }, d),
       render: ({ commands: d }) => d.length ? n("ul", { class: "ks-list" }, d.map(
         (p) => P(
@@ -866,7 +870,7 @@ function Nt(e, a, t) {
         )
       )) : q("Команд пока не было.")
     }) : u = R({
-      host: i,
+      host: s,
       load: (d) => $(t, "api/outbox", { limit: 100 }, d),
       render: ({ messages: d }, p) => d.length ? n("ul", { class: "ks-list" }, d.map(
         (m) => P(
@@ -886,10 +890,10 @@ function Nt(e, a, t) {
       )) : q("Исходящих сообщений не было.")
     });
   }, l = (d) => ve(d);
-  return c(), _(e, n("div", { class: "ks-page" }, G(b.activity), o, M("", i))), B(t, s, ["audit", "commands", "outbox", "items", "locations", "notes", "tasks", "reminders", "calendar"], () => u?.refresh(), 500), s.add(() => u?.dispose()), H(s);
+  return c(), _(e, n("div", { class: "ks-page" }, G(b.activity), o, M("", s))), B(t, i, ["audit", "commands", "outbox", "items", "locations", "notes", "tasks", "reminders", "calendar"], () => u?.refresh(), 500), i.add(() => u?.dispose()), H(i);
 }
-function Ne(e, a, t, s) {
-  const i = Z(), o = ee(t ? t.start : new Date(Math.ceil(Date.now() / 36e5) * 36e5).toISOString(), i), r = t ? ee(t.end, i) : "", u = a.sources.filter((c) => c.capabilities.includes("create") && c.available);
+function Ne(e, a, t, i) {
+  const s = Z(), o = ee(t ? t.start : new Date(Math.ceil(Date.now() / 36e5) * 36e5).toISOString(), s), r = t ? ee(t.end, s) : "", u = a.sources.filter((c) => c.capabilities.includes("create") && c.available);
   K(
     t ? `Изменить: ${t.title}` : "Новое событие",
     [
@@ -904,22 +908,22 @@ function Ne(e, a, t, s) {
     async (c) => {
       const l = {
         title: String(c.title).trim(),
-        start: te(String(c.start), i),
+        start: te(String(c.start), s),
         all_day: c.all_day === !0,
         location: String(c.location ?? ""),
         notes: String(c.notes ?? "")
       };
-      c.end && (l.end = te(String(c.end), i));
+      c.end && (l.end = te(String(c.end), s));
       const d = t ? await e.invokeAction("domovoy.actions", "calendar.update", { ref: t.ref, ...l }) : await e.invokeAction("domovoy.actions", "calendar.create", { ...l, calendar: c.calendar });
-      return d.ok && s(), d;
+      return d.ok && i(), d;
     }
   );
 }
 function Rt(e, a, t) {
-  const s = new I(), i = n("div");
+  const i = new I(), s = n("div");
   let o = 14, r = { sources: [], default: "local" };
   const u = T(b.add, { variant: "primary" }), c = T("Показать ещё 2 недели", { variant: "ghost" }), l = R({
-    host: i,
+    host: s,
     load: (d) => {
       const p = Z(), m = Y((/* @__PURE__ */ new Date()).toISOString(), p), h = te(`${m}T00:00`, p), g = te(`${Y(new Date(Date.parse(`${m}T12:00:00Z`) + o * 864e5).toISOString(), "UTC")}T00:00`, p);
       return me(
@@ -964,7 +968,7 @@ function Rt(e, a, t) {
   });
   return c.onclick = () => {
     o += 14, l.refresh();
-  }, e.replaceChildren(n("div", { class: "ks-page" }, G(b.calendar, u), i, n("div", { class: "ks-row" }, c))), t.readData("domovoy.api", { path: "api/state" }).then((d) => d.ok && ne(d.data.timezone)), B(t, s, ["calendar"], () => l.refresh()), s.add(() => l.dispose()), H(s);
+  }, e.replaceChildren(n("div", { class: "ks-page" }, G(b.calendar, u), s, n("div", { class: "ks-row" }, c))), t.readData("domovoy.api", { path: "api/state" }).then((d) => d.ok && ne(d.data.timezone)), B(t, i, ["calendar"], () => l.refresh()), i.add(() => l.dispose()), H(i);
 }
 const Ut = {
   home_assistant: "Home Assistant",
@@ -975,7 +979,7 @@ const Ut = {
   stt: "Распознавание речи"
 }, Re = (e) => Array.isArray(e) ? e.join(`
 `) : "", Ae = (e) => e.split(/[\n,]/).map((a) => a.trim()).filter(Boolean);
-function oe(e, a, t, s) {
+function oe(e, a, t, i) {
   return ce(a, {
     onSubmit: async (o, r) => {
       const { settings: u, secrets: c } = t(o), l = Object.fromEntries(Object.entries(c ?? {}).filter(([, d]) => d !== ""));
@@ -994,7 +998,7 @@ function oe(e, a, t, s) {
           return;
         }
       }
-      D("Сохранено", "good"), s();
+      D("Сохранено", "good"), i();
     }
   }).el;
 }
@@ -1009,20 +1013,20 @@ const pe = (e, a, t) => ({
 });
 function Bt(e, a, t) {
   return w("Проверить", async () => {
-    const s = await e.invokeAction("domovoy.actions", "integration.test", { name: a });
-    s.ok ? s.data.ok ? D("Связь есть", "good") : D(s.data.error?.message ?? "Не получилось", "bad", 7e3) : D(s.error.message, "bad", 7e3), t();
+    const i = await e.invokeAction("domovoy.actions", "integration.test", { name: a });
+    i.ok ? i.data.ok ? D("Связь есть", "good") : D(i.data.error?.message ?? "Не получилось", "bad", 7e3) : D(i.error.message, "bad", 7e3), t();
   });
 }
-function J(e, a, t, s) {
-  return n("details", { class: "ks-card dv-section", id: `dv-${e}` }, n("summary", null, n("h2", null, a), t), s);
+function J(e, a, t, i) {
+  return n("details", { class: "ks-card dv-section", id: `dv-${e}` }, n("summary", null, n("h2", null, a), t), i);
 }
-function ye(e, a, t, s, i, o, r, u) {
+function ye(e, a, t, i, s, o, r, u) {
   const c = async (d) => {
     const p = await e.invokeAction("domovoy.actions", "settings.update", { [a]: d });
     return p.ok ? u() : D(p.error.message, "bad", 7e3), p;
   }, l = (d) => {
     const p = d >= 0 ? t[d] : null;
-    K(p ? `Изменить: ${r}` : `Добавить: ${r}`, i(p), async (m) => {
+    K(p ? `Изменить: ${r}` : `Добавить: ${r}`, s(p), async (m) => {
       const h = t.slice(), g = o(m, p);
       return d >= 0 ? h[d] = g : h.push(g), c(h);
     });
@@ -1032,7 +1036,7 @@ function ye(e, a, t, s, i, o, r, u) {
     null,
     qe(
       [
-        ...s.map((d, p) => ({ key: `c${p}`, header: d.header, render: (m) => d.render(m) })),
+        ...i.map((d, p) => ({ key: `c${p}`, header: d.header, render: (m) => d.render(m) })),
         { key: "a", header: "", render: (d) => n("div", { class: "ks-row" }, w(b.edit, () => l(t.indexOf(d))), w(b.delete, async () => {
           await c(t.filter((p) => p !== d));
         }, "danger")) }
@@ -1044,7 +1048,7 @@ function ye(e, a, t, s, i, o, r, u) {
   );
 }
 function Ht(e, a, t) {
-  const s = (o) => {
+  const i = (o) => {
     K(
       o ? `Изменить: ${o.name}` : "Новый контакт",
       [
@@ -1060,7 +1064,7 @@ function Ht(e, a, t) {
         return l.ok && t(), l;
       }
     );
-  }, i = (o, r) => {
+  }, s = (o, r) => {
     K(
       `Привязать ${r}`,
       [{ name: "contact_id", label: "К контакту", type: "select", options: a.contacts.map((u) => ({ value: String(u.id), label: u.name })), required: !0 }],
@@ -1078,7 +1082,7 @@ function Ht(e, a, t) {
         { key: "name", header: "Имя", render: (o) => n("span", null, o.name, o.is_self ? [" ", j("это я", "info")] : null) },
         { key: "al", header: "Также", render: (o) => o.aliases.join(", ") || b.none },
         { key: "tg", header: "Telegram", render: (o) => o.channels.telegram?.chat_id ? j("привязан", "good") : j("не привязан", "warn") },
-        { key: "a", header: "", render: (o) => n("div", { class: "ks-row" }, w(b.edit, () => s(o)), w(b.delete, async () => {
+        { key: "a", header: "", render: (o) => n("div", { class: "ks-row" }, w(b.edit, () => i(o)), w(b.delete, async () => {
           (await A(e, "contacts.delete", { id: o.id }, { confirm: { title: "Удалить контакт", message: o.name } })).ok && t();
         }, "danger")) }
       ],
@@ -1089,9 +1093,9 @@ function Ht(e, a, t) {
       "div",
       { class: "dv-link-requests" },
       n("h3", null, "Кто-то написал боту"),
-      n("ul", { class: "ks-list" }, a.linkRequests.map((o) => n("li", null, n("div", { class: "ks-grow" }, `${o.name || o.username || "Без имени"} · chat_id ${o.chat_id}`, o.text ? n("div", { class: "ks-sub" }, `«${o.text}»`) : null), w("Привязать…", () => i(o.chat_id, o.name || o.username || o.chat_id), "primary"))))
+      n("ul", { class: "ks-list" }, a.linkRequests.map((o) => n("li", null, n("div", { class: "ks-grow" }, `${o.name || o.username || "Без имени"} · chat_id ${o.chat_id}`, o.text ? n("div", { class: "ks-sub" }, `«${o.text}»`) : null), w("Привязать…", () => s(o.chat_id, o.name || o.username || o.chat_id), "primary"))))
     ) : null,
-    n("div", { class: "ks-row" }, T("Добавить контакт", { onClick: () => s(null) }))
+    n("div", { class: "ks-row" }, T("Добавить контакт", { onClick: () => i(null) }))
   );
 }
 const Ft = "http://127.0.0.1:48123/domovoy-api/", Vt = "<секрет Assist — нажмите «Показать»>";
@@ -1126,13 +1130,13 @@ function Wt(e, a) {
   const t = async () => {
     const o = await $(e, "api/security");
     return o.ok ? o.data : (D(o.error.message, "bad", 7e3), null);
-  }, s = async (o) => {
+  }, i = async (o) => {
     try {
       await navigator.clipboard.writeText(o), D("Скопировано", "good");
     } catch {
       D("Не удалось скопировать — нажмите «Показать» и выделите вручную", "warn", 7e3);
     }
-  }, i = (o, r, u) => {
+  }, s = (o, r, u) => {
     const c = n("code", { class: "dv-secret" }, "•".repeat(12));
     let l = !1;
     return n(
@@ -1153,7 +1157,7 @@ function Wt(e, a) {
         }, "ghost"),
         w("Скопировать", async () => {
           const d = await t();
-          d && await s(r(d));
+          d && await i(r(d));
         }, "ghost"),
         w("Сменить", async () => {
           (await A(e, "security.rotate", { name: u }, { confirm: { title: "Сменить секрет", message: "Старый перестанет работать: его нужно будет заменить везде, где он указан.", label: "Сменить" } })).ok && a();
@@ -1165,21 +1169,21 @@ function Wt(e, a) {
     "div",
     null,
     n("p", { class: "ks-muted" }, "Из панели Home Assistant доступ уже открыт. Эти ключи нужны только для внешних клиентов: они не хранятся на странице, пока вы их не запросите."),
-    i("API-токен (Bearer)", (o) => o.api_token, "api_token"),
-    i("Секрет для Home Assistant (Assist)", (o) => o.assist_secret, "assist_secret"),
-    i("Путь вебхука для навыка Алисы (добавьте ваш публичный https://-адрес перед ним)", (o) => o.alice_path, "alice_secret"),
+    s("API-токен (Bearer)", (o) => o.api_token, "api_token"),
+    s("Секрет для Home Assistant (Assist)", (o) => o.assist_secret, "assist_secret"),
+    s("Путь вебхука для навыка Алисы (добавьте ваш публичный https://-адрес перед ним)", (o) => o.alice_path, "alice_secret"),
     n("h3", null, "Голос через Home Assistant (фраза «домовой …»)"),
     n("p", { class: "ks-muted" }, "Если Home Assistant работает не на этом же устройстве, замените 127.0.0.1 на адрес, по которому он видит аддон."),
     n("pre", { class: "dv-code" }, Ue(Vt)),
     w("Скопировать YAML с секретом", async () => {
       const o = await t();
-      o && await s(Ue(o.assist_secret));
+      o && await i(Ue(o.assist_secret));
     }, "secondary")
   );
 }
 function Kt(e, a, t) {
-  const s = new I(), i = n("div"), o = R({
-    host: i,
+  const i = new I(), s = n("div"), o = R({
+    host: s,
     load: async (r) => {
       const [u, c, l] = await Promise.all([
         $(t, "api/integrations", void 0, r),
@@ -1293,13 +1297,13 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
       return n("div", { class: "dv-stack" }, p, m, h, g, y, f, v, E, x);
     }
   });
-  return _(e, n("div", { class: "ks-page" }, G(b.integrations), i)), B(t, s, ["integrations", "contacts", "settings"], () => o.refresh(), 800, e), s.add(() => o.dispose()), H(s);
+  return _(e, n("div", { class: "ks-page" }, G(b.integrations), s)), B(t, i, ["integrations", "contacts", "settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), H(i);
 }
 function dt(e, a = !0) {
-  const t = e.slice().sort((s, i) => s.path.join("/").localeCompare(i.path.join("/"), "ru")).map((s) => ({ value: String(s.id), label: s.path.join(" → ") }));
+  const t = e.slice().sort((i, s) => i.path.join("/").localeCompare(s.path.join("/"), "ru")).map((i) => ({ value: String(i.id), label: i.path.join(" → ") }));
   return a ? [{ value: "", label: "— без места —" }, ...t] : t;
 }
-function Ee(e, a, t, s) {
+function Ee(e, a, t, i) {
   return K(
     t ? `Изменить: ${t.name}` : "Добавить вещь",
     [
@@ -1312,18 +1316,18 @@ function Ee(e, a, t, s) {
       { name: "properties", label: "Свойства", type: "textarea", rows: 3, value: Pt(t?.properties), hint: "По строке: «номинал: 10 кОм»", wide: !0 },
       { name: "notes", label: b.notes, type: "textarea", rows: 2, value: t?.notes ?? "", wide: !0 }
     ],
-    async (i) => {
-      const o = Lt(String(i.new_path ?? "")), r = {
-        name: String(i.name).trim(),
-        quantity: It(i.quantity),
-        unit: String(i.unit ?? "").trim(),
-        category: String(i.category ?? "").trim(),
-        properties: Mt(String(i.properties ?? "")),
-        notes: String(i.notes ?? "")
+    async (s) => {
+      const o = Lt(String(s.new_path ?? "")), r = {
+        name: String(s.name).trim(),
+        quantity: It(s.quantity),
+        unit: String(s.unit ?? "").trim(),
+        category: String(s.category ?? "").trim(),
+        properties: Mt(String(s.properties ?? "")),
+        notes: String(s.notes ?? "")
       };
-      o.length ? r.location_path = o : r.location_id = i.location_id ? Number(i.location_id) : null;
+      o.length ? r.location_path = o : r.location_id = s.location_id ? Number(s.location_id) : null;
       const u = t ? await Be(e, "items.update", { id: t.id, ...r }) : await Be(e, "items.create", r);
-      return u.ok && s(), u;
+      return u.ok && i(), u;
     }
   );
 }
@@ -1331,7 +1335,7 @@ function Be(e, a, t) {
   return e.invokeAction("domovoy.actions", a, t);
 }
 function ct(e, a, t) {
-  const s = n("div", { class: "dv-item-detail" }, n("p", { class: "ks-muted" }, b.loading)), i = ue("Вещь", s);
+  const i = n("div", { class: "dv-item-detail" }, n("p", { class: "ks-muted" }, b.loading)), s = ue("Вещь", i);
   (async () => {
     const [o, r, u] = await Promise.all([
       $(e, `api/items/${a}`),
@@ -1339,14 +1343,14 @@ function ct(e, a, t) {
       $(e, "api/locations")
     ]);
     if (!o.ok) {
-      _(s, n("p", { class: "ks-error" }, o.error.message));
+      _(i, n("p", { class: "ks-error" }, o.error.message));
       return;
     }
     const c = o.data.item, l = () => {
-      t(), i.close();
+      t(), s.close();
     };
     _(
-      s,
+      i,
       n("h3", null, c.name),
       n(
         "dl",
@@ -1378,14 +1382,14 @@ function ct(e, a, t) {
   })();
 }
 function Zt(e, a, t) {
-  const s = new I();
-  let i = "", o = String(a.location_id ?? "");
+  const i = new I();
+  let s = "", o = String(a.location_id ?? "");
   const r = n("div"), u = le({ name: "q", label: "Фильтр", placeholder: "название или заметка" }), c = le({ name: "loc", label: b.place, type: "select", options: [{ value: "", label: "Везде" }], value: o });
   let l = [];
   const d = R({
     host: r,
     load: (m) => me(
-      $(t, "api/items", { q: i || void 0, location_id: o || void 0, limit: 500 }, m),
+      $(t, "api/items", { q: s || void 0, location_id: o || void 0, limit: 500 }, m),
       $(t, "api/locations", void 0, m)
     ),
     render: ([{ items: m }, { locations: h }], g) => {
@@ -1421,7 +1425,7 @@ function Zt(e, a, t) {
     }
   }), p = () => d.refresh();
   return u.input.addEventListener("input", () => {
-    i = u.input.value.trim(), p();
+    s = u.input.value.trim(), p();
   }), c.input.addEventListener("change", () => {
     o = c.input.value, p();
   }), _(
@@ -1433,7 +1437,7 @@ function Zt(e, a, t) {
       n("div", { class: "ks-card ks-filters" }, u.el, c.el),
       r
     )
-  ), B(t, s, ["items", "locations"], p), s.add(() => d.dispose()), H(s);
+  ), B(t, i, ["items", "locations"], p), i.add(() => d.dispose()), H(i);
 }
 const ut = { home: "дом", room: "комната", cabinet: "шкаф", shelf: "полка", box: "коробка", cell: "ячейка", place: "место" }, Gt = Object.entries(ut).map(([e, a]) => ({ value: e, label: a }));
 function mt(e, a = []) {
@@ -1442,7 +1446,7 @@ function mt(e, a = []) {
   return a;
 }
 function Jt(e, a, t) {
-  const s = new I(), i = n("div"), o = T(b.add, { variant: "primary" }), r = (l, d, p, m) => {
+  const i = new I(), s = n("div"), o = T(b.add, { variant: "primary" }), r = (l, d, p, m) => {
     const h = mt(p).filter((g) => !l || g.id !== l.id && !g.path.join("\0").startsWith(l.path.join("\0") + "\0"));
     K(
       l ? `Изменить: ${l.name}` : d ? `Новое место внутри «${d.name}»` : "Новое место",
@@ -1478,11 +1482,11 @@ function Jt(e, a, t) {
     ),
     l.children.length ? n("ul", { class: "dv-loc-tree" }, l.children.map((m) => u(m, d, p))) : null
   ), c = R({
-    host: i,
+    host: s,
     load: (l) => t.readData("domovoy.api", { path: "api/locations/tree" }, { signal: l }),
     render: ({ tree: l }, d) => (o.onclick = () => r(null, null, l, d), l.length ? n("ul", { class: "dv-loc-tree dv-loc-root" }, l.map((p) => u(p, l, d))) : n("div", { class: "ks-empty" }, n("strong", null, "Мест ещё нет"), n("p", null, "Они появятся сами, когда вы скажете «положил в третью коробку нижнего шкафа», или добавьте вручную.")))
   });
-  return e.replaceChildren(n("div", { class: "ks-page" }, G(b.locations, o), n("div", { class: "ks-card" }, i))), B(t, s, ["locations", "items"], () => c.refresh()), s.add(() => c.dispose()), H(s);
+  return e.replaceChildren(n("div", { class: "ks-page" }, G(b.locations, o), n("div", { class: "ks-card" }, s))), B(t, i, ["locations", "items"], () => c.refresh()), i.add(() => c.dispose()), H(i);
 }
 const He = "domovoy.session";
 function Yt() {
@@ -1494,31 +1498,31 @@ function Yt() {
   }
 }
 function Me(e, a) {
-  const t = n("input", { class: "ks-input dv-command", type: "text", placeholder: b.commandPlaceholder, "aria-label": "Команда", autocomplete: "off", enterkeyhint: "send" }), s = n("div", { class: "dv-reply", role: "status", "aria-live": "polite" }), i = T(b.send, { variant: "primary", type: "submit" }), o = n("form", { class: "dv-commandbar" }, t, i), r = async (c) => {
+  const t = n("input", { class: "ks-input dv-command", type: "text", placeholder: b.commandPlaceholder, "aria-label": "Команда", autocomplete: "off", enterkeyhint: "send" }), i = n("div", { class: "dv-reply", role: "status", "aria-live": "polite" }), s = T(b.send, { variant: "primary", type: "submit" }), o = n("form", { class: "dv-commandbar" }, t, s), r = async (c) => {
     const l = c.trim();
     if (!l)
       return;
-    i.disabled = !0, _(s, n("span", { class: "ks-muted" }, b.loading));
+    s.disabled = !0, _(i, n("span", { class: "ks-muted" }, b.loading));
     const d = await lt(e, "command.send", { text: l, session_id: Yt() });
-    if (i.disabled = !1, !d.ok) {
-      _(s, n("span", { class: "ks-error" }, d.error.message));
+    if (s.disabled = !1, !d.ok) {
+      _(i, n("span", { class: "ks-error" }, d.error.message));
       return;
     }
     t.value = "", u(d.data), a();
   }, u = (c) => {
     const l = (c.options ?? []).map((d, p) => w(`${p + 1}. ${d}`, () => void r(String(p + 1))));
     _(
-      s,
+      i,
       n("div", { class: "dv-reply-line" }, j(Q(c.status), de(c.status)), " ", c.reply),
       l.length ? n("div", { class: "ks-row dv-chips" }, l) : null,
       c.undoable && c.command_id ? w(b.undo, async () => {
-        (await A(e, "command.undo", { id: c.command_id }, { success: "Отменено" })).ok && (_(s, n("span", { class: "ks-muted" }, "Отменено.")), a());
+        (await A(e, "command.undo", { id: c.command_id }, { success: "Отменено" })).ok && (_(i, n("span", { class: "ks-muted" }, "Отменено.")), a());
       }, "ghost") : null
     );
   };
   return o.addEventListener("submit", (c) => {
     c.preventDefault(), r(t.value);
-  }), n("div", { class: "ks-card dv-command-card" }, o, s);
+  }), n("div", { class: "ks-card dv-command-card" }, o, i);
 }
 function Xt(e) {
   if (!e.events.length)
@@ -1530,15 +1534,15 @@ function Xt(e) {
     "ul",
     { class: "ks-list" },
     e.events.map(
-      (s) => P(
-        s.title,
-        `${Y(s.start, a) === t ? "сегодня" : "завтра"}, ${s.all_day ? "весь день" : `${ae(s.start, a)}–${ae(s.end, a)}`}${s.location ? ` · ${s.location}` : ""}`
+      (i) => P(
+        i.title,
+        `${Y(i.start, a) === t ? "сегодня" : "завтра"}, ${i.all_day ? "весь день" : `${ae(i.start, a)}–${ae(i.end, a)}`}${i.location ? ` · ${i.location}` : ""}`
       )
     )
   );
 }
 function Qt(e, a, t) {
-  const s = new I(), i = t.mode === "kiosk", o = n("div", { class: `ks-page dv-today${i ? " ks-scope dv-kiosk" : ""}`, dataset: i ? { theme: "kiosk", noSwipe: "true" } : void 0 }), r = n("div", { class: "ks-page" }), u = Me(t, () => c.refresh());
+  const i = new I(), s = t.mode === "kiosk", o = n("div", { class: `ks-page dv-today${s ? " ks-scope dv-kiosk" : ""}`, dataset: s ? { theme: "kiosk", noSwipe: "true" } : void 0 }), r = n("div", { class: "ks-page" }), u = Me(t, () => c.refresh());
   _(e, o), _(o, u, r);
   const c = R({
     host: r,
@@ -1563,7 +1567,7 @@ function Qt(e, a, t) {
           "Напоминания",
           l.reminders.length ? n("ul", { class: "ks-list" }, l.reminders.map((m) => P(
             m.text,
-            [m.state === "fired" ? "сработало" : m.due_at ? `${L(m.due_at)} (${Oe(m.due_at)})` : it(m.trigger), m.recurrence ? ` · ${be(m.recurrence)}` : "", ` · ${b.channels[m.channel] ?? m.channel}`].join(""),
+            [m.state === "fired" ? "сработало" : m.due_at ? `${L(m.due_at)} (${Oe(m.due_at)})` : st(m.trigger), m.recurrence ? ` · ${be(m.recurrence)}` : "", ` · ${b.channels[m.channel] ?? m.channel}`].join(""),
             p(m.id, m.state),
             m.state === "fired" ? "dv-fired" : ""
           ))) : q("Напоминаний нет.")
@@ -1585,17 +1589,17 @@ function Qt(e, a, t) {
           null,
           n("p", null, `Есть неуверенные команды: ${l.review_count}. Я ничего не записал без вашего подтверждения.`),
           // the review page exists in the admin UI only; on the kiosk there is nothing to open
-          i ? n("p", { class: "ks-muted" }, "Откройте администрирование на телефоне или компьютере, чтобы решить.") : T("Открыть проверку", { variant: "primary", onClick: () => t.navigate("domovoy.review") })
+          s ? n("p", { class: "ks-muted" }, "Откройте администрирование на телефоне или компьютере, чтобы решить.") : T("Открыть проверку", { variant: "primary", onClick: () => t.navigate("domovoy.review") })
         )) : null,
         l.warnings.length ? M("Календари", n("p", { class: "ks-stale-banner" }, `Не удалось прочитать: ${l.warnings.map((m) => m.source).join(", ")}`)) : null,
-        i ? null : M(
+        s ? null : M(
           "Последние команды",
           l.recent.length ? n("ul", { class: "ks-list" }, l.recent.map((m) => P(m.text, m.reply ?? "", j(Q(m.status), de(m.status))))) : Ye("Команд ещё не было", "Скажите или напишите что-нибудь выше.")
         )
       );
     }
   });
-  return B(t, s, ["calendar", "reminders", "tasks", "review", "commands", "outbox", "notification"], () => c.refresh()), s.add(() => c.dispose()), H(s);
+  return B(t, i, ["calendar", "reminders", "tasks", "review", "commands", "outbox", "notification"], () => c.refresh()), i.add(() => c.dispose()), H(i);
 }
 function Fe(e, a, t) {
   K(
@@ -1605,17 +1609,17 @@ function Fe(e, a, t) {
       { name: "body", label: "Текст", type: "textarea", rows: 6, required: !0, value: a?.body ?? "", wide: !0 },
       { name: "tags", label: "Теги", value: (a?.tags ?? []).join(", "), hint: "Через запятую", wide: !0 }
     ],
-    async (s) => {
-      const i = { title: String(s.title ?? "").trim(), body: String(s.body).trim(), tags: String(s.tags ?? "").split(",").map((r) => r.trim()).filter(Boolean) }, o = a ? await e.invokeAction("domovoy.actions", "notes.update", { id: a.id, ...i }) : await e.invokeAction("domovoy.actions", "notes.create", i);
+    async (i) => {
+      const s = { title: String(i.title ?? "").trim(), body: String(i.body).trim(), tags: String(i.tags ?? "").split(",").map((r) => r.trim()).filter(Boolean) }, o = a ? await e.invokeAction("domovoy.actions", "notes.update", { id: a.id, ...s }) : await e.invokeAction("domovoy.actions", "notes.create", s);
       return o.ok && t(), o;
     }
   );
 }
 function ea(e, a, t) {
-  const s = new I(), i = n("div");
+  const i = new I(), s = n("div");
   let o = "";
   const r = le({ name: "q", label: "Поиск по заметкам", placeholder: "слово из заголовка или текста" }), u = T(b.add, { variant: "primary" }), c = R({
-    host: i,
+    host: s,
     load: (l) => me(
       $(t, "api/notes", { q: o || void 0 }, l),
       $(t, "api/items", { limit: 8 }, l)
@@ -1648,18 +1652,18 @@ function ea(e, a, t) {
   });
   return r.input.addEventListener("input", () => {
     o = r.input.value.trim(), c.refresh();
-  }), _(e, n("div", { class: "ks-page" }, G(b.memory, u), Me(t, () => c.refresh()), n("div", { class: "ks-card ks-filters" }, r.el), i)), B(t, s, ["notes", "items", "locations"], () => c.refresh()), s.add(() => c.dispose()), H(s);
+  }), _(e, n("div", { class: "ks-page" }, G(b.memory, u), Me(t, () => c.refresh()), n("div", { class: "ks-card ks-filters" }, r.el), s)), B(t, i, ["notes", "items", "locations"], () => c.refresh()), i.add(() => c.dispose()), H(i);
 }
-async function pt(e, a, t, s) {
-  const i = await A(e, "review.approve", t ? { id: a, proposal: t } : { id: a });
-  if (!i.ok)
+async function pt(e, a, t, i) {
+  const s = await A(e, "review.approve", t ? { id: a, proposal: t } : { id: a });
+  if (!s.ok)
     return !1;
-  const o = i.data.results.filter((r) => !r.ok).map((r) => r.message);
-  return i.data.still_pending ? (D(`Не выполнено, осталось в очереди: ${o.join(" ")}`, "bad", 9e3), !1) : (D(o.length ? `Выполнено частично. ${o.join(" ")}` : s, o.length ? "warn" : "good", o.length ? 9e3 : 4500), !0);
+  const o = s.data.results.filter((r) => !r.ok).map((r) => r.message);
+  return s.data.still_pending ? (D(`Не выполнено, осталось в очереди: ${o.join(" ")}`, "bad", 9e3), !1) : (D(o.length ? `Выполнено частично. ${o.join(" ")}` : i, o.length ? "warn" : "good", o.length ? 9e3 : 4500), !0);
 }
 function ta(e, a, t) {
-  ue("Проверить и поправить", (s) => {
-    const i = a.proposal.map((r) => {
+  ue("Проверить и поправить", (i) => {
+    const s = a.proposal.map((r) => {
       const c = (ge[String(r.type)]?.fields ?? []).filter((l) => l.kind !== "json").map((l) => {
         const d = r[l.name], p = l.kind === "iso" && typeof d == "string" ? ee(d) : l.kind === "bool" ? d === !0 : ot(l, d);
         return {
@@ -1674,20 +1678,20 @@ function ta(e, a, t) {
       return { intent: r, fields: c, handle: ce(c, { submitLabel: b.save, onSubmit: () => {
       } }) };
     }), o = async () => {
-      const r = i.map(({ intent: u, handle: c }) => Dt(u, c.values(), (l) => te(l)));
-      await pt(e, a.id, r, "Выполнено с вашими правками") && (s(!0), t());
+      const r = s.map(({ intent: u, handle: c }) => Dt(u, c.values(), (l) => te(l)));
+      await pt(e, a.id, r, "Выполнено с вашими правками") && (i(!0), t());
     };
     return n(
       "div",
       null,
       n("p", { class: "ks-muted" }, `Вы сказали: «${a.command_text ?? ""}». ${a.reason}`),
-      i.map(({ intent: r, handle: u }) => n("fieldset", { class: "dv-intent" }, n("legend", null, jt(String(r.type))), n("div", { class: "ks-form-grid" }, Object.values(u.fields).map((c) => c.el)))),
-      n("div", { class: "ks-form-actions" }, T("Применить с правками", { variant: "primary", onClick: () => void o() }), T(b.cancel, { onClick: () => s(!1) }))
+      s.map(({ intent: r, handle: u }) => n("fieldset", { class: "dv-intent" }, n("legend", null, jt(String(r.type))), n("div", { class: "ks-form-grid" }, Object.values(u.fields).map((c) => c.el)))),
+      n("div", { class: "ks-form-actions" }, T("Применить с правками", { variant: "primary", onClick: () => void o() }), T(b.cancel, { onClick: () => i(!1) }))
     );
   });
 }
 function aa(e, a, t) {
-  const s = new I(), i = n("div"), o = async (d, p, m) => {
+  const i = new I(), s = n("div"), o = async (d, p, m) => {
     await pt(t, d, p, "Выполнено") && m();
   };
   let r = "pending";
@@ -1698,7 +1702,7 @@ function aa(e, a, t) {
       } }, d === "pending" ? "Ждут решения" : d === "approved" ? "Принятые" : "Отклонённые")
     ));
   }), l = R({
-    host: i,
+    host: s,
     load: (d) => $(t, "api/review", { status: r }, d),
     render: ({ items: d }, p) => d.length ? n("div", { class: "ks-grid" }, d.map(
       (m) => M(
@@ -1723,11 +1727,11 @@ function aa(e, a, t) {
       )
     )) : n("div", { class: "ks-empty" }, n("strong", null, r === "pending" ? "Всё проверено" : "Пусто"), n("p", null, r === "pending" ? "Неуверенные команды попадают сюда — я ничего не записываю без вашего подтверждения." : ""))
   });
-  return c(), _(e, n("div", { class: "ks-page" }, G(b.review), n("p", { class: "ks-muted" }, "Здесь команды, в которых я не уверен, и всё, что предложила языковая модель. Пока вы не подтвердите, ничего не изменилось."), u, i)), B(t, s, ["review", "commands"], () => l.refresh()), s.add(() => l.dispose()), H(s);
+  return c(), _(e, n("div", { class: "ks-page" }, G(b.review), n("p", { class: "ks-muted" }, "Здесь команды, в которых я не уверен, и всё, что предложила языковая модель. Пока вы не подтвердите, ничего не изменилось."), u, s)), B(t, i, ["review", "commands"], () => l.refresh()), i.add(() => l.dispose()), H(i);
 }
 const Ve = { location: "domovoy.locations", note: "domovoy.memory", task: "domovoy.tasks", event: "domovoy.calendar" };
 function na(e, a, t) {
-  const s = new I(), i = /* @__PURE__ */ new Set(), o = n("input", { class: "ks-input dv-command", type: "search", placeholder: b.search_placeholder, "aria-label": b.search, autocomplete: "off", value: String(a.q ?? "") }), r = n("div", { class: "ks-row dv-chips" }), u = n("div", { class: "dv-results", "aria-live": "polite" }), c = n("p", { class: "ks-muted dv-search-meta" });
+  const i = new I(), s = /* @__PURE__ */ new Set(), o = n("input", { class: "ks-input dv-command", type: "search", placeholder: b.search_placeholder, "aria-label": b.search, autocomplete: "off", value: String(a.q ?? "") }), r = n("div", { class: "ks-row dv-chips" }), u = n("div", { class: "dv-results", "aria-live": "polite" }), c = n("p", { class: "ks-muted dv-search-meta" });
   let l = 0, d = null;
   const p = () => De(r, () => {
     _(
@@ -1736,10 +1740,10 @@ function na(e, a, t) {
         ([v, y]) => n("button", {
           type: "button",
           dataset: { key: v },
-          class: `ks-chip${i.has(v) ? " is-active" : ""}`,
-          "aria-pressed": String(i.has(v)),
+          class: `ks-chip${s.has(v) ? " is-active" : ""}`,
+          "aria-pressed": String(s.has(v)),
           onClick: () => {
-            i.has(v) ? i.delete(v) : i.add(v), p(), h();
+            s.has(v) ? s.delete(v) : s.add(v), p(), h();
           }
         }, y)
       )
@@ -1755,7 +1759,7 @@ function na(e, a, t) {
       return;
     }
     d = new AbortController(), _(u, Xe());
-    const f = await $(t, "api/search", { q: v, kinds: [...i].join(",") || void 0, limit: 30 }, d.signal);
+    const f = await $(t, "api/search", { q: v, kinds: [...s].join(",") || void 0, limit: 30 }, d.signal);
     if (y !== l)
       return;
     if (!f.ok) {
@@ -1776,10 +1780,10 @@ function na(e, a, t) {
       })) : q(`Ничего не нашлось по «${v}». Возможно, я этого ещё не запоминал.`)
     );
   }, g = Je(() => void h(), 250);
-  return o.addEventListener("input", () => g()), s.add(() => g.cancel()), s.add(() => d?.abort()), p(), _(e, n("div", { class: "ks-page" }, n("div", { class: "ks-card" }, o, r, c), u)), h(), B(t, s, ["items", "locations", "notes", "tasks", "calendar"], () => void h(), 500), H(s);
+  return o.addEventListener("input", () => g()), i.add(() => g.cancel()), i.add(() => d?.abort()), p(), _(e, n("div", { class: "ks-page" }, n("div", { class: "ks-card" }, o, r, c), u)), h(), B(t, i, ["items", "locations", "notes", "tasks", "calendar"], () => void h(), 500), H(i);
 }
-const sa = (e) => e.split(/[\n,]/).map((a) => a.trim()).filter(Boolean);
-function ia(e) {
+const ia = (e) => e.split(/[\n,]/).map((a) => a.trim()).filter(Boolean);
+function sa(e) {
   let a = [];
   try {
     a = Intl.supportedValuesOf?.("timeZone") ?? [];
@@ -1791,25 +1795,25 @@ function ia(e) {
 function re(e, a, ...t) {
   return n("section", { class: "ks-card dv-section-card" }, n("header", null, n("h2", null, e)), a ? n("p", { class: "ks-muted" }, a) : null, t);
 }
-function fe(e, a, t, s) {
+function fe(e, a, t, i) {
   return ce(a, {
-    onSubmit: async (i, o) => {
-      const r = await e.invokeAction("domovoy.actions", "settings.update", t(i));
+    onSubmit: async (s, o) => {
+      const r = await e.invokeAction("domovoy.actions", "settings.update", t(s));
       if (!r.ok) {
         o.showErrors(r.error);
         return;
       }
-      D("Сохранено", "good"), s();
+      D("Сохранено", "good"), i();
     }
   }).el;
 }
 function oa(e, a) {
-  const t = URL.createObjectURL(new Blob([JSON.stringify(a, null, 2)], { type: "application/json" })), s = n("a", { href: t, download: e });
-  document.body.appendChild(s), s.click(), s.remove(), window.setTimeout(() => URL.revokeObjectURL(t), 1e4);
+  const t = URL.createObjectURL(new Blob([JSON.stringify(a, null, 2)], { type: "application/json" })), i = n("a", { href: t, download: e });
+  document.body.appendChild(i), i.click(), i.remove(), window.setTimeout(() => URL.revokeObjectURL(t), 1e4);
 }
 function ra(e, a, t) {
-  const s = new I(), i = n("div"), o = R({
-    host: i,
+  const i = new I(), s = n("div"), o = R({
+    host: s,
     load: async (r) => {
       const [u, c, l, d] = await Promise.all([
         $(t, "api/settings", void 0, r),
@@ -1822,7 +1826,7 @@ function ra(e, a, t) {
     render: ({ settings: r, voice: u, state: c, backups: l }, d) => {
       ne(c.timezone);
       const p = re("Общие", null, fe(t, [
-        { name: "timezone", label: "Часовой пояс", type: "select", options: ia(r.timezone), value: r.timezone, hint: `Сейчас на сервере: ${c.timezone}`, wide: !0 },
+        { name: "timezone", label: "Часовой пояс", type: "select", options: sa(r.timezone), value: r.timezone, hint: `Сейчас на сервере: ${c.timezone}`, wide: !0 },
         { name: "default_reminder_hour", label: "Во сколько напоминать, если сказали только «завтра» (час)", type: "number", min: 0, max: 23, required: !0, value: r.default_reminder_hour, wide: !0 },
         { name: "default_event_minutes", label: "Длительность события по умолчанию, минут", type: "number", min: 5, max: 1440, required: !0, value: r.default_event_minutes, wide: !0 }
       ], (f) => ({ timezone: String(f.timezone), default_reminder_hour: Number(f.default_reminder_hour), default_event_minutes: Number(f.default_event_minutes) }), d)), m = re("Насколько доверять пониманию команд", "Правила понимают привычные фразы сами. Если уверенность ниже порога — команда не выполняется, а ждёт вашего решения в «Проверке». Записи, предложенные языковой моделью, всегда идут на проверку, пока вы явно не разрешите иначе.", fe(t, [
@@ -1843,7 +1847,7 @@ function ra(e, a, t) {
           { name: "quiet_from", label: "Тихие часы с", type: "time", value: r.speak.quiet_from },
           { name: "quiet_to", label: "до", type: "time", value: r.speak.quiet_to },
           { name: "fallback", label: "Если колонка не ответила", type: "select", options: [{ value: "telegram", label: "Написать в Telegram" }, { value: "ui", label: "Показать на экране" }, { value: "none", label: "Ничего" }], value: r.speak.fallback, wide: !0 }
-        ], (f) => ({ voice: { enabled: f.enabled === !0, trigger_words: sa(String(f.trigger_words)), window_s: Number(f.window_s), reply: f.reply, room: String(f.room).trim() }, speak: { enabled: f.speak_enabled === !0, quiet_from: String(f.quiet_from), quiet_to: String(f.quiet_to), fallback: f.fallback } }), d)
+        ], (f) => ({ voice: { enabled: f.enabled === !0, trigger_words: ia(String(f.trigger_words)), window_s: Number(f.window_s), reply: f.reply, room: String(f.room).trim() }, speak: { enabled: f.speak_enabled === !0, quiet_from: String(f.quiet_from), quiet_to: String(f.quiet_to), fallback: f.fallback } }), d)
       ), g = re("Сообщения", null, fe(t, [
         { name: "sandbox", label: "Тестовый режим: ничего не отправлять наружу (Telegram, HA-уведомления)", type: "checkbox", value: r.messaging.sandbox, hint: "Сообщения останутся в «Журнале → Отправка» — удобно проверять сценарии.", wide: !0 }
       ], (f) => ({ messaging: { sandbox: f.sandbox === !0 } }), d)), v = n("input", { type: "file", accept: "application/json,.json", hidden: !0 });
@@ -1882,17 +1886,17 @@ function ra(e, a, t) {
       return n("div", { class: "dv-stack" }, p, m, h, g, y);
     }
   });
-  return _(e, n("div", { class: "ks-page" }, G(b.settings), i)), B(t, s, ["settings"], () => o.refresh(), 800, e), s.add(() => o.dispose()), H(s);
+  return _(e, n("div", { class: "ks-page" }, G(b.settings), s)), B(t, i, ["settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), H(i);
 }
 const la = Object.entries(b.channels).map(([e, a]) => ({ value: e, label: a }));
-function We(e, a, t, s) {
-  const i = Z(), o = t?.kind ?? "time", r = t?.trigger ?? {}, u = o !== "time" && r.type === "state", c = r.window ? { window: r.window } : {};
+function We(e, a, t, i) {
+  const s = Z(), o = t?.kind ?? "time", r = t?.trigger ?? {}, u = o !== "time" && r.type === "state", c = r.window ? { window: r.window } : {};
   K(
     t ? "Изменить напоминание" : "Новое напоминание",
     [
       { name: "text", label: "О чём напомнить", required: !0, value: t?.text ?? "", wide: !0 },
       { name: "mode", label: "Когда", type: "select", options: [...u ? [{ value: "keep", label: "Условие устройства (не меняется)" }] : [], { value: "time", label: "В указанное время" }, { value: "presence", label: "Когда приду домой" }, { value: "room", label: "Когда зайду в комнату" }], value: u ? "keep" : o === "time" ? "time" : String(r.type ?? "presence") },
-      { name: "due_at", label: "Дата и время", type: "datetime-local", value: t?.due_at ? ee(t.due_at, i) : "" },
+      { name: "due_at", label: "Дата и время", type: "datetime-local", value: t?.due_at ? ee(t.due_at, s) : "" },
       { name: "place", label: "Комната", value: r.place && r.type === "room" ? String(r.place) : "", hint: "Для «когда зайду в комнату»: как в настройках комнат, например «кухня»." },
       { name: "channel", label: "Как сообщить", type: "select", options: la, value: t?.channel ?? "speak" },
       { name: "recipient", label: "Кому", type: "select", options: [{ value: "self", label: "Мне" }, ...a.filter((l) => !l.is_self).map((l) => ({ value: l.name, label: l.name }))], value: t?.recipient ?? "self" }
@@ -1902,7 +1906,7 @@ function We(e, a, t, s) {
       if (d !== "keep") if (d === "time") {
         if (!l.due_at)
           return { ok: !1, error: { code: "validation", message: "Укажите время", fields: { due_at: "Укажите время" } } };
-        p.due_at = te(String(l.due_at), i), p.trigger = null;
+        p.due_at = te(String(l.due_at), s), p.trigger = null;
       } else if (d === "room") {
         if (!String(l.place).trim())
           return { ok: !1, error: { code: "validation", message: "Укажите комнату", fields: { place: "Укажите комнату" } } };
@@ -1914,30 +1918,30 @@ function We(e, a, t, s) {
         p.trigger = { type: "presence", person: g, place: "home", require_transition: !0, ...c };
       }
       const m = t ? await e.invokeAction("domovoy.actions", "reminders.update", { id: t.id, ...p }) : await e.invokeAction("domovoy.actions", "reminders.create", p);
-      return m.ok && s(), m;
+      return m.ok && i(), m;
     }
   );
 }
-function Ke(e, a, t, s) {
+function Ke(e, a, t, i) {
   K(
     a ? "Изменить задачу" : "Новая задача",
     [
       { name: "title", label: b.title, required: !0, value: a?.title ?? "", wide: !0 },
-      { name: "list", label: "Список", type: "select", options: Object.entries(b.lists).map(([i, o]) => ({ value: i, label: o })), value: a?.list ?? t },
+      { name: "list", label: "Список", type: "select", options: Object.entries(b.lists).map(([s, o]) => ({ value: s, label: o })), value: a?.list ?? t },
       { name: "due_date", label: "Срок", type: "date", value: a?.due_date ?? "" },
       { name: "notes", label: b.notes, type: "textarea", rows: 2, value: a?.notes ?? "", wide: !0 }
     ],
-    async (i) => {
-      const o = { title: String(i.title).trim(), list: i.list, due_date: i.due_date || null, notes: String(i.notes ?? "") }, r = a ? await e.invokeAction("domovoy.actions", "tasks.update", { id: a.id, ...o }) : await e.invokeAction("domovoy.actions", "tasks.create", o);
-      return r.ok && s(), r;
+    async (s) => {
+      const o = { title: String(s.title).trim(), list: s.list, due_date: s.due_date || null, notes: String(s.notes ?? "") }, r = a ? await e.invokeAction("domovoy.actions", "tasks.update", { id: a.id, ...o }) : await e.invokeAction("domovoy.actions", "tasks.create", o);
+      return r.ok && i(), r;
     }
   );
 }
 function da(e, a, t) {
-  const s = new I(), i = n("div");
+  const i = new I(), s = n("div");
   let o = !1, r = [];
   const u = T("Напоминание", { variant: "primary" }), c = T("Задача", { variant: "secondary" }), l = le({ name: "done", label: "Показывать выполненное", type: "checkbox", value: !1 }), d = R({
-    host: i,
+    host: s,
     load: async (p) => {
       const h = await me(
         $(t, "api/reminders", { states: o ? "pending,fired,done,cancelled" : "pending,fired" }, p),
@@ -1952,7 +1956,7 @@ function da(e, a, t) {
       r = h.contacts, u.onclick = () => We(t, r, null, g), c.onclick = () => Ke(t, null, "tasks", g);
       const v = (f) => P(
         n("span", null, f.text, " ", ve(f.state)),
-        `${f.kind === "time" && f.due_at ? `${L(f.due_at)}${f.state === "pending" ? ` (${Oe(f.due_at)})` : ""}` : it(f.trigger)}${f.recurrence ? ` · ${be(f.recurrence)}` : ""} · ${b.channels[f.channel] ?? f.channel}${f.recipient && f.recipient !== "self" ? ` → ${f.recipient}` : ""}`,
+        `${f.kind === "time" && f.due_at ? `${L(f.due_at)}${f.state === "pending" ? ` (${Oe(f.due_at)})` : ""}` : st(f.trigger)}${f.recurrence ? ` · ${be(f.recurrence)}` : ""} · ${b.channels[f.channel] ?? f.channel}${f.recipient && f.recipient !== "self" ? ` → ${f.recipient}` : ""}`,
         n(
           "div",
           { class: "ks-row" },
@@ -2000,7 +2004,7 @@ function da(e, a, t) {
   });
   return l.input.addEventListener("change", () => {
     o = l.input.checked, d.refresh();
-  }), _(e, n("div", { class: "ks-page" }, G(b.tasks, u, c), n("div", { class: "ks-card ks-filters" }, l.el), i)), B(t, s, ["reminders", "tasks", "contacts"], () => d.refresh()), s.add(() => d.dispose()), H(s);
+  }), _(e, n("div", { class: "ks-page" }, G(b.tasks, u, c), n("div", { class: "ks-card ks-filters" }, l.el), s)), B(t, i, ["reminders", "tasks", "contacts"], () => d.refresh()), i.add(() => d.dispose()), H(i);
 }
 function Ze(e) {
   let a = 0;
@@ -2036,10 +2040,10 @@ class ca {
   }
   /** Feed consecutive frames; returns the events this frame caused (usually none). */
   push(a) {
-    const t = [], s = a.length / this.o.sampleRate * 1e3, i = Ze(a), o = Math.max(this.o.minRms, this.noise * this.o.ratio), r = i >= o;
+    const t = [], i = a.length / this.o.sampleRate * 1e3, s = Ze(a), o = Math.max(this.o.minRms, this.noise * this.o.ratio), r = s >= o;
     if (this.state === "idle")
-      return this.calibrated ? (this.noise = i < this.noise ? this.noise * 0.9 + i * 0.1 : this.noise * 0.995 + i * 5e-3, this.keepPreroll(a), this.loudMs = r ? this.loudMs + s : 0, this.loudMs >= this.o.startMs && (this.state = "speech", this.quietMs = 0, this.chunks = [...this.preroll], this.samples = this.prerollSamples, this.preroll = [], this.prerollSamples = 0, t.push({ type: "start" })), t) : (this.calibSum += i, this.calibFrames += 1, this.calibMs += s, this.calibMs >= this.o.calibrateMs && (this.noise = Math.max(2e-3, this.calibSum / this.calibFrames), this.calibrated = !0), this.keepPreroll(a), t);
-    this.chunks.push(a), this.samples += a.length, this.quietMs = r ? 0 : this.quietMs + s;
+      return this.calibrated ? (this.noise = s < this.noise ? this.noise * 0.9 + s * 0.1 : this.noise * 0.995 + s * 5e-3, this.keepPreroll(a), this.loudMs = r ? this.loudMs + i : 0, this.loudMs >= this.o.startMs && (this.state = "speech", this.quietMs = 0, this.chunks = [...this.preroll], this.samples = this.prerollSamples, this.preroll = [], this.prerollSamples = 0, t.push({ type: "start" })), t) : (this.calibSum += s, this.calibFrames += 1, this.calibMs += i, this.calibMs >= this.o.calibrateMs && (this.noise = Math.max(2e-3, this.calibSum / this.calibFrames), this.calibrated = !0), this.keepPreroll(a), t);
+    this.chunks.push(a), this.samples += a.length, this.quietMs = r ? 0 : this.quietMs + i;
     const u = this.samples / this.o.sampleRate * 1e3, c = u >= this.o.maxMs && this.quietMs < this.o.hangoverMs;
     if (this.quietMs >= this.o.hangoverMs || c) {
       const l = u - this.quietMs, d = this.collect(), p = Ze(d);
@@ -2056,17 +2060,17 @@ class ca {
   collect() {
     const a = new Float32Array(this.samples);
     let t = 0;
-    for (const s of this.chunks)
-      a.set(s, t), t += s.length;
+    for (const i of this.chunks)
+      a.set(i, t), t += i.length;
     return a;
   }
 }
 function ua(e, a, t) {
   if (t >= a)
     return e;
-  const s = a / t, i = Math.floor(e.length / s), o = new Float32Array(i);
-  for (let r = 0; r < i; r += 1) {
-    const u = Math.floor(r * s), c = Math.min(e.length, Math.floor((r + 1) * s));
+  const i = a / t, s = Math.floor(e.length / i), o = new Float32Array(s);
+  for (let r = 0; r < s; r += 1) {
+    const u = Math.floor(r * i), c = Math.min(e.length, Math.floor((r + 1) * i));
     let l = 0;
     for (let d = u; d < c; d += 1)
       l += e[d];
@@ -2075,14 +2079,14 @@ function ua(e, a, t) {
   return o;
 }
 function ma(e, a) {
-  const t = new Uint8Array(44 + e.length * 2), s = new DataView(t.buffer), i = (o, r) => {
+  const t = new Uint8Array(44 + e.length * 2), i = new DataView(t.buffer), s = (o, r) => {
     for (let u = 0; u < r.length; u += 1)
-      s.setUint8(o + u, r.charCodeAt(u));
+      i.setUint8(o + u, r.charCodeAt(u));
   };
-  i(0, "RIFF"), s.setUint32(4, 36 + e.length * 2, !0), i(8, "WAVE"), i(12, "fmt "), s.setUint32(16, 16, !0), s.setUint16(20, 1, !0), s.setUint16(22, 1, !0), s.setUint32(24, a, !0), s.setUint32(28, a * 2, !0), s.setUint16(32, 2, !0), s.setUint16(34, 16, !0), i(36, "data"), s.setUint32(40, e.length * 2, !0);
+  s(0, "RIFF"), i.setUint32(4, 36 + e.length * 2, !0), s(8, "WAVE"), s(12, "fmt "), i.setUint32(16, 16, !0), i.setUint16(20, 1, !0), i.setUint16(22, 1, !0), i.setUint32(24, a, !0), i.setUint32(28, a * 2, !0), i.setUint16(32, 2, !0), i.setUint16(34, 16, !0), s(36, "data"), i.setUint32(40, e.length * 2, !0);
   for (let o = 0; o < e.length; o += 1) {
     const r = Math.max(-1, Math.min(1, e[o]));
-    s.setInt16(44 + o * 2, r < 0 ? r * 32768 : r * 32767, !0);
+    i.setInt16(44 + o * 2, r < 0 ? r * 32768 : r * 32767, !0);
   }
   return t;
 }
@@ -2090,7 +2094,7 @@ function pa() {
   return typeof navigator > "u" || !navigator.mediaDevices?.getUserMedia ? window.isSecureContext === !1 ? "Браузер разрешает микрофон только на https:// или localhost. Откройте киоск по HTTPS или добавьте адрес в исключения браузера." : "В этом браузере нет доступа к микрофону." : null;
 }
 function fa(e) {
-  let a = null, t = null, s = null, i = null, o = null, r = !1, u = !1, c = !1, l = 0, d = !1, p;
+  let a = null, t = null, i = null, s = null, o = null, r = !1, u = !1, c = !1, l = 0, d = !1, p;
   const m = (v) => e.onState(v), h = (v, y = 0) => {
     window.clearTimeout(p), y > 0 ? (m(v), p = window.setTimeout(() => u && !r && m({ kind: "listening" }), y)) : m(v);
   }, g = async (v, y) => {
@@ -2145,19 +2149,19 @@ function fa(e) {
         x(), document.addEventListener("pointerdown", x, { once: !0 });
       }
       const E = t.sampleRate;
-      o = new ca({ sampleRate: E }), i = t.createMediaStreamSource(a), s = t.createScriptProcessor(4096, 1, 1), s.onaudioprocess = (x) => {
+      o = new ca({ sampleRate: E }), s = t.createMediaStreamSource(a), i = t.createScriptProcessor(4096, 1, 1), i.onaudioprocess = (x) => {
         if (r || !u || !o)
           return;
         const k = new Float32Array(x.inputBuffer.getChannelData(0));
         for (const S of o.push(k))
           S.type === "start" ? m({ kind: "hearing" }) : S.type === "discard" ? m({ kind: "listening" }) : g(S.samples, E);
-      }, i.connect(s), s.connect(t.destination), u = !0, c = !1, a.getAudioTracks().forEach((x) => {
+      }, s.connect(i), i.connect(t.destination), u = !0, c = !1, a.getAudioTracks().forEach((x) => {
         x.enabled = !r;
       }), m(r ? { kind: "muted" } : { kind: "listening" });
     },
     stop() {
-      l += 1, c = !1, u = !1, window.clearTimeout(p), s?.disconnect(), i?.disconnect(), s && (s.onaudioprocess = null), a?.getTracks().forEach((v) => v.stop()), t?.close().catch(() => {
-      }), a = t = s = i = null, o = null, m({ kind: "off" });
+      l += 1, c = !1, u = !1, window.clearTimeout(p), i?.disconnect(), s?.disconnect(), i && (i.onaudioprocess = null), a?.getTracks().forEach((v) => v.stop()), t?.close().catch(() => {
+      }), a = t = i = s = null, o = null, m({ kind: "off" });
     },
     setMuted(v) {
       r = v, o?.reset(), a?.getAudioTracks().forEach((y) => {
@@ -2174,11 +2178,11 @@ const ka = {
   muted: "Микрофон выключен"
 };
 function ba(e) {
-  const a = n("span", { class: "dv-mic-dot", "aria-hidden": "true" }), t = n("span", { class: "dv-mic-label" }), s = n("button", { class: "dv-mic", type: "button", "aria-live": "polite", title: "Включить или выключить микрофон", dataset: { noSwipe: "true" }, onClick: e }, a, t);
+  const a = n("span", { class: "dv-mic-dot", "aria-hidden": "true" }), t = n("span", { class: "dv-mic-label" }), i = n("button", { class: "dv-mic", type: "button", "aria-live": "polite", title: "Включить или выключить микрофон", dataset: { noSwipe: "true" }, onClick: e }, a, t);
   return {
-    el: s,
-    render(i) {
-      s.dataset.state = i.kind, s.hidden = i.kind === "off", t.textContent = i.kind === "unavailable" ? i.reason : i.kind === "heard" ? i.reply : ka[i.kind] ?? "";
+    el: i,
+    render(s) {
+      i.dataset.state = s.kind, i.hidden = s.kind === "off", t.textContent = s.kind === "unavailable" ? s.reason : s.kind === "heard" ? s.reply : ka[s.kind] ?? "";
     }
   };
 }
@@ -2200,8 +2204,8 @@ function va(e) {
       modes: ["kiosk"],
       start(a) {
         return a.subscribe(ke, "notification", (t) => {
-          const s = t.payload?.text;
-          typeof s == "string" && s.trim() && D(s, "info", 12e3);
+          const i = t.payload?.text;
+          typeof i == "string" && i.trim() && D(i, "info", 12e3);
         });
       }
     },
@@ -2216,11 +2220,11 @@ function va(e) {
         if (t !== !0 && !(t && typeof t == "object"))
           return () => {
           };
-        const s = typeof t.room == "string" ? String(t.room) : "", i = ba(() => o.setMuted(!o.muted));
-        i.el.hidden = !0, document.body.appendChild(i.el);
-        const o = fa({ http: e, room: s, onState: i.render });
+        const i = typeof t.room == "string" ? String(t.room) : "", s = ba(() => o.setMuted(!o.muted));
+        s.el.hidden = !0, document.body.appendChild(s.el);
+        const o = fa({ http: e, room: i, onState: s.render });
         return o.start(), () => {
-          o.stop(), i.el.remove();
+          o.stop(), s.el.remove();
         };
       }
     }
@@ -2290,17 +2294,17 @@ const ga = `
 @keyframes dv-pulse { 50% { transform: scale(1.5); opacity: .6; } }
 @media (prefers-reduced-motion: reduce) { .dv-mic-dot { animation: none !important; } }
 `, we = (e, a, t) => {
-  const s = Number(e);
-  return Number.isFinite(s) && s >= 1 ? Math.min(t, Math.floor(s)) : a;
+  const i = Number(e);
+  return Number.isFinite(i) && i >= 1 ? Math.min(t, Math.floor(i)) : a;
 };
 function xe(e, a, t) {
   return {
     id: e,
     title: a,
-    mount(s, i, o) {
+    mount(i, s, o) {
       const r = new I(), u = n("div", { class: `ks-scope dv-widget ${e.replace(".", "-")}`, dataset: { noSwipe: "true", theme: "kiosk" } });
-      _(s, u);
-      let c = i;
+      _(i, u);
+      let c = s;
       const l = R({
         host: u,
         load: (p) => $(o, "api/today", void 0, p),
@@ -2323,31 +2327,31 @@ function _e(e) {
 }
 const ha = [
   xe("domovoy.next-event", "Ближайшее событие", (e) => {
-    const [a] = _e(e).filter((i) => !i.all_day), [t] = _e(e).filter((i) => i.all_day && Y(i.start, e.timezone) === Y(e.now, e.timezone)), s = a ?? t;
-    return s ? n("div", { class: "dv-next" }, n("div", { class: "dv-next-when" }, s.all_day ? "сегодня" : `${ae(s.start, e.timezone)} · ${Oe(s.start, new Date(e.now).getTime())}`), n("div", { class: "dv-next-title" }, s.title), s.location ? n("div", { class: "ks-muted" }, s.location) : null) : n("div", { class: "dv-next" }, n("div", { class: "ks-muted" }, "Ближайших событий нет"));
+    const [a] = _e(e).filter((s) => !s.all_day), [t] = _e(e).filter((s) => s.all_day && Y(s.start, e.timezone) === Y(e.now, e.timezone)), i = a ?? t;
+    return i ? n("div", { class: "dv-next" }, n("div", { class: "dv-next-when" }, i.all_day ? "сегодня" : `${ae(i.start, e.timezone)} · ${Oe(i.start, new Date(e.now).getTime())}`), n("div", { class: "dv-next-title" }, i.title), i.location ? n("div", { class: "ks-muted" }, i.location) : null) : n("div", { class: "dv-next" }, n("div", { class: "ks-muted" }, "Ближайших событий нет"));
   }),
   xe("domovoy.today", "Сегодня", (e, a, t) => {
-    const s = _e(e).slice(0, we(t.maxEvents, 4, 10)), i = e.reminders.slice(0, we(t.maxReminders, 4, 10));
+    const i = _e(e).slice(0, we(t.maxEvents, 4, 10)), s = e.reminders.slice(0, we(t.maxReminders, 4, 10));
     return n(
       "div",
       { class: "dv-today-widget" },
-      s.length ? n("ul", { class: "ks-list" }, s.map((o) => n("li", null, n("span", { class: "dv-time" }, o.all_day ? "весь день" : ae(o.start, e.timezone)), " ", o.title))) : q("Событий нет"),
-      i.length ? n("ul", { class: "ks-list dv-reminders" }, i.map((o) => n("li", { class: o.state === "fired" ? "dv-fired" : "" }, "🔔 ", o.text))) : null,
+      i.length ? n("ul", { class: "ks-list" }, i.map((o) => n("li", null, n("span", { class: "dv-time" }, o.all_day ? "весь день" : ae(o.start, e.timezone)), " ", o.title))) : q("Событий нет"),
+      s.length ? n("ul", { class: "ks-list dv-reminders" }, s.map((o) => n("li", { class: o.state === "fired" ? "dv-fired" : "" }, "🔔 ", o.text))) : null,
       e.review_count ? n("div", { class: "ks-muted" }, `Ждёт проверки: ${e.review_count}`) : null
     );
   }),
-  xe("domovoy.shopping", "Покупки", (e, a, t, s) => {
-    const i = e.shopping.slice(0, we(t.max, 8, 30));
-    return i.length ? n("ul", { class: "ks-list dv-shopping" }, i.map((o) => n("li", null, n("span", { class: "ks-grow" }, o.title), w("✓", async () => {
-      (await A(s, "tasks.complete", { id: o.id })).ok && a();
+  xe("domovoy.shopping", "Покупки", (e, a, t, i) => {
+    const s = e.shopping.slice(0, we(t.max, 8, 30));
+    return s.length ? n("ul", { class: "ks-list dv-shopping" }, s.map((o) => n("li", null, n("span", { class: "ks-grow" }, o.title), w("✓", async () => {
+      (await A(i, "tasks.complete", { id: o.id })).ok && a();
     }, "ghost", "Куплено")))) : q("Список покупок пуст");
   }),
   {
     id: "domovoy.command",
     title: "Командная строка",
     mount(e, a, t) {
-      const s = new I(), i = n("div", { class: "ks-scope dv-widget", dataset: { noSwipe: "true", theme: "kiosk" } }, Me(t, () => t.refresh()));
-      return _(e, i), H(s);
+      const i = new I(), s = n("div", { class: "ks-scope dv-widget", dataset: { noSwipe: "true", theme: "kiosk" } }, Me(t, () => t.refresh()));
+      return _(e, s), H(i);
     }
   }
 ];
@@ -2356,14 +2360,14 @@ function ya(e) {
   if (Se || Date.now() < Ge)
     return;
   Se = !0, ue("Нужен токен доступа", (t) => {
-    const s = ce([{ name: "token", label: "API-токен", type: "password", required: !0, wide: !0 }], {
+    const i = ce([{ name: "token", label: "API-токен", type: "password", required: !0, wide: !0 }], {
       submitLabel: b.save,
       extraActions: [T(b.cancel, { onClick: () => t(!1) })],
-      onSubmit: (i) => {
-        e(String(i.token).trim()), t(!0), window.location.reload();
+      onSubmit: (s) => {
+        e(String(s.token).trim()), t(!0), window.location.reload();
       }
     });
-    return n("div", null, n("p", null, "Сервер просит подтвердить, что это вы. Введите токен из раздела «Интеграции → Доступ» (или откройте страницу из панели Home Assistant — там токен не нужен)."), s.el);
+    return n("div", null, n("p", null, "Сервер просит подтвердить, что это вы. Введите токен из раздела «Интеграции → Доступ» (или откройте страницу из панели Home Assistant — там токен не нужен)."), i.el);
   }).closed.then((t) => {
     Se = !1, t !== !0 && (Ge = Date.now() + 5 * 6e4);
   });
@@ -2387,18 +2391,18 @@ const wa = [
     if (new URL(a, window.location.href).origin !== window.location.origin)
       throw new Error("Domovoy: apiBase must be on the same origin as the page");
     St({ retry: b.retry, cancel: b.cancel, confirm: b.confirm, save: b.save, close: b.close, required: "Обязательное поле", loading: b.loading, nothingHere: b.empty, olderData: "Показаны прежние данные", renderFailed: "Не удалось показать этот раздел." }), Le("domovoy-ui-kit", At), Le("domovoy-ui", ga);
-    const t = /\/admin\.html$/.test(window.location.pathname), s = qt({ baseUrl: a, onUnauthorized: () => {
+    const t = /\/admin\.html$/.test(window.location.pathname), i = qt({ baseUrl: a, onUnauthorized: () => {
       t && ya(Ct);
     } });
-    s.http.request("api/state").then((i) => {
-      i.ok && i.data.timezone && ne(i.data.timezone);
-    }), e.registerDataProvider(s.data), e.registerActionProvider(s.actions), e.registerRealtimeSource(xt({ id: ke, http: s.http, waitSeconds: 25, pauseWhenHidden: !0 }));
-    for (const i of wa)
-      e.registerPage(i);
-    for (const i of ha)
-      e.registerWidget(i);
-    for (const i of va(s.http))
-      e.registerService(i);
+    i.http.request("api/state").then((s) => {
+      s.ok && s.data.timezone && ne(s.data.timezone);
+    }), e.registerDataProvider(i.data), e.registerActionProvider(i.actions), e.registerRealtimeSource(xt({ id: ke, http: i.http, waitSeconds: 25, pauseWhenHidden: !0 }));
+    for (const s of wa)
+      e.registerPage(s);
+    for (const s of ha)
+      e.registerWidget(s);
+    for (const s of va(i.http))
+      e.registerService(s);
   }
 };
 export {

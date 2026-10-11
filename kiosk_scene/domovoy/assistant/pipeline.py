@@ -167,6 +167,25 @@ class CommandPipeline:
             return {"status": "clarify", "reply": question, "results": [], "questions": [question], "interpreter": interpreter,
                     "confidence": overall, "intents": clean}
 
+        # Resolve reminder names and pronouns before review. The saved proposal must point to
+        # the concrete record that was shown to the user, never a future fuzzy match.
+        for intent in clean:
+            issue = self.executor.resolve_reminder_intent(intent, session)
+            if issue is None:
+                continue
+            status = "clarify" if issue.clarify else "failed"
+            new_session = dict(session)
+            if issue.clarify:
+                new_session["pending"] = _pending_from({"intent": intent, **issue.clarify})
+            app.sessions.save(session_id, new_session)
+            app.commands.finish(command_id, status=status, interpreter=interpreter, intents=clean, confidence=overall, reply=issue.message)
+            payload = {"status": status, "reply": issue.message, "results": [{"ok": False, "message": issue.message}],
+                       "interpreter": interpreter, "confidence": overall, "intents": clean}
+            if issue.clarify:
+                payload["questions"] = [issue.clarify["question"]]
+                payload["options"] = issue.clarify["options"]
+            return payload
+
         # A model may not undo things on its own either: "undo" is read-only for the rules (a person said it), but a
         # write when it was proposed by a model.
         writes = [i for i in clean if is_mutating(i["type"]) or (interpreter == "llm" and i["type"] == "undo")]
@@ -252,6 +271,9 @@ class CommandPipeline:
         "move_item": lambda i: f"перемещение «{i.get('name') or 'вещи'}»", "consume_item": lambda i: f"списание «{i.get('name') or 'вещи'}»",
         "set_quantity": lambda i: f"количество «{i.get('name') or 'вещи'}»", "remove_item": lambda i: f"удаление «{i.get('name') or 'вещи'}»",
         "create_reminder": lambda i: f"напоминание «{i.get('text')}»", "create_event": lambda i: f"событие «{i.get('title')}»",
+        "complete_reminder": lambda i: f"выполнение напоминания №{i.get('reminder_id')}",
+        "snooze_reminder": lambda i: f"отложить напоминание №{i.get('reminder_id')} на {i.get('minutes')} минут",
+        "delete_reminder": lambda i: f"удаление напоминания №{i.get('reminder_id')}",
         "update_event": lambda i: f"перенос события «{i.get('title')}»", "delete_event": lambda i: f"удаление события «{i.get('title')}»",
         "send_message": lambda i: f"сообщение для {i.get('recipient')}", "add_task": lambda i: f"задача «{i.get('title')}»",
         "add_shopping": lambda i: "покупки: " + ", ".join(i.get("items") or []), "complete_task": lambda i: f"отметка задачи «{i.get('title')}»",
@@ -270,6 +292,7 @@ class CommandPipeline:
             return []
         options = pending.get("options") or []
         item_ids = pending.get("item_ids") or []
+        reminder_ids = pending.get("reminder_ids") or []
         intent = dict(pending.get("intent") or {})
         if not intent or not options:
             return None
@@ -293,7 +316,11 @@ class CommandPipeline:
         if index is None:
             return None
         chosen = options[index]
-        if item_ids:
+        if reminder_ids:
+            intent["reminder_id"] = reminder_ids[index]
+            intent.pop("text", None)
+            intent.pop("use_last", None)
+        elif item_ids:
             intent["item_id"] = item_ids[index]
             intent.pop("name", None)
         elif intent["type"] in ("update_event", "delete_event", "complete_task"):
@@ -311,7 +338,8 @@ class CommandPipeline:
 def _pending_from(clarification: dict[str, Any]) -> dict[str, Any] | None:
     if not clarification.get("options"):
         return None
-    return {"intent": clarification["intent"], "options": clarification["options"], "item_ids": clarification.get("item_ids") or []}
+    return {"intent": clarification["intent"], "options": clarification["options"],
+            "item_ids": clarification.get("item_ids") or [], "reminder_ids": clarification.get("reminder_ids") or []}
 
 
 def _trim(data: dict[str, Any]) -> dict[str, Any]:
