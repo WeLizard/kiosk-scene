@@ -7,7 +7,7 @@ from typing import Any
 
 from ..clock import Clock, from_iso, to_iso
 from ..db import Database, dumps, loads
-from ..errors import DomovoyError, NotFoundError, ValidationError
+from ..errors import ConflictError, DomovoyError, NotFoundError, ValidationError
 from ..nlu.datetimes import next_occurrence, validate_recurrence
 from .audit import AuditLog, row_to_dict
 from .context import Ctx
@@ -114,11 +114,18 @@ class ReminderService:
             self.db.emit(conn, "reminders.changed", {"id": reminder_id})
         return self.get(reminder_id)
 
-    def update(self, ctx: Ctx, reminder_id: int, patch: dict[str, Any]) -> dict[str, Any]:
+    def update(self, ctx: Ctx, reminder_id: int, patch: dict[str, Any], *,
+               _require_active: bool = False, _require_kind: str | None = None) -> dict[str, Any]:
         with self.db.write() as conn:
             row = conn.execute("SELECT * FROM reminders WHERE id = ? AND deleted_at IS NULL", (reminder_id,)).fetchone()
             if row is None:
                 raise NotFoundError("Reminder not found")
+            if _require_active and row["state"] not in ("pending", "fired"):
+                raise ConflictError("Reminder is already finished")
+            if _require_kind and row["kind"] != _require_kind:
+                raise ConflictError("Only time reminders can be snoozed")
+            if row["state"] in ("done", "cancelled") and patch.get("state") in ("pending", "fired"):
+                raise ConflictError("Finished reminders cannot be reopened")
             before = row_to_dict(row)
             values: dict[str, Any] = {}
             if "text" in patch:
@@ -159,19 +166,21 @@ class ReminderService:
         return self.get(reminder_id)
 
     def complete(self, ctx: Ctx, reminder_id: int) -> dict[str, Any]:
-        return self.update(ctx, reminder_id, {"state": "done"})
+        return self.update(ctx, reminder_id, {"state": "done"}, _require_active=True)
 
     def snooze(self, ctx: Ctx, reminder_id: int, minutes: int = 10) -> dict[str, Any]:
-        if not 1 <= minutes <= 7 * 24 * 60:
+        if type(minutes) is not int or not 1 <= minutes <= 7 * 24 * 60:
             raise ValidationError("Snooze must be 1 minute to 7 days", fields={"minutes": "Out of range"})
         due = self.clock.now() + dt.timedelta(minutes=minutes)
-        return self.update(ctx, reminder_id, {"state": "pending", "due_at": due})
+        return self.update(ctx, reminder_id, {"state": "pending", "due_at": due}, _require_active=True, _require_kind="time")
 
-    def delete(self, ctx: Ctx, reminder_id: int) -> None:
+    def delete(self, ctx: Ctx, reminder_id: int, *, _require_active: bool = False) -> None:
         with self.db.write() as conn:
             row = conn.execute("SELECT * FROM reminders WHERE id = ? AND deleted_at IS NULL", (reminder_id,)).fetchone()
             if row is None:
                 raise NotFoundError("Reminder not found")
+            if _require_active and row["state"] not in ("pending", "fired"):
+                raise ConflictError("Reminder is already finished")
             now = self.clock.now_iso()
             before = row_to_dict(row)
             conn.execute("UPDATE reminders SET deleted_at = ?, updated_at = ? WHERE id = ?", (now, now, reminder_id))

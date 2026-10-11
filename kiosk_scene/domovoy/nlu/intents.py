@@ -15,7 +15,7 @@ from ..errors import ValidationError
 # kind → (max length / max items, required)
 STR, NUM, BOOL, STRLIST, STRMAP, ISO, ENUM, DICT, ANY = "str", "num", "bool", "strlist", "strmap", "iso", "enum", "dict", "any"
 
-READ_ONLY = {"find_item", "list_location", "query_calendar", "query_tasks", "query_memory", "ha_query", "clarify", "help"}
+READ_ONLY = {"find_item", "list_location", "query_calendar", "query_tasks", "query_memory", "query_reminders", "ha_query", "clarify", "help"}
 
 INTENTS: dict[str, dict[str, tuple]] = {
     "add_item": {"name": (STR, 200, True), "quantity": (NUM,), "unit": (STR, 32), "location_path": (STRLIST, 8, 80),
@@ -34,6 +34,10 @@ INTENTS: dict[str, dict[str, tuple]] = {
     "query_memory": {"query": (STR, 300, True)},
     "create_reminder": {"text": (STR, 500, True), "when": (ISO,), "date_only": (BOOL,), "trigger": (DICT,), "recurrence": (DICT,),
                         "channel": (ENUM, ("ui", "telegram", "speak", "ha_notify")), "recipient": (STR, 80)},
+    "query_reminders": {},
+    "complete_reminder": {"reminder_id": (NUM,), "text": (STR, 500), "use_last": (BOOL,)},
+    "snooze_reminder": {"reminder_id": (NUM,), "text": (STR, 500), "use_last": (BOOL,), "minutes": (NUM, None, True)},
+    "delete_reminder": {"reminder_id": (NUM,), "text": (STR, 500), "use_last": (BOOL,)},
     "create_event": {"title": (STR, 300, True), "start": (ISO, None, True), "end": (ISO,), "all_day": (BOOL,), "location": (STR, 300),
                      "notes": (STR, 2000), "calendar": (STR, 80)},
     "query_calendar": {"start": (ISO, None, True), "end": (ISO, None, True), "label": (STR, 80)},
@@ -88,6 +92,14 @@ def validate_intent(raw: Any) -> dict[str, Any]:
         cleaned = _coerce(name, definition, value)
         if cleaned is not None:
             clean[name] = cleaned
+    if intent_type in ("complete_reminder", "snooze_reminder", "delete_reminder"):
+        if not any(clean.get(key) for key in ("reminder_id", "text", "use_last")):
+            raise _fail("Which reminder? reminder_id, text or use_last is required", "reminder_id")
+        for name, ceiling in (("reminder_id", 1_000_000), ("minutes", 10_080)):
+            if name in clean and (not clean[name].is_integer() or not 1 <= clean[name] <= ceiling):
+                raise _fail(f"{name} must be a positive integer up to {ceiling}", name)
+            if name in clean:
+                clean[name] = int(clean[name])
     if not (spec.get("name") or spec.get("item_id")) or intent_type not in ("move_item", "consume_item", "set_quantity", "remove_item", "place_item", "use_item"):
         return clean
     if "name" not in clean and "item_id" not in clean and not clean.get("use_last"):

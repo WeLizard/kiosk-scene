@@ -21,6 +21,7 @@ from ..nlu.presence_words import DAY_WINDOWS
 from ..services.context import Ctx
 from ..services.items import format_quantity
 from ..services.triggers import looks_active
+from ..text import norm_key
 
 
 @dataclass
@@ -291,6 +292,78 @@ class Executor:
         return Outcome(True, "Нашёл: " + "; ".join(lines) + ".", refs=[{"kind": h["kind"], "id": h["id"]} for h in hits], data=result)
 
     # ---- reminders, calendar, messages ---------------------------------------------------------
+
+    def resolve_reminder_intent(self, intent: dict[str, Any], session: dict[str, Any]) -> Outcome | None:
+        """Pin a management command to an active ID before it enters the review queue."""
+        if intent["type"] not in ("complete_reminder", "snooze_reminder", "delete_reminder"):
+            return None
+        reminder_id = intent.get("reminder_id")
+        if reminder_id is None and intent.get("text"):
+            query = norm_key(intent["text"])
+            active = self.app.reminders.list(limit=1000)
+            exact = [r for r in active if norm_key(r["text"]) == query]
+            matches = exact or [r for r in active if query and query in norm_key(r["text"])]
+            if len(matches) > 1:
+                options = [f"№{r['id']} — {r['text']}" for r in matches[:8]]
+                return Outcome(False, "Какое напоминание: " + "; ".join(options) + "?",
+                               clarify={"question": "Какое напоминание?", "options": options,
+                                        "reminder_ids": [r["id"] for r in matches[:8]]})
+            if not matches:
+                return Outcome(False, f"Не нашёл активное напоминание «{intent['text']}».")
+            reminder_id = matches[0]["id"]
+        if reminder_id is None and intent.get("use_last"):
+            reminder_id = session.get("last_reminder_id")
+        if reminder_id is None:
+            return Outcome(False, "Какое напоминание? Назовите его или номер.")
+        try:
+            reminder = self.app.reminders.get(int(reminder_id))
+        except (NotFoundError, ValueError, TypeError):
+            return Outcome(False, f"Не нашёл активное напоминание №{reminder_id}.")
+        if reminder["state"] not in ("pending", "fired"):
+            return Outcome(False, f"Напоминание №{reminder_id} уже завершено или отменено.")
+        if intent["type"] == "snooze_reminder" and reminder["kind"] != "time":
+            return Outcome(False, "Напоминание по условию нельзя отложить на время.")
+        intent["reminder_id"] = int(reminder_id)
+        intent.pop("text", None)
+        intent.pop("use_last", None)
+        return None
+
+    def do_query_reminders(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:
+        reminders = self.app.reminders.list()
+        if not reminders:
+            return Outcome(True, "Активных напоминаний нет.", data={"reminders": []})
+        parts = []
+        for reminder in reminders[:8]:
+            when = format_when(from_iso(reminder["due_at"]).astimezone(self.app.clock.tz), self._now()) if reminder["due_at"] else "по условию"
+            parts.append(f"№{reminder['id']} — {reminder['text']}, {when}")
+        more = f" И ещё {len(reminders) - 8}." if len(reminders) > 8 else ""
+        return Outcome(True, "Активные напоминания: " + "; ".join(parts) + "." + more,
+                       refs=[{"kind": "reminder", "id": r["id"]} for r in reminders], data={"reminders": reminders})
+
+    def do_complete_reminder(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:
+        error = self.resolve_reminder_intent(intent, session)
+        if error:
+            return error
+        reminder = self.app.reminders.complete(ctx, intent["reminder_id"])
+        return Outcome(True, f"Отмечено выполненным: №{reminder['id']} — {reminder['text']}.",
+                       refs=[{"kind": "reminder", "id": reminder["id"]}], session={"last_reminder_id": reminder["id"]})
+
+    def do_snooze_reminder(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:
+        error = self.resolve_reminder_intent(intent, session)
+        if error:
+            return error
+        reminder = self.app.reminders.snooze(ctx, intent["reminder_id"], intent["minutes"])
+        return Outcome(True, f"Отложено на {intent['minutes']} минут: №{reminder['id']} — {reminder['text']}.",
+                       refs=[{"kind": "reminder", "id": reminder["id"]}], session={"last_reminder_id": reminder["id"]})
+
+    def do_delete_reminder(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:
+        error = self.resolve_reminder_intent(intent, session)
+        if error:
+            return error
+        reminder = self.app.reminders.get(intent["reminder_id"])
+        self.app.reminders.delete(ctx, reminder["id"], _require_active=True)
+        return Outcome(True, f"Удалено напоминание №{reminder['id']} — {reminder['text']}.", refs=[{"kind": "reminder", "id": reminder["id"]}],
+                       session={"last_reminder_id": None})
 
     def _default_channel(self) -> str:
         if self.app.settings.get("speakers") and self.app.settings.get("speak").get("enabled", True):

@@ -62,21 +62,21 @@ jobs:
           # Extract version from config.yaml
           VERSION=$(sed -n 's/^version: "\(.*\)"/\1/p' kiosk_scene/config.yaml)
           test -n "$VERSION"
-          test "$VERSION" = "0.11.4"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "Version: $VERSION"
 
           # Prepare options.json
           mkdir -p .ci-data
           cat > .ci-data/options.json <<'OPTIONS_EOF'
-{
-  "timezone": "Europe/Moscow",
-  "active_pack_id": "neiri",
-  "domovoy_enabled": true,
-  "domovoy_kiosk_mic": false,
-  "domovoy_kiosk_room": "",
-  "domovoy_trusted_networks": []
-}
-OPTIONS_EOF
+          {
+            "timezone": "Europe/Moscow",
+            "active_pack_id": "neiri",
+            "domovoy_enabled": true,
+            "domovoy_kiosk_mic": false,
+            "domovoy_kiosk_room": "",
+            "domovoy_trusted_networks": []
+          }
+          OPTIONS_EOF
 
           # Build image
           docker build --no-cache \

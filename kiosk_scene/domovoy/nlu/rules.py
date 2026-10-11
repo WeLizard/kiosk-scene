@@ -81,7 +81,7 @@ class RuleInterpreter:
 
     def __init__(self) -> None:
         self._handlers: list[Callable[[str, str, InterpretContext], list[Intent] | None]] = [
-            self._undo, self._help, self._correction, self._reminder, self._message, self._calendar,
+            self._undo, self._help, self._correction, self._reminder_management, self._reminder, self._message, self._calendar,
             self._shopping_and_tasks, self._home_assistant, self._inventory, self._note,
         ]
 
@@ -149,6 +149,49 @@ class RuleInterpreter:
         return None
 
     # ---- reminders and event-driven messages ---------------------------------------------------
+
+    def _reminder_management(self, original: str, folded: str, ctx: InterpretContext) -> list[Intent] | None:
+        phrase = folded.strip(" .!?")
+        if re.fullmatch(r"(?:покажи|перечисли|назови|какие|что у меня|есть ли у меня)\b.*\bнапоминани\w*|(?:что мне предстоит|мои напоминания)", phrase):
+            return [_intent("query_reminders", 0.95, original)]
+
+        action = None
+        target = ""
+        minutes = None
+        snooze = re.fullmatch(r"(?:отложи|отложить|перенеси)\s+(?P<target>.+?)\s+на\s+(?P<amount>[а-я\d\s]+?)\s+минут\w*", phrase)
+        if snooze:
+            parsed = parse_number(snooze.group("amount").split(), 0)
+            if not parsed or parsed[1] != len(snooze.group("amount").split()):
+                return [_intent("clarify", 0.5, original, question="На сколько минут отложить?")]
+            minutes = parsed[0]
+            target = snooze.group("target")
+            action = "snooze_reminder"
+        else:
+            done = re.fullmatch(r"(?:отметь|пометь|считай)\s+(?P<target>.+?)\s+(?:выполненн\w*|сделанн\w*)|(?:я\s+)?(?:сделал[аи]?|выполнил[аи]?)\s+(?P<done>.+)", phrase)
+            deleted = re.fullmatch(r"(?:удали|удалить|отмени|убери)\s+(?P<target>(?:напоминани\w*|его|это)\b.*)", phrase)
+            if done and ("напоминан" in phrase or re.search(r"\b(?:его|это)\b", phrase)):
+                target = done.group("target") or done.group("done")
+                action = "complete_reminder"
+            elif deleted:
+                target = deleted.group("target")
+                action = "delete_reminder"
+        if not action:
+            return None
+        target = re.sub(r"^напоминани\w*\s*", "", target).strip(" «»\"'.,")
+        if target in ("его", "это", "его же"):
+            fields: dict[str, Any] = {"use_last": True}
+        else:
+            id_match = re.fullmatch(r"(?:номер\s*|№\s*|#\s*)?(\d+)", target)
+            if id_match:
+                fields = {"reminder_id": int(id_match.group(1))}
+            else:
+                text = re.sub(r"^(?:о|об|про|что|насчет)\s+", "", target).strip(" «»\"'.,")
+                if not text:
+                    return [_intent("clarify", 0.5, original, question="Какое напоминание?")]
+                fields = {"text": text}
+        if minutes is not None:
+            fields["minutes"] = minutes
+        return [_intent(action, 0.95, original, **fields)]
 
     _PRESENCE = re.compile(
         r"(?P<lead>\b(?:когда|как только|как|после того как)\s+(?:я\s+)?(?:(?P<p1>утром|днем|вечером|ночью)\s+)?"
