@@ -14,7 +14,7 @@ For a Home Assistant kiosk deployment, keep the kiosk entrypoint stable and host
 
 Runtime and pack delivery:
 
-- `/config/kiosk-scene/scene-runtime/`
+- `/scene-runtime/` — assets served directly from the Kiosk Scene add-on image
 - `/config/kiosk-scene/scene-packs/<pack-id>/renderer.kiosk-scene.json`
 - `/config/kiosk-scene/scene-packs/<pack-id>/avatar.manifest.json`
 - `/config/kiosk-scene/scene-packs/<pack-id>/scene.default.json`
@@ -32,8 +32,11 @@ Ingress and bootstrap:
 The old `/config/openclaw-scene/` and `/config/www/neiri-scene/` layouts are migration-only:
 
 - `Kiosk Scene` may seed missing canonical pack files from `/config/openclaw-scene/` and `/config/www/neiri-scene/`
-- new edits and new runtime ownership must target `/config/kiosk-scene/...`
+- new edits to packs and other persistent state target `/config/kiosk-scene/...`; the runtime itself ships in the add-on image
 - `/local/...` should be treated as compatibility-only, not as the canonical delivery path
+
+The former `/config/kiosk-scene/scene-runtime/` is preserved for existing installations, but is no longer served. This
+prevents an older HAOS-kiosk add-on from replacing the Kiosk Scene runtime when the display add-on restarts.
 
 ## State sources
 

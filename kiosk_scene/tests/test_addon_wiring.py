@@ -37,6 +37,14 @@ class ShippedDomovoyPort(unittest.TestCase):
         self.assertEqual(service_port.group(1), default_port.group(1))
         self.assertNotEqual(service_port.group(1), "48099")
 
+    def test_runtime_is_owned_by_the_image_not_shared_config(self) -> None:
+        nginx = (ADDON_DIR / "nginx.conf").read_text(encoding="utf-8")
+        dockerfile = (ADDON_DIR / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn('export SCENE_RUNTIME_DIR="/opt/kiosk-scene/scene-runtime"', RUN_SH)
+        self.assertIn("root /opt/kiosk-scene;", nginx)
+        self.assertIn("COPY scene-runtime-seed /opt/kiosk-scene/scene-runtime", dockerfile)
+        self.assertNotIn("IMAGE_SCENE_RUNTIME_SEED_DIR", RUN_SH)
+
 
 def free_port() -> int:
     with socket.socket() as s:
@@ -77,6 +85,7 @@ def nginx_conf(root: Path, *, listen: int, domovoy_port: int, origin_conf: Path)
     text = (ADDON_DIR / "nginx.conf").read_text(encoding="utf-8")
     text = text.replace("/etc/nginx/domovoy-origin.conf", str(origin_conf)).replace("listen 48123;", f"listen {listen};")
     text = text.replace("127.0.0.1:48199", f"127.0.0.1:{domovoy_port}").replace("/config/kiosk-scene", str(root / "config" / "kiosk-scene"))
+    text = text.replace("/opt/kiosk-scene", str(root / "image"))
     text = text.replace("access_log /dev/stdout;", f"access_log {root / 'access.log'};").replace("error_log /dev/stderr notice;", f"error_log {root / 'error.log'} notice;")
     path = root / "nginx.conf"
     path.write_text(text, encoding="utf-8")
@@ -150,6 +159,11 @@ class BehindNginx(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.root = Path(tempfile.mkdtemp(prefix="addon-nginx-"))
+        runtime = cls.root / "image" / "scene-runtime"
+        shutil.copytree(ADDON_DIR / "scene-runtime-seed", runtime)
+        legacy = cls.root / "config" / "kiosk-scene" / "scene-runtime"
+        legacy.mkdir(parents=True)
+        (legacy / "index.html").write_text("obsolete display runtime", encoding="utf-8")
         cls.lan = lan_address()
         trusted = ""   # the LAN address is deliberately NOT trusted at first
         cls.origin_conf = run_block(cls.root, networks=trusted)
@@ -261,6 +275,21 @@ class BehindNginx(unittest.TestCase):
         self.assertEqual(status, 302)
         self.assertTrue(headers["Location"].startswith("../scene-runtime/admin.html"))
         self.assertEqual(get(self.url("/admin"))[2]["Location"], "admin/")
+
+    def test_runtime_serves_image_even_if_an_old_display_addon_overwrites_shared_files(self) -> None:
+        image = self.root / "image" / "scene-runtime"
+        legacy = self.root / "config" / "kiosk-scene" / "scene-runtime"
+        for name in ("index.html", "admin.html", "avatar.html"):
+            status, body, _ = get(self.url(f"/scene-runtime/{name}"))
+            self.assertEqual(status, 200)
+            self.assertEqual(body, (image / name).read_bytes())
+        asset = next((image / "assets").glob("*.js"))
+        status, body, _ = get(self.url(f"/scene-runtime/assets/{asset.name}"))
+        self.assertEqual(status, 200)
+        self.assertEqual(body, asset.read_bytes())
+        (legacy / "index.html").write_text("older HAOS-kiosk copied here again", encoding="utf-8")
+        self.assertEqual(get(self.url("/scene-runtime/"))[1], (image / "index.html").read_bytes())
+        self.assertEqual((legacy / "index.html").read_text(encoding="utf-8"), "older HAOS-kiosk copied here again")
 
 
 if __name__ == "__main__":
