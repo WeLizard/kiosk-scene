@@ -24,6 +24,43 @@ def make_manifest(pack_dir: Path, **overrides) -> None:
     (pack_dir / "avatar.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
 
+def make_scene(pack_dir: Path, name: str = "Scene") -> None:
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    (pack_dir / "renderer.kiosk-scene.json").write_text(json.dumps({"assistant": {"name": name}}), encoding="utf-8")
+    (pack_dir / "scene.default.json").write_text(json.dumps({"pages": [{"id": "home"}]}), encoding="utf-8")
+
+
+class ScenePackTests(unittest.TestCase):
+    def test_catalog_clone_and_select_are_scene_only(self) -> None:
+        with scene_env() as root:
+            host = load_module("scene_host_service")
+            make_scene(root / "scene-packs" / "demo", "Demo")
+            make_manifest(root / "avatar-packs" / "avatar-only")
+            (root / "scene-packs" / "broken").mkdir()
+            catalog = host.load_scene_catalog()
+            self.assertEqual([item["id"] for item in catalog["items"]], ["demo"])
+            self.assertTrue(catalog["items"][0]["active"])
+            host.clone_scene_pack("demo", "copy")
+            self.assertEqual(host.inspect_scene_pack("copy")["name"], "Demo")
+            with self.assertRaises(FileExistsError):
+                host.clone_scene_pack("demo", "copy")
+            with self.assertRaises(ValueError):
+                host.clone_scene_pack("demo", "../escape")
+            host.select_scene_pack("copy", "demo")
+            self.assertEqual(host.load_active_pack_id(), "copy")
+            with self.assertRaises(RuntimeError):
+                host.select_scene_pack("demo", "demo")
+            self.assertEqual(host.load_active_pack_id(), "copy")
+
+    def test_invalid_scene_cannot_be_selected(self) -> None:
+        with scene_env() as root:
+            host = load_module("scene_host_service")
+            make_scene(root / "scene-packs" / "demo")
+            with self.assertRaises((FileNotFoundError, ValueError)):
+                host.select_scene_pack("missing", "demo")
+            self.assertEqual(host.load_active_pack_id(), "demo")
+
+
 class BootstrapTests(unittest.TestCase):
     def test_stale_display_config_is_not_used(self) -> None:
         with scene_env() as root:

@@ -1,10 +1,10 @@
 configuration:
   timezone:
     name: Time zone
-    description: IANA time zone used by the scene and by Domovoy (for example Europe/Moscow).
+    description: Main add-on and Domovoy time zone. Restart the add-on after changing it. The active scene's weather time zone is configured separately on the Kiosk Scene panel.
   active_pack_id:
-    name: Active scene pack
-    description: Scene pack shown by default.
+    name: Initial scene pack
+    description: Used on first start only. Choose the active scene on the Kiosk Scene panel afterward.
   domovoy_enabled:
     name: Enable Domovoy
     description: Starts the Domovoy household assistant (inventory, memory, reminders, calendar) and its admin UI.

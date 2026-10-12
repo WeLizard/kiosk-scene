@@ -15,6 +15,29 @@ interface Loaded {
   settings: Settings;
   contacts: Contact[];
   linkRequests: Array<{ chat_id: string; name?: string; username?: string; text?: string }>;
+  haEntities: HaEntity[];
+  haEntitiesAvailable: boolean;
+}
+
+interface HaEntity { id: string; name: string; domain: string; state: string }
+
+export function entityFields(name: string, label: string, saved: string, entities: HaEntity[], domains?: string[], required = false): FieldOptions[] {
+  const choices = entities.filter((entity) => !domains || domains.includes(entity.domain));
+  const options = [{ value: "", label: "Выбрать из Home Assistant" },
+    ...choices.map((entity) => ({ value: entity.id, label: `${entity.name} (${entity.id})` }))];
+  if (saved && !choices.some((entity) => entity.id === saved)) {
+    options.push({ value: saved, label: `${saved} (сейчас не найдено)` });
+  }
+  return [
+    { name: `${name}_pick`, label, type: "select", options, value: saved, wide: true },
+    { name, label: `${label}: ID вручную`, value: saved, required: required && choices.length === 0,
+      hint: "Можно указать ID вручную. Сохранённое значение не исчезнет, если HA временно недоступен.", wide: true },
+  ];
+}
+
+export function entityValue(values: Record<string, string | boolean>, name: string, saved: string): string {
+  const manual = String(values[name] ?? "").trim();
+  return manual !== saved ? manual : String(values[`${name}_pick`] ?? "").trim() || manual;
 }
 
 const lines = (value: unknown): string => (Array.isArray(value) ? value.join("\n") : "");
@@ -292,10 +315,11 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
   const handle = asyncView<Loaded>({
     host: content,
     load: async (signal) => {
-      const [main, settings, contacts] = await Promise.all([
+      const [main, settings, contacts, entities] = await Promise.all([
         read<{ integrations: Integration[]; secrets: Record<string, boolean> }>(runtime, "api/integrations", undefined, signal),
         read<{ settings: Settings }>(runtime, "api/settings", undefined, signal),
         read<{ contacts: Contact[]; link_requests: Loaded["linkRequests"] }>(runtime, "api/contacts", undefined, signal),
+        read<{ entities: HaEntity[] }>(runtime, "api/ha/entities", { limit: 1000 }, signal),
       ]);
       const paired = await both(Promise.resolve(main), Promise.resolve(settings));
       if (!paired.ok) {
@@ -304,7 +328,8 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
       if (!contacts.ok) {
         return contacts;
       }
-      return { ok: true as const, data: { integrations: paired.data[0].integrations, secrets: paired.data[0].secrets, settings: paired.data[1].settings, contacts: contacts.data.contacts, linkRequests: contacts.data.link_requests ?? [] } };
+      return { ok: true as const, data: { integrations: paired.data[0].integrations, secrets: paired.data[0].secrets, settings: paired.data[1].settings, contacts: contacts.data.contacts, linkRequests: contacts.data.link_requests ?? [],
+        haEntities: entities.ok ? entities.data.entities : [], haEntitiesAvailable: entities.ok } };
     },
     render: (data, refresh) => {
       const s = data.settings;
@@ -324,12 +349,13 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         h("div", { class: "ks-card dv-status" }, h("strong", null, INTEGRATION_TITLES[i.name] ?? i.name), badge(statusLabel(i.status), statusTone(i.status)), h("small", { class: "ks-muted" }, i.detail && i.detail.toLowerCase() !== statusLabel(i.status).toLowerCase() ? i.detail : "")),
       ));
 
-      const ha = section("ha", "Home Assistant", status("home_assistant"), h("div", null, detail("home_assistant"), settingsForm(runtime, [
+      const ha = section("ha", "Home Assistant", status("home_assistant"), h("div", null, detail("home_assistant"),
+        data.haEntitiesAvailable ? null : h("p", { class: "ks-muted" }, "Список сущностей недоступен. Можно указать ID вручную."), settingsForm(runtime, [
         { name: "url", label: "Адрес Home Assistant", type: "url", value: s.ha.url, placeholder: "http://homeassistant.local:8123", hint: "В аддоне обычно http://supervisor/core — оставьте пустым, если работаете внутри HA.", wide: true },
         secretField("ha_token", "Долгоживущий токен доступа", data.secrets.ha_token),
-        { name: "person_entity", label: "Ваш person", value: s.ha.person_entity, placeholder: "person.ivan", hint: "Для напоминаний «когда приду домой».", wide: true },
+        ...entityFields("person_entity", "Ваш person", s.ha.person_entity, data.haEntities, ["person"]),
         { name: "allowed_services", label: "Разрешённые сервисы управления", type: "textarea", rows: 4, value: lines(s.ha.allowed_services), placeholder: "light.turn_on\nlight.turn_off\nscript.turn_on", hint: "Дополнительно к базовым (свет, розетки, вентиляторы, шторы, сцены). Замки, сигнализация, скрипты и Supervisor запрещены всегда.", wide: true },
-      ], (v) => ({ settings: { ha: { url: String(v.url).trim(), person_entity: String(v.person_entity).trim(), allowed_services: splitLines(String(v.allowed_services)) } }, secrets: { ha_token: String(v.ha_token) } }), refresh)));
+      ], (v) => ({ settings: { ha: { url: String(v.url).trim(), person_entity: entityValue(v, "person_entity", s.ha.person_entity), allowed_services: splitLines(String(v.allowed_services)) } }, secrets: { ha_token: String(v.ha_token) } }), refresh)));
 
       const tg = section("telegram", "Telegram", status("telegram"), h("div", null, detail("telegram"), settingsForm(runtime, [
         { name: "enabled", label: "Включён", type: "checkbox", value: s.telegram.enabled },
@@ -341,8 +367,12 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         { name: "username", label: "Логин", value: s.caldav.username },
         secretField("caldav_password", "Пароль / пароль приложения", data.secrets.caldav_password),
         { name: "default", label: "Куда добавлять по умолчанию", type: "select", options: [{ value: "local", label: "Локальный календарь" }, { value: "caldav", label: "CalDAV" }], value: s.calendar.default },
+        { name: "ha_calendar_pick", label: "Добавить календарь HA", type: "select", value: "", options: [{ value: "", label: "Выбрать из Home Assistant" },
+          ...data.haEntities.filter((entity) => entity.domain === "calendar").map((entity) => ({ value: entity.id, label: `${entity.name} (${entity.id})` }))], wide: true },
         { name: "ha_calendars", label: "Календари из Home Assistant", type: "textarea", rows: 2, value: lines(s.calendar.ha_calendars), placeholder: "calendar.family", hint: "По одному на строку. События из них видны; добавлять можно, менять и удалять — нет.", wide: true },
-      ], (v) => ({ settings: { caldav: { url: String(v.url).trim(), username: String(v.username).trim() }, calendar: { default: v.default, ha_calendars: splitLines(String(v.ha_calendars)) } }, secrets: { caldav_password: String(v.caldav_password) } }), refresh)));
+      ], (v) => ({ settings: { caldav: { url: String(v.url).trim(), username: String(v.username).trim() }, calendar: { default: v.default,
+        ha_calendars: [...new Set([...splitLines(String(v.ha_calendars)), String(v.ha_calendar_pick || "").trim()].filter(Boolean))] } },
+        secrets: { caldav_password: String(v.caldav_password) } }), refresh)));
 
       const llm = section("llm", "Языковая модель (необязательно)", status("llm"), h("div", null, detail("llm"),
         h("p", { class: "ks-muted" }, "Подойдёт любой OpenAI-совместимый сервер: локальный (Ollama, llama.cpp, LM Studio) или облачный. Без неё Домовой работает по правилам — быстро и без нагрузки на процессор. Модель ничего не решает сама: её предложения проходят проверку и попадают в «Проверку»."),
@@ -363,13 +393,15 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
           { header: "", render: (r) => (r.default ? "по умолчанию" : "") },
         ], (row) => [
           { name: "name", label: "Название", value: row?.name ?? "", placeholder: "Станция на кухне" },
-          { name: "entity_id", label: "media_player", required: true, value: row?.entity_id ?? "", placeholder: "media_player.yandex_station_kitchen", wide: true },
+          ...entityFields("entity_id", "media_player", String(row?.entity_id ?? ""), data.haEntities, ["media_player"], true),
           { name: "room", label: "Комната", value: row?.room ?? "", placeholder: "кухня" },
           { name: "mode", label: "Способ озвучки", type: "select", options: [{ value: "yandex_station_text", label: "Яндекс Станция: media_player.play_media (text)" }, { value: "tts_speak", label: "tts.speak (нужна TTS-сущность)" }, { value: "custom", label: "Свой сервис" }], value: row?.mode ?? "yandex_station_text", wide: true },
-          { name: "tts_entity", label: "TTS-сущность", value: row?.tts_entity ?? "", placeholder: "tts.yandex_station", hint: "Только для tts.speak." },
+          ...entityFields("tts_entity", "TTS-сущность (для tts.speak)", String(row?.tts_entity ?? ""), data.haEntities, ["tts"]),
           { name: "service", label: "Свой сервис", value: row?.service ?? "", placeholder: "script.say", hint: "domain.service; в данных используйте {text} и {entity_id}." },
           { name: "default", label: "По умолчанию, если неизвестно, где человек", type: "checkbox", value: row?.default === true, wide: true },
-        ], (v, prev) => ({ ...(prev ?? {}), id: prev?.id ?? String(v.entity_id), name: String(v.name).trim(), entity_id: String(v.entity_id).trim(), room: String(v.room).trim(), mode: v.mode, tts_entity: String(v.tts_entity).trim(), service: String(v.service).trim(), default: v.default === true }), "колонка", refresh),
+        ], (v, prev) => ({ ...(prev ?? {}), id: prev?.id ?? entityValue(v, "entity_id", String(prev?.entity_id ?? "")), name: String(v.name).trim(),
+          entity_id: entityValue(v, "entity_id", String(prev?.entity_id ?? "")), room: String(v.room).trim(), mode: v.mode,
+          tts_entity: entityValue(v, "tts_entity", String(prev?.tts_entity ?? "")), service: String(v.service).trim(), default: v.default === true }), "колонка", refresh),
       ));
 
       const rooms = section("rooms", "Где вы находитесь: комнаты и места", null, h("div", null,
@@ -378,16 +410,19 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         collectionEditor(runtime, "rooms", s.rooms, [{ header: "Комната", render: (r) => String(r.name || r.room) }, { header: "Датчик", render: (r) => `${r.entity_id ?? ""} = ${r.state ?? "on"}` }],
           (row) => [
             { name: "name", label: "Название", required: true, value: row?.name ?? row?.room ?? "", placeholder: "кухня" },
-            { name: "entity_id", label: "Сущность", required: true, value: row?.entity_id ?? "", placeholder: "binary_sensor.kitchen_presence", wide: true },
+            ...entityFields("entity_id", "Сущность", String(row?.entity_id ?? ""), data.haEntities,
+              ["binary_sensor", "sensor", "device_tracker", "person", "zone", "input_boolean"], true),
             { name: "state", label: "Активна, когда состояние", value: row?.state ?? "on" },
-          ], (v, prev) => ({ ...(prev ?? {}), name: String(v.name).trim(), entity_id: String(v.entity_id).trim(), state: String(v.state).trim() || "on" }), "комната", refresh),
+          ], (v, prev) => ({ ...(prev ?? {}), name: String(v.name).trim(), entity_id: entityValue(v, "entity_id", String(prev?.entity_id ?? "")),
+            state: String(v.state).trim() || "on" }), "комната", refresh),
         h("h3", null, "Другие места и устройства"),
         collectionEditor(runtime, "places", s.places, [{ header: "Место", render: (r) => String(r.name) }, { header: "Сущность", render: (r) => `${r.entity_id ?? ""} = ${r.state ?? "on"}` }],
           (row) => [
             { name: "name", label: "Название", required: true, value: row?.name ?? "", placeholder: "мастерская" },
-            { name: "entity_id", label: "Сущность", required: true, value: row?.entity_id ?? "", placeholder: "sensor.printer_status", wide: true },
+            ...entityFields("entity_id", "Сущность", String(row?.entity_id ?? ""), data.haEntities, undefined, true),
             { name: "state", label: "Активно, когда состояние", value: row?.state ?? "on" },
-          ], (v, prev) => ({ ...(prev ?? {}), name: String(v.name).trim(), entity_id: String(v.entity_id).trim(), state: String(v.state).trim() || "on" }), "место", refresh),
+          ], (v, prev) => ({ ...(prev ?? {}), name: String(v.name).trim(), entity_id: entityValue(v, "entity_id", String(prev?.entity_id ?? "")),
+            state: String(v.state).trim() || "on" }), "место", refresh),
       ));
 
       const stt = section("stt", "Распознавание речи (микрофон киоска)", status("stt"), h("div", null, detail("stt"),

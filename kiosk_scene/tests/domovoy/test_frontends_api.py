@@ -8,7 +8,8 @@ import urllib.error
 import urllib.request
 
 from ..helpers import ADDON_DIR  # noqa: F401
-from domovoy.api import ApiServer
+from domovoy.api import ApiServer, Request, build_router
+from domovoy.errors import ValidationError
 from domovoy.assistant.voice import strip_trigger
 from domovoy.frontends.alice import AliceFrontend
 from domovoy.text import speakable
@@ -339,6 +340,34 @@ class HttpApi(AppCase):
         status, imported = self.call("POST", "/api/import", dump)
         self.assertEqual(imported["imported"]["items"], 1)
         self.assertEqual(self.call("GET", "/api/items")[1]["items"][0]["quantity"], 9)
+
+
+class HaEntityDiscovery(AppCase):
+    def test_authenticated_route_filters_bounds_and_redacts_states(self) -> None:
+        ctx, _ = build(self.app)
+        matched = build_router(ctx).match("GET", "/api/ha/entities")
+        self.assertIsInstance(matched, tuple)
+        handler, _, auth = matched
+        self.assertEqual(auth, "user")
+
+        with FakeHA() as ha:
+            ha.set_state("media_player.kitchen", "idle", friendly_name="Кухня", access_token="PRIVATE-TOKEN")
+            ha.set_state("person.ilya", "home", friendly_name="Илья", secret="PRIVATE-TOKEN")
+            ha.set_state("calendar.family", "on", friendly_name="Семья")
+            self.app.settings.update({"ha": {"url": ha.url + "/api"}})
+            self.app.secrets.set("ha_token", ha.TOKEN)
+
+            def discover(query: dict[str, str]) -> dict:
+                return handler(Request("GET", "/api/ha/entities", query, {}, b"", None, "127.0.0.1"))
+
+            found = discover({"domains": "person,media_player", "limit": "1"})
+            self.assertEqual(len(found["entities"]), 1)
+            self.assertEqual(set(found["entities"][0]), {"id", "name", "domain", "state"})
+            self.assertNotIn("PRIVATE-TOKEN", json.dumps(found))
+            people = discover({"domains": "person"})
+            self.assertEqual(people["entities"], [{"id": "person.ilya", "name": "Илья", "domain": "person", "state": "home"}])
+            with self.assertRaises(ValidationError):
+                discover({"domains": "person,$bad"})
 
 
 class AvatarBridge(AppCase):

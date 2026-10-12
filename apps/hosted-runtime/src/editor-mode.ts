@@ -925,22 +925,25 @@ function initialSelectedPageId(config: SceneConfigV1): string | null {
   return orderedPages(config)[0]?.id || null;
 }
 
-async function loadConfig(apiUrl: string): Promise<SceneConfigV1> {
+async function loadConfig(apiUrl: string): Promise<{ config: SceneConfigV1; packId: string }> {
   const response = await fetch(apiUrl, { cache: "no-store" });
-  const payload = await response.json() as { success?: boolean; config?: SceneConfigV1 };
-  if (!response.ok || payload.success === false || !payload.config) {
+  const payload = await response.json() as { success?: boolean; config?: SceneConfigV1; packId?: string };
+  if (!response.ok || payload.success === false || !payload.config || !payload.packId) {
     throw new Error(`GET ${apiUrl} failed: HTTP ${response.status}`);
   }
-  return cloneConfig(payload.config);
+  return { config: cloneConfig(payload.config), packId: payload.packId };
 }
 
-async function saveConfig(apiUrl: string, config: SceneConfigV1): Promise<SceneConfigV1> {
+async function saveConfig(apiUrl: string, config: SceneConfigV1, expectedPackId: string): Promise<SceneConfigV1> {
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(config),
+    body: JSON.stringify({ config, expectedPackId }),
   });
-  const payload = await response.json() as { success?: boolean; config?: SceneConfigV1 };
+  const payload = await response.json() as { success?: boolean; config?: SceneConfigV1; error?: string };
+  if (response.status === 409) {
+    throw new Error(payload.error || "Active scene changed. Reload the editor before saving.");
+  }
   if (!response.ok || payload.success === false || !payload.config) {
     throw new Error(`POST ${apiUrl} failed: HTTP ${response.status}`);
   }
@@ -2554,8 +2557,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
     avatarPackLoading: false,
     avatarPackDirty: false,
     avatarPackSaving: false,
-    activeSectionTab: "cards",
+    activeSectionTab: new URL(window.location.href).searchParams.get("editorTab") === "avatar" ? "avatar" : "cards",
   };
+  let loadedPackId = options.packId;
 
   const loadSelectedAvatarPackDetails = async (packId: string | null | undefined): Promise<void> => {
     const normalizedPackId = String(packId || "").trim();
@@ -3418,6 +3422,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
       state.avatarPackSaving = state.avatarPackDirty;
       setStatus(copy.saving, "muted");
       try {
+        // Check before saving a separate avatar motion map as well as the scene config.
+        const currentPack = await loadConfig(options.sceneApiUrl);
+        if (currentPack.packId !== loadedPackId) {
+          throw new Error(`Active scene changed from ${loadedPackId} to ${currentPack.packId}. Reload the editor before saving.`);
+        }
         if (state.avatarPackDirty && state.avatarPackDetails && options.avatarPackApiUrl) {
           try {
             state.avatarPackDetails = await saveAvatarPackDetails(options.avatarPackApiUrl, state.avatarPackDetails);
@@ -3426,7 +3435,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
           }
           state.avatarPackDirty = false;
         }
-        state.config = await saveConfig(options.sceneApiUrl, cloneConfig(state.config));
+        state.config = await saveConfig(options.sceneApiUrl, cloneConfig(state.config), loadedPackId);
         state.dirty = false;
         state.saving = false;
         state.avatarPackSaving = false;
@@ -3597,7 +3606,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   });
 
   try {
-    state.config = await loadConfig(options.sceneApiUrl);
+    const loaded = await loadConfig(options.sceneApiUrl);
+    state.config = loaded.config;
+    loadedPackId = loaded.packId;
     if (options.sceneAvatarManifestUrl) {
       try {
         state.bundledAvatar = await loadBundledAvatarSummary(options.sceneAvatarManifestUrl, options.packId);

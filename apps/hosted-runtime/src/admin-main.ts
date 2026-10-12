@@ -5,6 +5,7 @@ import { loadBootstrap, resolveBootstrapUrl, resolveHostedUrl, retryBoot } from 
 import { loadBootstrapExtensions } from "./kiosk-extensions";
 import { resolveUiLang } from "./locale";
 import { renderStatus } from "./status";
+import { createSettingsExtension } from "./settings-page";
 
 const STRINGS = {
   ru: {
@@ -55,10 +56,24 @@ async function boot(): Promise<void> {
   const bootstrapUrl = resolveBootstrapUrl();
   const bootstrap = await loadBootstrap(bootstrapUrl);
   const registry = new ExtensionRegistry();
+  const avatarEditorUrl = new URL(resolveHostedUrl(String(bootstrap.entryUrl || "/scene-runtime/"), bootstrapUrl));
+  avatarEditorUrl.searchParams.set("editor", "1");
+  avatarEditorUrl.searchParams.set("editorTab", "avatar");
+  await loadBootstrapExtensions(registry, bootstrap, bootstrapUrl);
+  await registry.load(createSettingsExtension({
+    lang,
+    catalogUrl: resolveHostedUrl(bootstrap.files?.sceneCatalogUrl || "/scene-api/scene-catalog", bootstrapUrl),
+    capabilitiesUrl: resolveHostedUrl(bootstrap.files?.adminCapabilitiesUrl || "/scene-api/admin-capabilities", bootstrapUrl),
+    selectUrl: resolveHostedUrl(bootstrap.files?.sceneSelectUrl || "/scene-api/scene-pack/select", bootstrapUrl),
+    cloneUrl: resolveHostedUrl(bootstrap.files?.sceneCloneUrl || "/scene-api/scene-pack/clone", bootstrapUrl),
+    avatarEditorUrl: avatarEditorUrl.toString(),
+    hasDomovoy: registry.listExtensions().some((extension) => extension.id === "domovoy"),
+  }));
   const app = mountAdminApp(container, {
     registry,
     title: text.title,
     locale: navigator.language,
+    defaultPageId: "kiosk-scene.settings",
     resolveUrl: (url) => resolveHostedUrl(url, bootstrapUrl),
     labels: {
       sections: text.sections,
@@ -76,7 +91,6 @@ async function boot(): Promise<void> {
       { label: text.editor, href: resolveHostedUrl(String(bootstrap.sceneEditorUrl || "/scene-editor/"), bootstrapUrl) },
     ],
   });
-  await loadBootstrapExtensions(registry, bootstrap, bootstrapUrl);
   // `persisted` = the page is going into the back/forward cache and may come back: keep it alive.
   window.addEventListener("pagehide", (event) => {
     if (!event.persisted) {

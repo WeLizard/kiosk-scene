@@ -79,6 +79,7 @@ HOME_ASSISTANT_TOKEN_PATHS = (
 
 
 SAFE_PACK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_scene_pack_lock = threading.Lock()
 
 
 def is_safe_pack_id(value: str) -> bool:
@@ -96,7 +97,90 @@ def load_active_pack_id() -> str:
                 logging.warning("Ignoring unsafe active pack id %r in %s", value, ACTIVE_PACK_FILE)
         except Exception as exc:
             logging.warning("Failed to read %s: %s", ACTIVE_PACK_FILE, exc)
-    return DEFAULT_PACK_ID
+    return DEFAULT_PACK_ID if is_safe_pack_id(DEFAULT_PACK_ID) else "neiri"
+
+
+def inspect_scene_pack(pack_id: str) -> dict[str, Any]:
+    """Return a scene pack summary only for a safe, usable scene directory."""
+    if not is_safe_pack_id(pack_id):
+        raise ValueError("Invalid scene pack id.")
+    pack_dir = PACKS_DIR / pack_id
+    if pack_dir.is_symlink() or not pack_dir.is_dir():
+        raise FileNotFoundError(f"Scene pack not found: {pack_id}")
+    if any((pack_dir / name).is_symlink() for name in ("renderer.kiosk-scene.json", "scene.default.json")):
+        raise ValueError(f"Scene pack {pack_id} has invalid configuration.")
+    try:
+        renderer = read_json_file(pack_dir / "renderer.kiosk-scene.json")
+        scene = read_json_file(pack_dir / "scene.default.json")
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"Scene pack {pack_id} has invalid configuration.") from exc
+    if not isinstance(renderer, dict) or not isinstance(scene, dict) or not isinstance(scene.get("pages"), list):
+        raise ValueError(f"Scene pack {pack_id} has invalid configuration.")
+    assistant = renderer.get("assistant") if isinstance(renderer.get("assistant"), dict) else {}
+    return {
+        "id": pack_id,
+        "name": str(assistant.get("name") or pack_id),
+        "pageCount": len(scene["pages"]),
+    }
+
+
+def load_scene_catalog() -> dict[str, Any]:
+    active_id = load_active_pack_id()
+    items: list[dict[str, Any]] = []
+    if PACKS_DIR.is_dir():
+        for pack_dir in sorted(PACKS_DIR.iterdir(), key=lambda item: item.name.lower()):
+            try:
+                item = inspect_scene_pack(pack_dir.name)
+            except (FileNotFoundError, ValueError):
+                continue
+            item["active"] = item["id"] == active_id
+            items.append(item)
+    return {"success": True, "activePackId": active_id, "items": items}
+
+
+def select_scene_pack(pack_id: str, expected_pack_id: str | None = None) -> dict[str, Any]:
+    """Switch the active scene pointer atomically; caller must enforce authorization."""
+    with _scene_pack_lock:
+        item = inspect_scene_pack(pack_id)
+        active_id = load_active_pack_id()
+        if expected_pack_id is not None and active_id != expected_pack_id:
+            raise RuntimeError(f"Active scene changed from {expected_pack_id} to {active_id}.")
+        ACTIVE_PACK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        handle, temp_name = tempfile.mkstemp(prefix="active-pack.", suffix=".tmp", dir=str(ACTIVE_PACK_FILE.parent))
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as stream:
+                json.dump({"id": pack_id}, stream, ensure_ascii=False)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp_name, ACTIVE_PACK_FILE)
+        finally:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
+        return {"success": True, "activePackId": pack_id, "item": item}
+
+
+def clone_scene_pack(source_pack_id: str, new_pack_id: str) -> dict[str, Any]:
+    """Clone a valid scene into a new ID; caller must enforce authorization."""
+    if not is_safe_pack_id(new_pack_id):
+        raise ValueError("Invalid new scene pack id.")
+    with _scene_pack_lock:
+        inspect_scene_pack(source_pack_id)
+        source_dir = PACKS_DIR / source_pack_id
+        target_dir = PACKS_DIR / new_pack_id
+        if target_dir.exists() or target_dir.is_symlink():
+            raise FileExistsError(f"Scene pack already exists: {new_pack_id}")
+        # Scene files are served by nginx. Never copy links that could expose files outside the pack.
+        if any(path.is_symlink() for path in source_dir.rglob("*")):
+            raise ValueError("Scene packs containing symlinks cannot be cloned.")
+        target_dir.mkdir()  # exclusive reservation: never overwrite an existing directory
+        try:
+            shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
+            item = inspect_scene_pack(new_pack_id)
+        except BaseException:
+            shutil.rmtree(target_dir)
+            raise
+        return {"success": True, "item": item}
 
 
 def display_config_is_current(pack_dir: Path) -> bool:
@@ -194,6 +278,10 @@ def build_bootstrap() -> dict[str, Any]:
             "avatarCatalogUrl": f"{PATH_PREFIX}/avatar-catalog",
             "avatarImportUrl": f"{PATH_PREFIX}/avatar-import",
             "avatarPackApiUrl": f"{PATH_PREFIX}/avatar-pack",
+            "sceneCatalogUrl": f"{PATH_PREFIX}/scene-catalog",
+            "sceneSelectUrl": f"{PATH_PREFIX}/scene-pack/select",
+            "sceneCloneUrl": f"{PATH_PREFIX}/scene-pack/clone",
+            "adminCapabilitiesUrl": f"{PATH_PREFIX}/admin-capabilities",
         },
         "availability": {
             "runtimeIndex": (RUNTIME_DIR / "index.html").exists(),
@@ -1040,6 +1128,12 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         if path == f"{PATH_PREFIX}/avatar-catalog":
             self.send_json(load_avatar_catalog())
             return
+        if path == f"{PATH_PREFIX}/scene-catalog":
+            self.send_json(load_scene_catalog())
+            return
+        if path == f"{PATH_PREFIX}/admin-capabilities":
+            self.send_json({"success": True, "canManageScenePacks": self.scene_admin_allowed()})
+            return
         if path == f"{PATH_PREFIX}/avatar-pack":
             try:
                 self.send_json(load_avatar_pack_details(resolve_pack_id(parsed.query)))
@@ -1085,6 +1179,9 @@ class SceneHostHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlsplit(self.path)
         path = parsed.path.rstrip("/") or "/"
+        if path in (f"{PATH_PREFIX}/scene-pack/select", f"{PATH_PREFIX}/scene-pack/clone"):
+            self.handle_scene_pack_mutation(path)
+            return
         if path == f"{PATH_PREFIX}/avatar-import":
             self.handle_avatar_import()
             return
@@ -1095,6 +1192,43 @@ class SceneHostHandler(BaseHTTPRequestHandler):
             {"success": False, "error": f"Endpoint not found: {path}"},
             status=HTTPStatus.NOT_FOUND,
         )
+
+    def handle_scene_pack_mutation(self, path: str) -> None:
+        # nginx overwrites X-Scene-Admin from its trusted ingress address map.
+        # X-Scene-Client is a same-origin browser request marker (custom header).
+        if not self.scene_admin_allowed():
+            self.send_json({"success": False, "error": "Admin access required."}, status=HTTPStatus.FORBIDDEN)
+            return
+        try:
+            content_length = parse_content_length(self.headers.get("Content-Length"))
+            if content_length <= 0 or content_length > 4096:
+                raise ValueError("Invalid scene pack request size.")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise ValueError("Expected a JSON object.")
+            if path.endswith("/select"):
+                pack_id = str(payload.get("packId") or "")
+                expected = payload.get("expectedPackId")
+                if not isinstance(expected, str):
+                    raise ValueError("Missing expectedPackId.")
+                result = select_scene_pack(pack_id, expected)
+            else:
+                source_id = str(payload.get("sourcePackId") or "")
+                new_id = str(payload.get("newPackId") or "")
+                result = clone_scene_pack(source_id, new_id)
+            self.send_json(result)
+        except FileNotFoundError as exc:
+            self.send_json({"success": False, "error": str(exc)}, status=HTTPStatus.NOT_FOUND)
+        except (FileExistsError, RuntimeError) as exc:
+            self.send_json({"success": False, "error": str(exc)}, status=HTTPStatus.CONFLICT)
+        except (ValueError, UnicodeDecodeError) as exc:
+            self.send_json({"success": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+        except Exception as exc:
+            logging.exception("Scene pack mutation failed")
+            self.send_json({"success": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def scene_admin_allowed(self) -> bool:
+        return self.headers.get("X-Scene-Admin") == "1" and bool(self.headers.get("X-Scene-Client"))
 
     def handle_avatar_import(self) -> None:
         try:
