@@ -10,7 +10,7 @@ What this add-on owns:
 - `/scene-api/avatar-catalog`
 - `/scene-api/avatar-import`
 - `/scene-editor/`
-- `/admin/` (administration UI for extensions such as Domovoy)
+- `/admin/` (the add-on ingress entry point and administration UI)
 - `/domovoy-api/` (optional Domovoy service, `domovoy_enabled`)
 - `/scene-extensions/` (extension modules)
 - `/scene-runtime/` (served from the add-on image at `/opt/kiosk-scene/scene-runtime/`)
@@ -34,6 +34,14 @@ Editor model:
 - the Home Assistant section now exposes explicit binding targets for the selected card, so entity assignment does not depend on guessing the currently focused field
 - the editor preview is now interactive: clicking a page or card inside the simulated display selects it in the settings dashboard below
 - page order and card order can now be changed by drag-and-drop directly in the editor lists, in addition to the existing move buttons
+
+Settings in Home Assistant:
+
+- Enable **Show in sidebar** on the Kiosk Scene add-on to open `/admin/` from the HA sidebar. The panel is restricted to HA administrators.
+- Use the add-on **Configuration** tab for startup options: the IANA time zone, Domovoy on/off, kiosk microphone and trusted networks. These take effect after an add-on restart. `active_pack_id` is only the initial scene on first start.
+- Use **KioskScene → Settings** to select or clone an existing scene pack. These actions are available through authenticated HA ingress; direct LAN access can browse the catalog but cannot change it.
+- Use the scene editor to import and select avatar packs. Scene packs and avatar packs have separate catalogs.
+- When Domovoy is enabled, its own Settings and Integrations pages contain its runtime settings. HA entity fields offer a list of current entities while preserving manual IDs and values that are temporarily unavailable.
 
 Development workflow:
 

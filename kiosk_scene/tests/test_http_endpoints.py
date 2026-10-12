@@ -41,7 +41,7 @@ class ConfigServiceHttpTests(unittest.TestCase):
                 status, body = request(
                     base + "/scene-editor-form/api/config",
                     "POST",
-                    json.dumps(payload).encode(),
+                    json.dumps({"config": payload, "expectedPackId": "demo"}).encode(),
                     {"Content-Type": "application/json"},
                 )
                 self.assertEqual(status, 200, body)
@@ -69,6 +69,16 @@ class ConfigServiceHttpTests(unittest.TestCase):
                 self.assertEqual(conn.getresponse().status, 413)
                 conn.close()
 
+    def test_stale_editor_save_is_rejected(self) -> None:
+        with scene_env(SCENE_EDITOR_PATH_PREFIX="/scene-editor-form") as root:
+            service = load_module("scene_config_service")
+            with serve(service.SceneConfigHandler) as base:
+                payload = {"config": {"version": 1, "pages": []}, "expectedPackId": "demo"}
+                (root / "active-pack.json").write_text('{"id": "other"}', encoding="utf-8")
+                status, body = request(base + "/scene-editor-form/api/config", "POST", json.dumps(payload).encode())
+                self.assertEqual(status, 409, body)
+                self.assertFalse((root / "scene-packs" / "other" / "scene.default.json").exists())
+
 
 class HostServiceHttpTests(unittest.TestCase):
     def test_bootstrap_and_unknown_endpoint(self) -> None:
@@ -91,6 +101,26 @@ class HostServiceHttpTests(unittest.TestCase):
                     {"Content-Type": "application/json"},
                 )
                 self.assertIn(status, (400, 404))
+
+    def test_scene_mutation_requires_admin_headers(self) -> None:
+        with scene_env() as root:
+            host = load_module("scene_host_service")
+            pack = root / "scene-packs" / "demo"
+            (pack / "renderer.kiosk-scene.json").write_text('{"version": 1}', encoding="utf-8")
+            (pack / "scene.default.json").write_text('{"pages": []}', encoding="utf-8")
+            with serve(host.SceneHostHandler) as base:
+                status, catalog = request(base + "/scene-api/scene-catalog")
+                self.assertEqual(status, 200)
+                self.assertEqual([item["id"] for item in catalog["items"]], ["demo"])
+                body = json.dumps({"sourcePackId": "demo", "newPackId": "copy"}).encode()
+                self.assertEqual(request(base + "/scene-api/scene-pack/clone", "POST", body)[0], 403)
+                self.assertFalse((root / "scene-packs" / "copy").exists())
+                headers = {"X-Scene-Admin": "1", "X-Scene-Client": "admin-page"}
+                self.assertEqual(request(base + "/scene-api/scene-pack/clone", "POST", body, headers)[0], 200)
+                self.assertEqual(request(base + "/scene-api/scene-pack/clone", "POST", body, headers)[0], 409)
+                select = json.dumps({"packId": "copy", "expectedPackId": "demo"}).encode()
+                self.assertEqual(request(base + "/scene-api/scene-pack/select", "POST", select, headers)[0], 200)
+                self.assertEqual(request(base + "/scene-api/scene-pack/select", "POST", select, headers)[0], 409)
 
 
 if __name__ == "__main__":

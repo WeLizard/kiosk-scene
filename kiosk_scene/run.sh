@@ -13,6 +13,10 @@ DEFAULT_PACK_ID=$(jq -r '.active_pack_id // "neiri"' "$OPTIONS_FILE")
 if [ -z "$DEFAULT_PACK_ID" ] || [ "$DEFAULT_PACK_ID" = "null" ]; then
   DEFAULT_PACK_ID="neiri"
 fi
+if [[ ! "$DEFAULT_PACK_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ || "$DEFAULT_PACK_ID" == *..* ]]; then
+  echo "Invalid initial scene pack ID; using neiri" >&2
+  DEFAULT_PACK_ID="neiri"
+fi
 
 DOMOVOY_ENABLED=$(jq -r '.domovoy_enabled // false' "$OPTIONS_FILE")
 DOMOVOY_KIOSK_MIC=$(jq -r '.domovoy_kiosk_mic // false' "$OPTIONS_FILE")

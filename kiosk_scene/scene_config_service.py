@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import os
+import re
 import tempfile
 import threading
 from http import HTTPStatus
@@ -29,6 +30,13 @@ EXPLICIT_SCENE_CONFIG_PATH = os.environ.get("SCENE_EDITOR_CONFIG_PATH", "").stri
 DISPLAY_SCENE_CONFIG_FILENAME = "scene.display.json"
 MAX_CONFIG_BODY_BYTES = int(os.environ.get("SCENE_EDITOR_MAX_BODY_BYTES", str(2 * 1024 * 1024)))
 _config_write_lock = threading.Lock()
+SAFE_PACK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+class ScenePackChangedError(RuntimeError):
+    pass
+
+
 LEGACY_SCENE_CONFIG_PATHS = (
     Path("/config/www/neiri-scene/scene.default.json"),
     Path("/config/www/live2d/neiri-slides.json"),
@@ -671,6 +679,7 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     }
 
     let lastEditedMode = 'visual';
+    let loadedPackId = '';
 
     function setStatus(text, kind) {
       statusEl.textContent = text || '';
@@ -1424,6 +1433,10 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
       if (!response.ok || !data.success) {
         throw new Error(data.error || `HTTP ${response.status}`);
       }
+      if (typeof data.packId !== 'string' || !data.packId) {
+        throw new Error('The active scene ID is missing. Reload the editor.');
+      }
+      loadedPackId = data.packId;
       if (data.loadedFrom && data.loadedFrom !== data.path) {
         applyConfigToEditors(data.config, `Loaded legacy config from ${data.loadedFrom}. Save to migrate into ${data.path}.`);
       } else {
@@ -1432,12 +1445,15 @@ EDITOR_HTML_TEMPLATE = """<!doctype html>
     }
 
     async function saveConfig() {
+      if (!loadedPackId) {
+        throw new Error('Load the active scene before saving.');
+      }
       const parsed = lastEditedMode === 'visual' ? syncVisualToJson() : parseConfig();
       setStatus('Saving...');
       const response = await fetch(apiUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed),
+        body: JSON.stringify({ config: parsed, expectedPackId: loadedPackId }),
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
@@ -1784,11 +1800,11 @@ def load_active_pack_id() -> str:
         try:
             payload = json.loads(ACTIVE_PACK_FILE.read_text(encoding="utf-8"))
             value = str(payload.get("id", "")).strip()
-            if value:
+            if value and SAFE_PACK_ID_RE.match(value) and ".." not in value:
                 return value
         except Exception as exc:
             logging.warning("Failed to read %s: %s", ACTIVE_PACK_FILE, exc)
-    return DEFAULT_PACK_ID
+    return DEFAULT_PACK_ID if SAFE_PACK_ID_RE.match(DEFAULT_PACK_ID) and ".." not in DEFAULT_PACK_ID else "neiri"
 
 
 def resolve_primary_scene_config_path() -> Path:
@@ -1810,7 +1826,7 @@ def write_text_atomic(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, temp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+        with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as stream:
             stream.write(text)
             stream.flush()
             os.fsync(stream.fileno())
@@ -1877,14 +1893,19 @@ def load_scene_config() -> tuple[dict[str, Any], Path, str | None]:
     return normalize_scene_config(clone_json(DEFAULT_SCENE_CONFIG)), primary_path, None
 
 
-def save_scene_config(config: Any) -> tuple[dict[str, Any], Path]:
+def save_scene_config(config: Any, expected_pack_id: str | None = None) -> tuple[dict[str, Any], Path]:
     normalized = normalize_scene_config(config)
-    primary_path = resolve_primary_scene_config_path()
     source_text = serialize_json(normalized)
     # Compile first: if the payload cannot be compiled nothing is written.
     display = compile_scene_display_config(normalized)
     display["sourceSha256"] = source_digest(source_text)
     with _config_write_lock:
+        active_pack_id = load_active_pack_id()
+        if expected_pack_id is not None and active_pack_id != expected_pack_id:
+            raise ScenePackChangedError(f"Active scene changed from {expected_pack_id} to {active_pack_id}.")
+        primary_path = Path(EXPLICIT_SCENE_CONFIG_PATH) if EXPLICIT_SCENE_CONFIG_PATH else PACKS_DIR / active_pack_id / "scene.default.json"
+        if not EXPLICIT_SCENE_CONFIG_PATH and primary_path.parent.is_symlink():
+            raise ValueError("Active scene pack directory cannot be a symlink.")
         write_text_atomic(primary_path, source_text)
         write_json_atomic(resolve_display_scene_config_path(primary_path), display)
     return normalized, primary_path
@@ -1950,7 +1971,7 @@ class SceneConfigHandler(BaseHTTPRequestHandler):
                         "success": True,
                         "config": config,
                         "path": str(primary_path),
-                        "packId": load_active_pack_id(),
+                        "packId": load_active_pack_id() if EXPLICIT_SCENE_CONFIG_PATH else primary_path.parent.name,
                         "loadedFrom": loaded_from,
                     }
                 )
@@ -1990,14 +2011,21 @@ class SceneConfigHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            config, primary_path = save_scene_config(payload)
+            if not isinstance(payload, dict) or not isinstance(payload.get("expectedPackId"), str):
+                raise ValueError("Missing expectedPackId.")
+            config, primary_path = save_scene_config(payload.get("config"), payload["expectedPackId"])
             self.send_json(
                 {
                     "success": True,
                     "config": config,
                     "path": str(primary_path),
-                    "packId": load_active_pack_id(),
+                    "packId": load_active_pack_id() if EXPLICIT_SCENE_CONFIG_PATH else primary_path.parent.name,
                 }
+            )
+        except ScenePackChangedError as exc:
+            self.send_json(
+                {"success": False, "error": str(exc), "packId": load_active_pack_id()},
+                status=HTTPStatus.CONFLICT,
             )
         except ValueError as exc:
             self.send_json(

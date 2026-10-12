@@ -26,6 +26,10 @@ export interface SceneHostBootstrap {
     avatarCatalogUrl?: string;
     avatarImportUrl?: string;
     avatarPackApiUrl?: string;
+    sceneCatalogUrl?: string;
+    sceneSelectUrl?: string;
+    sceneCloneUrl?: string;
+    adminCapabilitiesUrl?: string;
   };
   availability?: Record<string, boolean>;
 }

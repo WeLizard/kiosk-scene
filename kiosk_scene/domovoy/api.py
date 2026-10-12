@@ -367,6 +367,30 @@ def build_router(ctx: "ApiContext") -> Router:
     r.add("GET", "/api/integrations", lambda req: {"integrations": app.integrations(),
           "secrets": {name: app.secrets.has(name) for name in WRITABLE_SECRETS}})
 
+    def ha_entities(req: Request) -> dict[str, Any]:
+        raw_domains = [part.strip() for part in req.query.get("domains", "").split(",") if part.strip()]
+        if len(raw_domains) > 20 or any(not re.fullmatch(r"[a-z_]+", part) for part in raw_domains):
+            raise ValidationError("domains must be comma-separated HA domains", fields={"domains": "Invalid"})
+        domains = set(raw_domains)
+        limit = req.q_int("limit", 500, 1, 1000)
+        entities = []
+        for item in app.ha.get_states():
+            entity_id = item.get("entity_id")
+            if not isinstance(entity_id, str) or "." not in entity_id or len(entity_id) > 255:
+                continue
+            domain = entity_id.split(".", 1)[0]
+            if domains and domain not in domains:
+                continue
+            attributes = item.get("attributes")
+            name = attributes.get("friendly_name") if isinstance(attributes, dict) else None
+            state = item.get("state")
+            entities.append({"id": entity_id, "name": str(name or entity_id)[:255], "domain": domain,
+                             "state": str(state)[:255] if state is not None else ""})
+            if len(entities) >= limit:
+                break
+        return {"entities": entities}
+    r.add("GET", "/api/ha/entities", ha_entities)
+
     def secrets_put(req: Request) -> dict[str, Any]:
         body = req.json()
         for name, value in body.items():
