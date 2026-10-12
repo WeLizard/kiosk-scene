@@ -2101,20 +2101,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         gap: 14px;
       }
       #scene-editor-shell .avatar-pack-grid {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 175px), 1fr));
         gap: 12px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 6px;
-        scroll-snap-type: x proximity;
-        -webkit-overflow-scrolling: touch;
-      }
-      #scene-editor-shell .avatar-pack-grid::-webkit-scrollbar {
-        height: 6px;
-      }
-      #scene-editor-shell .avatar-pack-grid::-webkit-scrollbar-thumb {
-        border-radius: 3px;
-        background: rgba(32,48,65,0.18);
       }
       #scene-editor-shell .avatar-pack-card {
         display: grid;
@@ -2123,10 +2112,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         border: 1px solid rgba(32,48,65,0.1);
         background: rgba(255,255,255,0.92);
         padding: 10px;
-        min-width: 140px;
-        max-width: 140px;
-        flex-shrink: 0;
-        scroll-snap-align: start;
+        min-width: 0;
       }
       #scene-editor-shell .avatar-pack-card.is-active {
         border-color: rgba(45,98,162,0.35);
@@ -2157,11 +2143,9 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         gap: 6px;
       }
       #scene-editor-shell .avatar-pack-card-body strong {
-        font-size: 12px;
+        font-size: 13px;
         line-height: 1.25;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        overflow-wrap: anywhere;
       }
       #scene-editor-shell .avatar-pack-card-meta {
         display: flex;
@@ -2826,7 +2810,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         </section>
       ` : ""}
       ${state.activeSectionTab === "avatar" ? `
-        <section class="scene-settings-card">
+        <section class="scene-settings-card" data-editor-section="avatar" tabindex="-1">
           <div class="scene-settings-head">
             <h2>${copy.avatar}</h2>
             <div class="meta">${copy.avatarSubtitle}</div>
@@ -3636,4 +3620,11 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   }
 
   render();
+  if (state.activeSectionTab === "avatar" && state.config) {
+    requestAnimationFrame(() => {
+      const avatarSection = dashboardHost.querySelector<HTMLElement>('[data-editor-section="avatar"]');
+      avatarSection?.scrollIntoView({ block: "start" });
+      avatarSection?.focus({ preventScroll: true });
+    });
+  }
 }

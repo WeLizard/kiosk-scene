@@ -39,8 +39,8 @@ Settings in Home Assistant:
 
 - Enable **Show in sidebar** on the Kiosk Scene add-on to open `/admin/` from the HA sidebar. The panel is restricted to HA administrators.
 - Use the add-on **Configuration** tab for startup options: the IANA time zone, Domovoy on/off, kiosk microphone and trusted networks. These take effect after an add-on restart. `active_pack_id` is only the initial scene on first start.
-- Use **KioskScene → Settings** to select or clone an existing scene pack. These actions are available through authenticated HA ingress; direct LAN access can browse the catalog but cannot change it.
-- Use the scene editor to import and select avatar packs. Scene packs and avatar packs have separate catalogs.
+- Use **KioskScene → Settings** to inspect the active scene and avatar, select or clone a scene pack, and open the add-on Configuration page. Scene changes are available through authenticated HA ingress; direct LAN access can browse the catalog but cannot change it.
+- The avatar button opens the editor directly at its Avatar section. The editor imports and selects avatar packs; scene packs and avatar packs have separate catalogs. Settings displays the current avatar and catalog count without maintaining a second avatar setting.
 - When Domovoy is enabled, its own Settings and Integrations pages contain its runtime settings. HA entity fields offer a list of current entities while preserving manual IDs and values that are temporarily unavailable.
 
 Development workflow:

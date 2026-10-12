@@ -63,6 +63,8 @@ async function boot(): Promise<void> {
   await registry.load(createSettingsExtension({
     lang,
     catalogUrl: resolveHostedUrl(bootstrap.files?.sceneCatalogUrl || "/scene-api/scene-catalog", bootstrapUrl),
+    avatarCatalogUrl: resolveHostedUrl(bootstrap.files?.avatarCatalogUrl || "/scene-api/avatar-catalog", bootstrapUrl),
+    sceneEditorApiUrl: resolveHostedUrl(bootstrap.sceneEditorApiUrl || "/scene-editor-form/api/config", bootstrapUrl),
     capabilitiesUrl: resolveHostedUrl(bootstrap.files?.adminCapabilitiesUrl || "/scene-api/admin-capabilities", bootstrapUrl),
     selectUrl: resolveHostedUrl(bootstrap.files?.sceneSelectUrl || "/scene-api/scene-pack/select", bootstrapUrl),
     cloneUrl: resolveHostedUrl(bootstrap.files?.sceneCloneUrl || "/scene-api/scene-pack/clone", bootstrapUrl),

@@ -249,7 +249,7 @@ function T(e, n = {}) {
     e
   );
 }
-function D(e, n = "neutral") {
+function j(e, n = "neutral") {
   return a("span", { class: `ks-badge ks-badge-${n}` }, e);
 }
 function Qe(e, n, t) {
@@ -334,7 +334,7 @@ function me(e, n) {
     d && (r.showErrors(null), r.setBusy(!0), Promise.resolve(n.onSubmit(r.values(), r)).finally(() => r.setBusy(!1)));
   }), r;
 }
-function De(e, n, t) {
+function je(e, n, t) {
   return n.length ? a(
     "div",
     { class: "ks-table-wrap" },
@@ -404,7 +404,7 @@ function nt(e) {
   ).closed.then((t) => t === !0);
 }
 let oe = null;
-function j(e, n = "neutral", t = 4500) {
+function D(e, n = "neutral", t = 4500) {
   (!oe || !oe.isConnected) && (oe = a("div", { class: "ks-toasts", role: "status", aria: { live: "polite" } }), document.body.appendChild(oe));
   const i = a("div", { class: `ks-toast ks-toast-${n}` }, e);
   oe.appendChild(i), setTimeout(() => i.remove(), t);
@@ -446,7 +446,7 @@ function ze(e, n) {
   const t = document.createElement("style");
   t.id = e, t.textContent = n, document.head.appendChild(t);
 }
-const Et = 1, At = '.ks-admin,.ks-dialog,.ks-toasts,.ks-scope{--ks-bg: #f5f7f9;--ks-surface: #ffffff;--ks-surface-2: #eef2f5;--ks-border: #d5dde4;--ks-text: #1c2833;--ks-muted: #5c6b78;--ks-accent: #2464a8;--ks-accent-text: #ffffff;--ks-good: #1f7a4d;--ks-warn: #9a6100;--ks-bad: #b3261e;--ks-info: #2464a8;--ks-radius: 10px;--ks-shadow: 0 1px 2px rgba(20, 30, 40, .06), 0 4px 14px rgba(20, 30, 40, .06);--ks-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;font-family:var(--ks-font);color:var(--ks-text)}@media(prefers-color-scheme:dark){.ks-admin,.ks-dialog,.ks-toasts,.ks-scope:not([data-theme=kiosk]){--ks-bg: #12181e;--ks-surface: #1a222a;--ks-surface-2: #222c36;--ks-border: #33404c;--ks-text: #e6ecf1;--ks-muted: #96a5b2;--ks-accent: #5b9be0;--ks-accent-text: #0b1620;--ks-good: #5cc493;--ks-warn: #e0a84a;--ks-bad: #f08a83;--ks-info: #5b9be0;--ks-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .35)}}.ks-admin *,.ks-dialog *,.ks-toasts *,.ks-scope *{box-sizing:border-box}.ks-scope[data-theme=kiosk]{--ks-bg: transparent;--ks-surface: rgba(255, 255, 255, .72);--ks-surface-2: rgba(32, 48, 65, .06);--ks-border: rgba(32, 48, 65, .12);--ks-text: #203041;--ks-muted: rgba(32, 48, 65, .66)}.ks-admin{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;min-height:100dvh;background:var(--ks-bg);font-size:15px;line-height:1.45}.ks-sidebar{position:sticky;top:0;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:8px;padding:16px 12px;background:var(--ks-surface);border-right:1px solid var(--ks-border);overflow-y:auto}.ks-brand{padding:4px 10px 12px;font-weight:700;font-size:17px;letter-spacing:-.01em}.ks-nav-list{display:flex;flex-direction:column;gap:2px}.ks-nav-group{margin:12px 10px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ks-muted)}.ks-nav-item,.ks-bottom-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--ks-text);text-decoration:none;min-height:40px}.ks-nav-item:hover{background:var(--ks-surface-2)}.ks-nav-item[aria-current=page]{background:color-mix(in srgb,var(--ks-accent) 14%,transparent);color:var(--ks-accent);font-weight:600}.ks-nav-icon{width:22px;text-align:center;flex:none}.ks-nav-footer{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:12px;border-top:1px solid var(--ks-border)}.ks-nav-footer-link{padding:6px 10px;color:var(--ks-muted);text-decoration:none;font-size:13px}.ks-content{min-width:0;display:flex;flex-direction:column}.ks-topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px 20px;background:color-mix(in srgb,var(--ks-bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--ks-border)}.ks-topbar-title{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ks-menu-button,.ks-bottom-nav,.ks-scrim{display:none}.ks-main-view{flex:1;padding:20px;outline:none;max-width:1200px;width:100%}.ks-conn{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-muted);white-space:nowrap}.ks-conn[data-state=live]{color:var(--ks-good)}.ks-conn[data-state=reconnecting],.ks-conn[data-state=connecting]{color:var(--ks-warn)}.ks-conn[data-state=offline]{color:var(--ks-bad);border-color:var(--ks-bad)}@media(max-width:899px){.ks-admin{display:block;padding-bottom:64px}.ks-sidebar{position:fixed;inset:0 auto 0 0;z-index:30;width:min(84vw,300px);transform:translate(-102%);transition:transform .18s ease;box-shadow:var(--ks-shadow)}.ks-admin:not([data-menu=open]) .ks-sidebar{visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s}.ks-admin[data-menu=open] .ks-sidebar{transform:none}.ks-admin[data-menu=open] .ks-scrim{display:block;position:fixed;inset:0;z-index:20;background:#0006}.ks-menu-button{display:inline-flex}.ks-topbar{padding:10px 12px}.ks-topbar-title{font-size:17px}.ks-main-view{padding:14px 12px}.ks-bottom-nav{position:fixed;inset:auto 0 0;z-index:10;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ks-surface);border-top:1px solid var(--ks-border);padding-bottom:env(safe-area-inset-bottom,0)}.ks-bottom-item{flex-direction:column;gap:2px;justify-content:center;padding:8px 4px;font-size:11px;border-radius:0;min-height:56px;color:var(--ks-muted)}.ks-bottom-item[aria-current=page]{color:var(--ks-accent);font-weight:600}.ks-bottom-item .ks-nav-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.ks-page{display:flex;flex-direction:column;gap:16px}.ks-card{background:var(--ks-surface);border:1px solid var(--ks-border);border-radius:var(--ks-radius);padding:16px;box-shadow:var(--ks-shadow);min-width:0}.ks-card>h2,.ks-card>header>h2{margin:0 0 10px;font-size:15px;font-weight:700}.ks-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.ks-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}.ks-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.ks-row-spread{justify-content:space-between}.ks-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ks-toolbar .ks-grow{flex:1;min-width:180px}.ks-muted{color:var(--ks-muted)}.ks-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.ks-list>li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--ks-border);min-width:0}.ks-list>li:last-child{border-bottom:0}.ks-list .ks-grow{flex:1;min-width:0}.ks-list .ks-title{font-weight:600;overflow-wrap:anywhere}.ks-list .ks-sub{color:var(--ks-muted);font-size:13px;overflow-wrap:anywhere}.ks-done{text-decoration:line-through;color:var(--ks-muted)}.ks-tree{list-style:none;margin:0;padding-left:18px;border-left:1px dashed var(--ks-border)}.ks-tree.ks-tree-root{padding-left:0;border-left:0}.ks-tree-node{padding:3px 0}.ks-btn{font:inherit;font-size:14px;min-height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer;touch-action:manipulation}.ks-btn:hover:not(:disabled){background:var(--ks-surface-2)}.ks-btn:focus-visible,.ks-field input:focus-visible,.ks-field select:focus-visible,.ks-field textarea:focus-visible,.ks-nav-item:focus-visible,.ks-bottom-item:focus-visible{outline:2px solid var(--ks-accent);outline-offset:1px}.ks-btn:disabled{opacity:.55;cursor:default}.ks-btn-primary{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text);font-weight:600}.ks-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--ks-accent) 88%,black)}.ks-btn-danger{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 50%,var(--ks-border))}.ks-btn-ghost{border-color:transparent;background:transparent}.ks-btn-sm{min-height:30px;padding:0 10px;font-size:13px}.ks-form{display:flex;flex-direction:column;gap:12px}.ks-form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}.ks-form-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.ks-form-error,.ks-field-error{color:var(--ks-bad);font-size:13px}.ks-field{display:flex;flex-direction:column;gap:4px;min-width:0}.ks-field-wide{grid-column:1 / -1}.ks-field label{font-size:13px;font-weight:600;color:var(--ks-muted)}.ks-field input:not([type=checkbox]),.ks-field select,.ks-field textarea,.ks-input{font:inherit;font-size:16px;width:100%;min-height:40px;padding:8px 10px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text)}.ks-field-check{flex-direction:row;align-items:center;gap:8px}.ks-field.has-error input,.ks-field.has-error select,.ks-field.has-error textarea{border-color:var(--ks-bad)}.ks-field-hint{color:var(--ks-muted);font-size:12px}.ks-required{color:var(--ks-bad)}.ks-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--ks-border);background:var(--ks-surface-2);color:var(--ks-muted);white-space:nowrap}.ks-badge-good{color:var(--ks-good);border-color:color-mix(in srgb,var(--ks-good) 40%,var(--ks-border))}.ks-badge-warn{color:var(--ks-warn);border-color:color-mix(in srgb,var(--ks-warn) 40%,var(--ks-border))}.ks-badge-bad{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 40%,var(--ks-border))}.ks-badge-info{color:var(--ks-info);border-color:color-mix(in srgb,var(--ks-info) 40%,var(--ks-border))}.ks-empty,.ks-loading,.ks-error{padding:28px 16px;text-align:center;color:var(--ks-muted)}.ks-empty strong,.ks-error strong{display:block;color:var(--ks-text);margin-bottom:4px}.ks-error{color:var(--ks-bad);display:flex;flex-direction:column;align-items:center;gap:8px}.ks-spinner{display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-3px;border:2px solid var(--ks-border);border-top-color:var(--ks-accent);border-radius:50%;animation:ks-spin .8s linear infinite}@keyframes ks-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ks-spinner{animation-duration:3s}}.ks-stale-banner{padding:8px 12px;margin-bottom:10px;border-radius:8px;background:color-mix(in srgb,var(--ks-warn) 14%,var(--ks-surface));color:var(--ks-warn);font-size:13px}.ks-table-wrap{overflow-x:auto}.ks-table{width:100%;border-collapse:collapse;font-size:14px}.ks-table th,.ks-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--ks-border);vertical-align:top}.ks-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ks-muted)}@media(max-width:640px){.ks-table thead{display:none}.ks-table,.ks-table tbody,.ks-table tr,.ks-table td{display:block;width:100%}.ks-table tr{padding:8px 0;border-bottom:1px solid var(--ks-border)}.ks-table td{border:0;padding:2px 4px}.ks-table td:before{content:attr(data-label) ": ";color:var(--ks-muted);font-size:12px}.ks-table td[data-label=""]:before{content:none}}.ks-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:#00000073}.ks-dialog{width:min(560px,100%);max-height:92vh;overflow:auto;background:var(--ks-surface);border-radius:14px;box-shadow:var(--ks-shadow);border:1px solid var(--ks-border)}.ks-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ks-border)}.ks-dialog-head h2{margin:0;font-size:16px}.ks-dialog-body{padding:16px}.ks-toasts{position:fixed;z-index:120;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}.ks-toast{padding:10px 14px;border-radius:10px;background:var(--ks-text);color:var(--ks-bg);box-shadow:var(--ks-shadow);font-size:14px}.ks-toast-good{background:var(--ks-good);color:#fff}.ks-toast-bad{background:var(--ks-bad);color:#fff}@media(max-width:899px){.ks-toasts{bottom:72px}}.ks-chip{font:inherit;font-size:14px;min-height:34px;padding:4px 12px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer}.ks-chip.is-active{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text)}.ks-link{font:inherit;padding:0;border:0;background:none;color:var(--ks-accent);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}.ks-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}.ks-filters .ks-field{flex:1 1 200px;min-width:0}.ks-list-click>li{cursor:pointer}.ks-list-click>li:hover,.ks-list-click>li:focus-visible{background:var(--ks-surface-2);outline:none}@media(max-width:640px){.ks-hide-narrow{display:none}}', Ct = At, at = "domovoy.api", it = "domovoy.actions", ge = "domovoy.events", W = (e, n = ["id"]) => Object.fromEntries(Object.entries(e).filter(([t]) => !n.includes(t))), B = (e) => (n) => `${e}/${encodeURIComponent(String(n.id))}`, Ne = {
+const Et = 1, At = '.ks-admin,.ks-dialog,.ks-toasts,.ks-scope{--ks-bg: #f5f7f9;--ks-surface: #ffffff;--ks-surface-2: #eef2f5;--ks-border: #d5dde4;--ks-text: #1c2833;--ks-muted: #5c6b78;--ks-accent: #2464a8;--ks-accent-text: #ffffff;--ks-good: #1f7a4d;--ks-warn: #9a6100;--ks-bad: #b3261e;--ks-info: #2464a8;--ks-radius: 10px;--ks-shadow: 0 1px 2px rgba(20, 30, 40, .06), 0 4px 14px rgba(20, 30, 40, .06);--ks-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;font-family:var(--ks-font);color:var(--ks-text)}@media(prefers-color-scheme:dark){.ks-admin,.ks-dialog,.ks-toasts,.ks-scope:not([data-theme=kiosk]){--ks-bg: #12181e;--ks-surface: #1a222a;--ks-surface-2: #222c36;--ks-border: #33404c;--ks-text: #e6ecf1;--ks-muted: #96a5b2;--ks-accent: #5b9be0;--ks-accent-text: #0b1620;--ks-good: #5cc493;--ks-warn: #e0a84a;--ks-bad: #f08a83;--ks-info: #5b9be0;--ks-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .35)}}.ks-admin *,.ks-dialog *,.ks-toasts *,.ks-scope *{box-sizing:border-box}.ks-scope[data-theme=kiosk]{--ks-bg: transparent;--ks-surface: rgba(255, 255, 255, .72);--ks-surface-2: rgba(32, 48, 65, .06);--ks-border: rgba(32, 48, 65, .12);--ks-text: #203041;--ks-muted: rgba(32, 48, 65, .66)}.ks-admin{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;min-height:100dvh;background:var(--ks-bg);font-size:15px;line-height:1.45}.ks-sidebar{position:sticky;top:0;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:8px;padding:16px 12px;background:var(--ks-surface);border-right:1px solid var(--ks-border);overflow-y:auto}.ks-brand{padding:4px 10px 12px;font-weight:700;font-size:17px;letter-spacing:-.01em}.ks-nav-list{display:flex;flex-direction:column;gap:2px}.ks-nav-group{margin:12px 10px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ks-muted)}.ks-nav-item,.ks-bottom-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--ks-text);text-decoration:none;min-height:40px}.ks-nav-item:hover{background:var(--ks-surface-2)}.ks-nav-item[aria-current=page]{background:color-mix(in srgb,var(--ks-accent) 14%,transparent);color:var(--ks-accent);font-weight:600}.ks-nav-icon{width:22px;text-align:center;flex:none}.ks-nav-footer{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:12px;border-top:1px solid var(--ks-border)}.ks-nav-footer-link{padding:6px 10px;color:var(--ks-muted);text-decoration:none;font-size:13px}.ks-content{min-width:0;display:flex;flex-direction:column}.ks-topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px 20px;background:color-mix(in srgb,var(--ks-bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--ks-border)}.ks-topbar-title{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ks-menu-button,.ks-bottom-nav,.ks-scrim{display:none}.ks-main-view{flex:1;padding:20px;outline:none;max-width:1200px;width:100%}.ks-conn{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-muted);white-space:nowrap}.ks-conn[data-state=live]{color:var(--ks-good)}.ks-conn[data-state=reconnecting],.ks-conn[data-state=connecting]{color:var(--ks-warn)}.ks-conn[data-state=offline]{color:var(--ks-bad);border-color:var(--ks-bad)}@media(max-width:899px){.ks-admin{display:block;padding-bottom:64px}.ks-sidebar{position:fixed;inset:0 auto 0 0;z-index:30;width:min(84vw,300px);transform:translate(-102%);transition:transform .18s ease;box-shadow:var(--ks-shadow)}.ks-admin:not([data-menu=open]) .ks-sidebar{visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s}.ks-admin[data-menu=open] .ks-sidebar{transform:none}.ks-admin[data-menu=open] .ks-scrim{display:block;position:fixed;inset:0;z-index:20;background:#0006}.ks-menu-button{display:inline-flex}.ks-topbar{padding:10px 12px}.ks-topbar-title{font-size:17px}.ks-main-view{padding:14px 12px}.ks-bottom-nav{position:fixed;inset:auto 0 0;z-index:10;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ks-surface);border-top:1px solid var(--ks-border);padding-bottom:env(safe-area-inset-bottom,0)}.ks-bottom-item{flex-direction:column;gap:2px;justify-content:center;padding:8px 4px;font-size:11px;border-radius:0;min-height:56px;color:var(--ks-muted)}.ks-bottom-item[aria-current=page]{color:var(--ks-accent);font-weight:600}.ks-bottom-item .ks-nav-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.ks-page{display:flex;flex-direction:column;gap:16px}.ks-card{background:var(--ks-surface);border:1px solid var(--ks-border);border-radius:var(--ks-radius);padding:16px;box-shadow:var(--ks-shadow);min-width:0}.ks-card>h2,.ks-card>header>h2{margin:0 0 10px;font-size:15px;font-weight:700}.ks-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.ks-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}.ks-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.ks-row-spread{justify-content:space-between}.ks-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ks-toolbar .ks-grow{flex:1;min-width:180px}.ks-muted{color:var(--ks-muted)}.ks-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.ks-list>li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--ks-border);min-width:0}.ks-list>li:last-child{border-bottom:0}.ks-list .ks-grow{flex:1;min-width:0}.ks-list .ks-title{font-weight:600;overflow-wrap:anywhere}.ks-list .ks-sub{color:var(--ks-muted);font-size:13px;overflow-wrap:anywhere}.ks-done{text-decoration:line-through;color:var(--ks-muted)}.ks-tree{list-style:none;margin:0;padding-left:18px;border-left:1px dashed var(--ks-border)}.ks-tree.ks-tree-root{padding-left:0;border-left:0}.ks-tree-node{padding:3px 0}.ks-btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;font:inherit;font-size:14px;min-height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer;touch-action:manipulation}.ks-btn:hover:not(:disabled){background:var(--ks-surface-2)}.ks-btn:focus-visible,.ks-field input:focus-visible,.ks-field select:focus-visible,.ks-field textarea:focus-visible,.ks-nav-item:focus-visible,.ks-bottom-item:focus-visible{outline:2px solid var(--ks-accent);outline-offset:1px}.ks-btn:disabled{opacity:.55;cursor:default}.ks-btn-primary{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text);font-weight:600}.ks-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--ks-accent) 88%,black)}.ks-btn-danger{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 50%,var(--ks-border))}.ks-btn-ghost{border-color:transparent;background:transparent}.ks-btn-sm{min-height:30px;padding:0 10px;font-size:13px}.ks-form{display:flex;flex-direction:column;gap:12px}.ks-form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}.ks-form-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.ks-form-error,.ks-field-error{color:var(--ks-bad);font-size:13px}.ks-field{display:flex;flex-direction:column;gap:4px;min-width:0}.ks-field-wide{grid-column:1 / -1}.ks-field label{font-size:13px;font-weight:600;color:var(--ks-muted)}.ks-field input:not([type=checkbox]),.ks-field select,.ks-field textarea,.ks-input{font:inherit;font-size:16px;width:100%;min-height:40px;padding:8px 10px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text)}.ks-field-check{flex-direction:row;align-items:center;gap:8px}.ks-field.has-error input,.ks-field.has-error select,.ks-field.has-error textarea{border-color:var(--ks-bad)}.ks-field-hint{color:var(--ks-muted);font-size:12px}.ks-required{color:var(--ks-bad)}.ks-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--ks-border);background:var(--ks-surface-2);color:var(--ks-muted);white-space:nowrap}.ks-badge-good{color:var(--ks-good);border-color:color-mix(in srgb,var(--ks-good) 40%,var(--ks-border))}.ks-badge-warn{color:var(--ks-warn);border-color:color-mix(in srgb,var(--ks-warn) 40%,var(--ks-border))}.ks-badge-bad{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 40%,var(--ks-border))}.ks-badge-info{color:var(--ks-info);border-color:color-mix(in srgb,var(--ks-info) 40%,var(--ks-border))}.ks-empty,.ks-loading,.ks-error{padding:28px 16px;text-align:center;color:var(--ks-muted)}.ks-empty strong,.ks-error strong{display:block;color:var(--ks-text);margin-bottom:4px}.ks-error{color:var(--ks-bad);display:flex;flex-direction:column;align-items:center;gap:8px}.ks-spinner{display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-3px;border:2px solid var(--ks-border);border-top-color:var(--ks-accent);border-radius:50%;animation:ks-spin .8s linear infinite}@keyframes ks-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ks-spinner{animation-duration:3s}}.ks-stale-banner{padding:8px 12px;margin-bottom:10px;border-radius:8px;background:color-mix(in srgb,var(--ks-warn) 14%,var(--ks-surface));color:var(--ks-warn);font-size:13px}.ks-table-wrap{overflow-x:auto}.ks-table{width:100%;border-collapse:collapse;font-size:14px}.ks-table th,.ks-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--ks-border);vertical-align:top}.ks-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ks-muted)}@media(max-width:640px){.ks-table thead{display:none}.ks-table,.ks-table tbody,.ks-table tr,.ks-table td{display:block;width:100%}.ks-table tr{padding:8px 0;border-bottom:1px solid var(--ks-border)}.ks-table td{border:0;padding:2px 4px}.ks-table td:before{content:attr(data-label) ": ";color:var(--ks-muted);font-size:12px}.ks-table td[data-label=""]:before{content:none}}.ks-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:#00000073}.ks-dialog{width:min(560px,100%);max-height:92vh;overflow:auto;background:var(--ks-surface);border-radius:14px;box-shadow:var(--ks-shadow);border:1px solid var(--ks-border)}.ks-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ks-border)}.ks-dialog-head h2{margin:0;font-size:16px}.ks-dialog-body{padding:16px}.ks-toasts{position:fixed;z-index:120;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}.ks-toast{padding:10px 14px;border-radius:10px;background:var(--ks-text);color:var(--ks-bg);box-shadow:var(--ks-shadow);font-size:14px}.ks-toast-good{background:var(--ks-good);color:#fff}.ks-toast-bad{background:var(--ks-bad);color:#fff}@media(max-width:899px){.ks-toasts{bottom:72px}}.ks-chip{font:inherit;font-size:14px;min-height:34px;padding:4px 12px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer}.ks-chip.is-active{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text)}.ks-link{font:inherit;padding:0;border:0;background:none;color:var(--ks-accent);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}.ks-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}.ks-filters .ks-field{flex:1 1 200px;min-width:0}.ks-list-click>li{cursor:pointer}.ks-list-click>li:hover,.ks-list-click>li:focus-visible{background:var(--ks-surface-2);outline:none}@media(max-width:640px){.ks-hide-narrow{display:none}}', Ct = At, at = "domovoy.api", it = "domovoy.actions", ge = "domovoy.events", W = (e, n = ["id"]) => Object.fromEntries(Object.entries(e).filter(([t]) => !n.includes(t))), B = (e) => (n) => `${e}/${encodeURIComponent(String(n.id))}`, Ne = {
   "command.send": { title: "Отправить команду", method: "POST", path: () => "api/command", body: (e) => e },
   "command.undo": { title: "Отменить команду", method: "POST", path: (e) => `api/commands/${e.id}/undo`, body: () => ({}) },
   "items.create": { title: "Добавить предмет", method: "POST", path: () => "api/items", body: (e) => e },
@@ -502,7 +502,7 @@ function Ot(e) {
   } catch {
   }
 }
-function Dt(e) {
+function jt(e) {
   const n = wt({
     baseUrl: e.baseUrl,
     fetchImpl: e.fetchImpl,
@@ -645,13 +645,13 @@ function I(e, n = Z()) {
 function ae(e, n = Z()) {
   return new Intl.DateTimeFormat("ru-RU", { timeZone: n, hour: "2-digit", minute: "2-digit" }).format(new Date(e));
 }
-function jt(e, n = Z()) {
+function Dt(e, n = Z()) {
   return new Intl.DateTimeFormat("ru-RU", { timeZone: n, weekday: "long", day: "numeric", month: "long" }).format(new Date(e));
 }
 function Y(e, n = Z()) {
   return te(e, n).slice(0, 10);
 }
-function je(e, n = Date.now()) {
+function De(e, n = Date.now()) {
   const t = new Date(e).getTime() - n, i = Math.abs(t), s = Math.round(i / 6e4), o = s < 1 ? "сейчас" : s < 60 ? `${s} мин` : s < 2880 ? `${Math.round(s / 60)} ч` : `${Math.round(s / 1440)} дн`;
   return s < 1 ? o : t < 0 ? `${o} назад` : `через ${o}`;
 }
@@ -745,7 +745,7 @@ async function E(e, n, t, i = {}) {
   if (i.confirm && !await nt({ title: i.confirm.title, message: i.confirm.message, confirmLabel: i.confirm.label ?? b.delete, destructive: !0 }))
     return { ok: !1, error: { code: "cancelled", message: "cancelled" } };
   const s = await ct(e, n, t);
-  return s.ok ? i.success && j(i.success, "good") : j(s.error.message, "bad", 7e3), s;
+  return s.ok ? i.success && D(i.success, "good") : D(s.error.message, "bad", 7e3), s;
 }
 function U(e, n, t, i, s = 250, o) {
   let r = !1;
@@ -785,7 +785,7 @@ function M(e, n, t) {
   return a("section", { class: "ks-card" }, a("header", null, a("h2", null, e), null), n);
 }
 function ve(e) {
-  return D(ee(e), ue(e));
+  return j(ee(e), ue(e));
 }
 function P(e, n, t, i = "") {
   return a("li", { class: i }, a("div", { class: "ks-grow" }, a("div", { class: "ks-title" }, e), n ? a("div", { class: "ks-sub" }, n) : null), t ?? null);
@@ -852,7 +852,7 @@ function Bt(e, n, t) {
       load: (c) => $(t, "api/audit", { limit: 100 }, c),
       render: ({ audit: c }, p) => c.length ? a("ul", { class: "ks-list" }, c.map(
         (m) => P(
-          a("span", null, m.summary, " ", D(m.source, "neutral")),
+          a("span", null, m.summary, " ", j(m.source, "neutral")),
           `${I(m.ts)} · ${m.actor}`,
           m.undoable ? w(b.undo, async () => {
             (await E(t, "audit.undo", { id: m.id }, { success: "Отменено" })).ok && p();
@@ -946,10 +946,10 @@ function Ut(e, n, t) {
           ([g, y]) => a(
             "section",
             { class: "ks-card" },
-            a("header", null, a("h2", null, jt(y[0].start))),
+            a("header", null, a("h2", null, Dt(y[0].start))),
             a("ul", { class: "ks-list" }, y.sort((f, A) => f.start.localeCompare(A.start)).map(
               (f) => P(
-                a("span", null, f.title, f.recurring ? a("span", { class: "ks-muted" }, " ↻") : null, f.read_only ? [" ", D("только чтение", "neutral")] : null),
+                a("span", null, f.title, f.recurring ? a("span", { class: "ks-muted" }, " ↻") : null, f.read_only ? [" ", j("только чтение", "neutral")] : null),
                 `${f.all_day ? "весь день" : `${ae(f.start)}–${ae(f.end)}`}${f.location ? ` · ${f.location}` : ""} · ${f.calendar}`,
                 f.read_only ? null : a(
                   "div",
@@ -1011,7 +1011,7 @@ function le(e, n, t, i) {
           r.showErrors(c.error);
           return;
         }
-        (c.data.secrets_cleared ?? []).filter((m) => !(m in l)).length && j("Адрес изменён, поэтому сохранённый ключ сброшен — введите его заново.", "warn", 9e3);
+        (c.data.secrets_cleared ?? []).filter((m) => !(m in l)).length && D("Адрес изменён, поэтому сохранённый ключ сброшен — введите его заново.", "warn", 9e3);
       }
       if (Object.keys(l).length) {
         const c = await e.invokeAction("domovoy.actions", "secrets.set", l);
@@ -1020,7 +1020,7 @@ function le(e, n, t, i) {
           return;
         }
       }
-      j("Сохранено", "good"), i();
+      D("Сохранено", "good"), i();
     }
   }).el;
 }
@@ -1036,7 +1036,7 @@ const ke = (e, n, t) => ({
 function Ft(e, n, t) {
   return w("Проверить", async () => {
     const i = await e.invokeAction("domovoy.actions", "integration.test", { name: n });
-    i.ok ? i.data.ok ? j("Связь есть", "good") : j(i.data.error?.message ?? "Не получилось", "bad", 7e3) : j(i.error.message, "bad", 7e3), t();
+    i.ok ? i.data.ok ? D("Связь есть", "good") : D(i.data.error?.message ?? "Не получилось", "bad", 7e3) : D(i.error.message, "bad", 7e3), t();
   });
 }
 function J(e, n, t, i) {
@@ -1045,7 +1045,7 @@ function J(e, n, t, i) {
 function xe(e, n, t, i, s, o, r, u) {
   const d = async (c) => {
     const p = await e.invokeAction("domovoy.actions", "settings.update", { [n]: c });
-    return p.ok ? u() : j(p.error.message, "bad", 7e3), p;
+    return p.ok ? u() : D(p.error.message, "bad", 7e3), p;
   }, l = (c) => {
     const p = c >= 0 ? t[c] : null;
     K(p ? `Изменить: ${r}` : `Добавить: ${r}`, s(p), async (m) => {
@@ -1056,7 +1056,7 @@ function xe(e, n, t, i, s, o, r, u) {
   return a(
     "div",
     null,
-    De(
+    je(
       [
         ...i.map((c, p) => ({ key: `c${p}`, header: c.header, render: (m) => c.render(m) })),
         { key: "a", header: "", render: (c) => a("div", { class: "ks-row" }, w(b.edit, () => l(t.indexOf(c))), w(b.delete, async () => {
@@ -1099,11 +1099,11 @@ function Vt(e, n, t) {
   return a(
     "div",
     null,
-    De(
+    je(
       [
-        { key: "name", header: "Имя", render: (o) => a("span", null, o.name, o.is_self ? [" ", D("это я", "info")] : null) },
+        { key: "name", header: "Имя", render: (o) => a("span", null, o.name, o.is_self ? [" ", j("это я", "info")] : null) },
         { key: "al", header: "Также", render: (o) => o.aliases.join(", ") || b.none },
-        { key: "tg", header: "Telegram", render: (o) => o.channels.telegram?.chat_id ? D("привязан", "good") : D("не привязан", "warn") },
+        { key: "tg", header: "Telegram", render: (o) => o.channels.telegram?.chat_id ? j("привязан", "good") : j("не привязан", "warn") },
         { key: "a", header: "", render: (o) => a("div", { class: "ks-row" }, w(b.edit, () => i(o)), w(b.delete, async () => {
           (await E(e, "contacts.delete", { id: o.id }, { confirm: { title: "Удалить контакт", message: o.name } })).ok && t();
         }, "danger")) }
@@ -1151,12 +1151,12 @@ function He(e) {
 function Zt(e, n) {
   const t = async () => {
     const o = await $(e, "api/security");
-    return o.ok ? o.data : (j(o.error.message, "bad", 7e3), null);
+    return o.ok ? o.data : (D(o.error.message, "bad", 7e3), null);
   }, i = async (o) => {
     try {
-      await navigator.clipboard.writeText(o), j("Скопировано", "good");
+      await navigator.clipboard.writeText(o), D("Скопировано", "good");
     } catch {
-      j("Не удалось скопировать — нажмите «Показать» и выделите вручную", "warn", 7e3);
+      D("Не удалось скопировать — нажмите «Показать» и выделите вручную", "warn", 7e3);
     }
   }, s = (o, r, u) => {
     const d = a("code", { class: "dv-secret" }, "•".repeat(12));
@@ -1226,12 +1226,12 @@ function Gt(e, n, t) {
     render: (r, u) => {
       const d = r.settings, l = (k) => {
         const x = r.integrations.find((z) => z.name === k);
-        return x ? D(ee(x.status), ue(x.status)) : null;
+        return x ? j(ee(x.status), ue(x.status)) : null;
       }, c = (k) => {
         const x = r.integrations.find((z) => z.name === k);
         return x ? a("p", { class: "ks-muted" }, [x.detail, x.last_ok ? `Последний успех: ${I(x.last_ok)}.` : "", x.last_error ? `Последняя ошибка: ${x.last_error}` : ""].filter(Boolean).join(" "), " ", Ft(t, k, u)) : null;
       }, p = a("div", { class: "ks-grid dv-status-grid" }, r.integrations.map(
-        (k) => a("div", { class: "ks-card dv-status" }, a("strong", null, Ht[k.name] ?? k.name), D(ee(k.status), ue(k.status)), a("small", { class: "ks-muted" }, k.detail && k.detail.toLowerCase() !== ee(k.status).toLowerCase() ? k.detail : ""))
+        (k) => a("div", { class: "ks-card dv-status" }, a("strong", null, Ht[k.name] ?? k.name), j(ee(k.status), ue(k.status)), a("small", { class: "ks-muted" }, k.detail && k.detail.toLowerCase() !== ee(k.status).toLowerCase() ? k.detail : ""))
       )), m = J("ha", "Home Assistant", l("home_assistant"), a(
         "div",
         null,
@@ -1472,10 +1472,10 @@ function Jt(e, n, t) {
       return S(g, y.map((f) => a("option", { value: f.value, selected: f.value === o }, f.label))), g.value = o, a(
         "div",
         null,
-        De(
+        je(
           [
             { key: "name", header: b.name, render: (f) => a("button", { class: "ks-link", type: "button", onClick: () => mt(t, f.id, h) }, f.name) },
-            { key: "qty", header: b.quantity, render: (f) => f.quantity === 0 ? D("нет", "warn") : Me(f.quantity, f.unit) || b.none },
+            { key: "qty", header: b.quantity, render: (f) => f.quantity === 0 ? j("нет", "warn") : Me(f.quantity, f.unit) || b.none },
             { key: "place", header: b.place, render: (f) => f.location_text || b.none },
             { key: "updated", header: "Изменено", render: (f) => I(f.updated_at), className: "ks-hide-narrow" },
             {
@@ -1541,7 +1541,7 @@ function Xt(e, n, t) {
     a(
       "div",
       { class: "dv-loc-row" },
-      a("span", { class: "dv-loc-name" }, l.name, " ", D(pt[l.kind] ?? l.kind, "neutral")),
+      a("span", { class: "dv-loc-name" }, l.name, " ", j(pt[l.kind] ?? l.kind, "neutral")),
       a("span", { class: "ks-muted" }, l.item_count ? `${l.item_count} вещ.` : ""),
       a(
         "span",
@@ -1587,7 +1587,7 @@ function Ie(e, n) {
     const l = (d.options ?? []).map((c, p) => w(`${p + 1}. ${c}`, () => void r(String(p + 1))));
     S(
       i,
-      a("div", { class: "dv-reply-line" }, D(ee(d.status), ue(d.status)), " ", d.reply),
+      a("div", { class: "dv-reply-line" }, j(ee(d.status), ue(d.status)), " ", d.reply),
       l.length ? a("div", { class: "ks-row dv-chips" }, l) : null,
       d.undoable && d.command_id ? w(b.undo, async () => {
         (await E(e, "command.undo", { id: d.command_id }, { success: "Отменено" })).ok && (S(i, a("span", { class: "ks-muted" }, "Отменено.")), n());
@@ -1641,7 +1641,7 @@ function tn(e, n, t) {
           "Напоминания",
           l.reminders.length ? a("ul", { class: "ks-list" }, l.reminders.map((m) => P(
             m.text,
-            [m.state === "fired" ? "сработало" : m.due_at ? `${I(m.due_at)} (${je(m.due_at)})` : rt(m.trigger), m.recurrence ? ` · ${he(m.recurrence)}` : "", ` · ${b.channels[m.channel] ?? m.channel}`].join(""),
+            [m.state === "fired" ? "сработало" : m.due_at ? `${I(m.due_at)} (${De(m.due_at)})` : rt(m.trigger), m.recurrence ? ` · ${he(m.recurrence)}` : "", ` · ${b.channels[m.channel] ?? m.channel}`].join(""),
             p(m.id, m.state),
             m.state === "fired" ? "dv-fired" : ""
           ))) : q("Напоминаний нет.")
@@ -1668,7 +1668,7 @@ function tn(e, n, t) {
         l.warnings.length ? M("Календари", a("p", { class: "ks-stale-banner" }, `Не удалось прочитать: ${l.warnings.map((m) => m.source).join(", ")}`)) : null,
         s ? null : M(
           "Последние команды",
-          l.recent.length ? a("ul", { class: "ks-list" }, l.recent.map((m) => P(m.text, m.reply ?? "", D(ee(m.status), ue(m.status))))) : Qe("Команд ещё не было", "Скажите или напишите что-нибудь выше.")
+          l.recent.length ? a("ul", { class: "ks-list" }, l.recent.map((m) => P(m.text, m.reply ?? "", j(ee(m.status), ue(m.status))))) : Qe("Команд ещё не было", "Скажите или напишите что-нибудь выше.")
         )
       );
     }
@@ -1733,7 +1733,7 @@ async function kt(e, n, t, i) {
   if (!s.ok)
     return !1;
   const o = s.data.results.filter((r) => !r.ok).map((r) => r.message);
-  return s.data.still_pending ? (j(`Не выполнено, осталось в очереди: ${o.join(" ")}`, "bad", 9e3), !1) : (j(o.length ? `Выполнено частично. ${o.join(" ")}` : i, o.length ? "warn" : "good", o.length ? 9e3 : 4500), !0);
+  return s.data.still_pending ? (D(`Не выполнено, осталось в очереди: ${o.join(" ")}`, "bad", 9e3), !1) : (D(o.length ? `Выполнено частично. ${o.join(" ")}` : i, o.length ? "warn" : "good", o.length ? 9e3 : 4500), !0);
 }
 function an(e, n, t) {
   pe("Проверить и поправить", (i) => {
@@ -1845,7 +1845,7 @@ function on(e, n, t) {
       u,
       A.length ? a("ul", { class: "ks-list ks-list-click" }, A.map((x) => {
         const z = P(
-          a("span", null, D(b.kinds[x.kind] ?? x.kind, "info"), " ", x.title),
+          a("span", null, j(b.kinds[x.kind] ?? x.kind, "info"), " ", x.title),
           x.snippet
         );
         return z.tabIndex = 0, z.setAttribute("role", "button"), z.addEventListener("click", () => m(x)), z.addEventListener("keydown", (C) => {
@@ -1877,7 +1877,7 @@ function be(e, n, t, i) {
         o.showErrors(r.error);
         return;
       }
-      j("Сохранено", "good"), i();
+      D("Сохранено", "good"), i();
     }
   }).el;
 }
@@ -1910,7 +1910,7 @@ function cn(e, n, t) {
       ], (f) => ({ auto_apply_confidence: Number(f.auto_apply_confidence), review_confidence: Number(f.review_confidence), ai: { auto_apply: f.ai_auto_apply === !0 } }), c)), v = de(
         "Голос",
         "Обращение по слову-триггеру работает и с колонками через Home Assistant, и с микрофоном киоска. Разговор без слова-триггера не сохраняется.",
-        a("p", null, "Микрофон киоска: ", u.enabled ? D("включён", "good") : D("выключен", "neutral"), " ", u.stt_configured ? D("распознавание настроено", "good") : D("распознавание не настроено", "warn")),
+        a("p", null, "Микрофон киоска: ", u.enabled ? j("включён", "good") : j("выключен", "neutral"), " ", u.stt_configured ? j("распознавание настроено", "good") : j("распознавание не настроено", "warn")),
         be(t, [
           { name: "enabled", label: "Принимать голосовые команды с микрофона киоска", type: "checkbox", value: r.voice.enabled, wide: !0 },
           { name: "trigger_words", label: "Слова-триггеры", value: (r.voice.trigger_words ?? []).join(", "), hint: "Через запятую, все падежи, которые вы произносите: «домовой, домового, домовому».", wide: !0 },
@@ -1933,7 +1933,7 @@ function cn(e, n, t) {
         try {
           A = JSON.parse(await f.text());
         } catch {
-          j("Это не JSON-файл", "bad");
+          D("Это не JSON-файл", "bad");
           return;
         }
         await nt({ title: "Заменить все данные?", message: "Все текущие данные (вещи, места, заметки, задачи, напоминания, журнал) будут заменены содержимым файла. Перед этим я сделаю резервную копию.", confirmLabel: "Заменить", destructive: !0 }) && (await E(t, "data.import", { data: A }, { success: "Данные импортированы" })).ok && c();
@@ -1949,7 +1949,7 @@ function cn(e, n, t) {
           } }),
           T("Скачать экспорт (JSON)", { onClick: async () => {
             const f = await $(t, "api/export");
-            f.ok ? dn(`domovoy-export-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`, f.data) : j(f.error.message, "bad");
+            f.ok ? dn(`domovoy-export-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`, f.data) : D(f.error.message, "bad");
           } }),
           T("Импортировать…", { variant: "danger", onClick: () => g.click() }),
           g
@@ -2030,7 +2030,7 @@ function mn(e, n, t) {
       r = v.contacts, u.onclick = () => Ze(t, r, null, h), d.onclick = () => Ge(t, null, "tasks", h);
       const g = (f) => P(
         a("span", null, f.text, " ", ve(f.state)),
-        `${f.kind === "time" && f.due_at ? `${I(f.due_at)}${f.state === "pending" ? ` (${je(f.due_at)})` : ""}` : rt(f.trigger)}${f.recurrence ? ` · ${he(f.recurrence)}` : ""} · ${b.channels[f.channel] ?? f.channel}${f.recipient && f.recipient !== "self" ? ` → ${f.recipient}` : ""}`,
+        `${f.kind === "time" && f.due_at ? `${I(f.due_at)}${f.state === "pending" ? ` (${De(f.due_at)})` : ""}` : rt(f.trigger)}${f.recurrence ? ` · ${he(f.recurrence)}` : ""} · ${b.channels[f.channel] ?? f.channel}${f.recipient && f.recipient !== "self" ? ` → ${f.recipient}` : ""}`,
         a(
           "div",
           { class: "ks-row" },
@@ -2279,7 +2279,7 @@ function yn(e) {
       start(n) {
         return n.subscribe(ge, "notification", (t) => {
           const i = t.payload?.text;
-          typeof i == "string" && i.trim() && j(i, "info", 12e3);
+          typeof i == "string" && i.trim() && D(i, "info", 12e3);
         });
       }
     },
@@ -2402,7 +2402,7 @@ function $e(e) {
 const xn = [
   Se("domovoy.next-event", "Ближайшее событие", (e) => {
     const [n] = $e(e).filter((s) => !s.all_day), [t] = $e(e).filter((s) => s.all_day && Y(s.start, e.timezone) === Y(e.now, e.timezone)), i = n ?? t;
-    return i ? a("div", { class: "dv-next" }, a("div", { class: "dv-next-when" }, i.all_day ? "сегодня" : `${ae(i.start, e.timezone)} · ${je(i.start, new Date(e.now).getTime())}`), a("div", { class: "dv-next-title" }, i.title), i.location ? a("div", { class: "ks-muted" }, i.location) : null) : a("div", { class: "dv-next" }, a("div", { class: "ks-muted" }, "Ближайших событий нет"));
+    return i ? a("div", { class: "dv-next" }, a("div", { class: "dv-next-when" }, i.all_day ? "сегодня" : `${ae(i.start, e.timezone)} · ${De(i.start, new Date(e.now).getTime())}`), a("div", { class: "dv-next-title" }, i.title), i.location ? a("div", { class: "ks-muted" }, i.location) : null) : a("div", { class: "dv-next" }, a("div", { class: "ks-muted" }, "Ближайших событий нет"));
   }),
   Se("domovoy.today", "Сегодня", (e, n, t) => {
     const i = $e(e).slice(0, _e(t.maxEvents, 4, 10)), s = e.reminders.slice(0, _e(t.maxReminders, 4, 10));
@@ -2465,7 +2465,7 @@ const Sn = [
     if (new URL(n, window.location.href).origin !== window.location.origin)
       throw new Error("Domovoy: apiBase must be on the same origin as the page");
     Tt({ retry: b.retry, cancel: b.cancel, confirm: b.confirm, save: b.save, close: b.close, required: "Обязательное поле", loading: b.loading, nothingHere: b.empty, olderData: "Показаны прежние данные", renderFailed: "Не удалось показать этот раздел." }), ze("domovoy-ui-kit", Ct), ze("domovoy-ui", wn);
-    const t = /\/admin\.html$/.test(window.location.pathname), i = Dt({ baseUrl: n, onUnauthorized: () => {
+    const t = /\/admin\.html$/.test(window.location.pathname), i = jt({ baseUrl: n, onUnauthorized: () => {
       t && _n(Ot);
     } });
     i.http.request("api/state").then((s) => {

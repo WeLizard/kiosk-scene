@@ -1,0 +1,154 @@
+.ks-page[data-page="kiosk-scene.settings"] {
+  max-width: 1060px;
+  gap: 20px;
+}
+
+.ks-settings-page .ks-settings-intro {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--ks-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.ks-settings-page .ks-settings-status:empty {
+  display: none;
+}
+
+.ks-settings-page .ks-settings-status,
+.ks-settings-page > .ks-form-error {
+  margin: 0;
+}
+
+.ks-settings-page .ks-settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.ks-settings-page .ks-settings-column {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.ks-settings-page .ks-settings-card {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  padding: 22px;
+}
+
+.ks-settings-page .ks-settings-card h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.ks-settings-page .ks-settings-card > .ks-muted,
+.ks-settings-page .ks-settings-meta {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ks-settings-page .ks-settings-card > .ks-field,
+.ks-settings-page .ks-settings-details,
+.ks-settings-page .ks-settings-avatar-summary {
+  width: 100%;
+}
+
+.ks-settings-page .ks-field label {
+  display: grid;
+  gap: 7px;
+}
+
+.ks-settings-page .ks-field select,
+.ks-settings-page .ks-field input {
+  min-height: 44px;
+}
+
+.ks-settings-page .ks-field select:disabled {
+  opacity: 1;
+  color: var(--ks-text);
+  background: var(--ks-surface-2);
+}
+
+.ks-settings-page .ks-btn {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 10px 16px;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.ks-settings-page .ks-settings-avatar-summary {
+  display: grid;
+  gap: 4px;
+  padding: 15px 17px;
+  border: 1px solid var(--ks-border);
+  border-radius: 10px;
+  background: var(--ks-surface-2);
+  overflow-wrap: anywhere;
+}
+
+.ks-settings-page .ks-settings-avatar-name {
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.ks-settings-page .ks-settings-avatar-count {
+  color: var(--ks-muted);
+  font-size: 13px;
+}
+
+.ks-settings-page .ks-settings-details {
+  border-top: 1px solid var(--ks-border);
+  padding-top: 16px;
+}
+
+.ks-settings-page .ks-settings-details summary {
+  cursor: pointer;
+  color: var(--ks-accent);
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 3px 0;
+}
+
+.ks-settings-page .ks-settings-details[open] {
+  display: grid;
+  gap: 13px;
+}
+
+.ks-settings-page .ks-field-hint {
+  display: block;
+  color: var(--ks-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ks-settings-page .ks-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 800px) {
+  .ks-settings-page .ks-settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .ks-settings-page .ks-settings-card {
+    padding: 18px;
+  }
+
+  .ks-settings-page .ks-settings-card > .ks-btn,
+  .ks-settings-page .ks-settings-actions,
+  .ks-settings-page .ks-settings-actions .ks-btn {
+    width: 100%;
+  }
+}

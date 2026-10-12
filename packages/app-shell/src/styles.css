@@ -432,6 +432,11 @@
 /* ---------- controls ---------- */
 
 .ks-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
   font: inherit;
   font-size: 14px;
   min-height: 38px;
