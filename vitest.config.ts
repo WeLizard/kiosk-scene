@@ -9,6 +9,7 @@ export default defineConfig({
       "@kiosk-scene/core": pkg("core"),
       "@kiosk-scene/adapter-live2d": pkg("adapter-live2d"),
       "@kiosk-scene/adapter-static": pkg("adapter-static"),
+      "@kiosk-scene/adapter-module": pkg("adapter-module"),
       "@kiosk-scene/adapter-unity-webgl": pkg("adapter-unity-webgl"),
       "@kiosk-scene/provider-ha": pkg("provider-ha"),
       "@kiosk-scene/provider-json": pkg("provider-json"),

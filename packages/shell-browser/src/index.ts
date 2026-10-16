@@ -1,5 +1,6 @@
 import { createLive2dAdapter } from "@kiosk-scene/adapter-live2d";
 import { createStaticAdapter } from "@kiosk-scene/adapter-static";
+import { createModuleAdapter } from "@kiosk-scene/adapter-module";
 import {
   buildAssistantPresentationModel,
   createExtensionRuntime,
@@ -1166,6 +1167,13 @@ export class BrowserSceneShellApp {
       return createLive2dAdapter({
         manifest: this.avatarManifest,
         rendererConfig: this.rendererConfig,
+      });
+    }
+
+    if (this.avatarManifest.adapter === "module") {
+      return createModuleAdapter({
+        manifest: this.avatarManifest,
+        alt: this.rendererConfig.assistant.name || "Assistant",
       });
     }
 

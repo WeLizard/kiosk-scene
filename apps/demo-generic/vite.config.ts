@@ -12,6 +12,7 @@ export default defineConfig({
       "@kiosk-scene/provider-ha": path.resolve(__dirname, "../../packages/provider-ha/src/index.ts"),
       "@kiosk-scene/provider-json": path.resolve(__dirname, "../../packages/provider-json/src/index.ts"),
       "@kiosk-scene/adapter-static": path.resolve(__dirname, "../../packages/adapter-static/src/index.ts"),
+      "@kiosk-scene/adapter-module": path.resolve(__dirname, "../../packages/adapter-module/src/index.ts"),
       "@kiosk-scene/shell-browser": path.resolve(__dirname, "../../packages/shell-browser/src"),
       "@kiosk-scene/widgets-core": path.resolve(__dirname, "../../packages/widgets-core/src/index.ts"),
     },

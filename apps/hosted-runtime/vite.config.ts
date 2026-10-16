@@ -14,6 +14,7 @@ export default defineConfig({
       "@kiosk-scene/provider-ha": pkg("provider-ha"),
       "@kiosk-scene/provider-json": pkg("provider-json"),
       "@kiosk-scene/adapter-static": pkg("adapter-static"),
+      "@kiosk-scene/adapter-module": pkg("adapter-module"),
       "@kiosk-scene/shell-browser": path.resolve(__dirname, "../../packages/shell-browser/src"),
       "@kiosk-scene/widgets-core": pkg("widgets-core"),
       "@kiosk-scene/app-shell/styles": pkg("app-shell", "src/styles.css"),

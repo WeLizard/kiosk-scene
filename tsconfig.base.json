@@ -22,6 +22,9 @@
       "@kiosk-scene/adapter-static": [
         "packages/adapter-static/src/index.ts"
       ],
+      "@kiosk-scene/adapter-module": [
+        "packages/adapter-module/src/index.ts"
+      ],
       "@kiosk-scene/shell-browser": [
         "packages/shell-browser/src/index.ts"
       ],

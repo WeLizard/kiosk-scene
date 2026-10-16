@@ -60,7 +60,8 @@ export interface AvatarAdapterCapabilities {
 export interface AvatarManifestV1 {
   version: 1;
   name?: string;
-  adapter: "live2d" | "unity-webgl" | "static";
+  /** `module`: the pack ships its own runtime as an ES module (`entry`) that exports `createAvatar()`. */
+  adapter: "live2d" | "unity-webgl" | "static" | "module";
   assetRoot: string;
   runtimeUrl?: string;
   entry?: string;

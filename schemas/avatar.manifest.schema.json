@@ -23,7 +23,8 @@
       "enum": [
         "live2d",
         "unity-webgl",
-        "static"
+        "static",
+        "module"
       ]
     },
     "assetRoot": {

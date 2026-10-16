@@ -121,7 +121,7 @@ export function sanitizeAvatarManifestV1(value: unknown): AvatarManifestV1 {
   return {
     version: 1,
     name: trimText((merged as { name?: unknown }).name, 120) || "",
-    adapter: merged.adapter === "live2d" || merged.adapter === "unity-webgl" ? merged.adapter : "static",
+    adapter: merged.adapter === "live2d" || merged.adapter === "unity-webgl" || merged.adapter === "module" ? merged.adapter : "static",
     assetRoot: trimText(merged.assetRoot, 1024) || DEFAULT_AVATAR_MANIFEST_V1.assetRoot,
     runtimeUrl: trimText(merged.runtimeUrl, 1024) || "",
     entry: trimText(merged.entry, 1024) || "",
