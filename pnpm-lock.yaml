@@ -41,6 +41,8 @@ importers:
 
   packages/adapter-live2d: {}
 
+  packages/adapter-module: {}
+
   packages/adapter-static: {}
 
   packages/adapter-unity-webgl: {}

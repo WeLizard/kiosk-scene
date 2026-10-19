@@ -22,7 +22,7 @@ The shell contract for the current Home Assistant deployment is also explicit:
 - Make the scene engine reusable with more than one avatar technology.
 - Keep the public repo safe to publish without proprietary model assets.
 - Separate `state` from `control`.
-- Allow instance repos such as `neiri-scene` to provide branding, assets, entity mapping, and deployment.
+- Allow private instance repos such as `neiri` to provide branding, assets, entity mapping, and deployment.
 
 ## Repository Layout
 
@@ -43,6 +43,7 @@ packages/shell-browser/       Browser shell with the left-avatar/right-carousel 
 packages/provider-ha/         Home Assistant state provider boundary
 packages/provider-json/       JSON file state provider boundary
 packages/widgets-core/        Shared widget contracts
+neiri/                        Private Neiri instance as a Git submodule (requires access)
 schemas/                      Public JSON schemas
 tools/                        Config validation and support tooling
 ```
@@ -91,7 +92,7 @@ The repository is already runnable:
 - `packages/app-shell` and the extension registry in `packages/core` form a generic frontend/platform layer (kiosk *and* desktop/mobile administration) that extensions plug into — see [docs/extensions.md](./docs/extensions.md)
 - [Domovoy](./docs/domovoy.md), a local household assistant (memory/inventory, calendar, reminders, messaging, voice through Yandex Stations), is the first extension; it is optional (`domovoy_enabled`) and lives entirely outside the platform packages — voice paths in [docs/voice.md](./docs/voice.md)
 
-The next migration step is instance work: move the real `neiri-scene` deployment onto these public contracts and keep the private model/runtime assets outside this repo.
+The Neiri instance is pinned as the `neiri/` Git submodule. The public repository stores only its Git commit pointer and URL; the model, apartment, and runtime remain in the private repository. Contributors with access can run `git submodule update --init neiri` after cloning. The generic demo, public CI, and add-on build do not require the private checkout. The remaining instance work is to complete deployment through the public module adapter contract.
 
 ## Quick Start
 

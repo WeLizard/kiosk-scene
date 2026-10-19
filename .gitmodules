@@ -1,0 +1,4 @@
+[submodule "neiri"]
+	path = neiri
+	url = https://github.com/WeLizard/neiri.git
+	branch = main
