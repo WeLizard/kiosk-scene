@@ -43,7 +43,9 @@ packages/shell-browser/       Browser shell with the left-avatar/right-carousel 
 packages/provider-ha/         Home Assistant state provider boundary
 packages/provider-json/       JSON file state provider boundary
 packages/widgets-core/        Shared widget contracts
-neiri/                        Private Neiri instance as a Git submodule (requires access)
+PROJECTS/                     Subprojects united under this repository
+PROJECTS/neiri/               Private Neiri instance as a Git submodule (requires access)
+PROJECTS/haos/                HAOS-kiosk Chromium fork as a Git submodule
 schemas/                      Public JSON schemas
 tools/                        Config validation and support tooling
 ```
@@ -92,7 +94,9 @@ The repository is already runnable:
 - `packages/app-shell` and the extension registry in `packages/core` form a generic frontend/platform layer (kiosk *and* desktop/mobile administration) that extensions plug into — see [docs/extensions.md](./docs/extensions.md)
 - [Domovoy](./docs/domovoy.md), a local household assistant (memory/inventory, calendar, reminders, messaging, voice through Yandex Stations), is the first extension; it is optional (`domovoy_enabled`) and lives entirely outside the platform packages — voice paths in [docs/voice.md](./docs/voice.md)
 
-The Neiri instance is pinned as the `neiri/` Git submodule. The public repository stores only its Git commit pointer and URL; the model, apartment, and runtime remain in the private repository. Contributors with access can run `git submodule update --init neiri` after cloning. The generic demo, public CI, and add-on build do not require the private checkout. The remaining instance work is to complete deployment through the public module adapter contract.
+The Neiri instance is pinned as the `PROJECTS/neiri` Git submodule. The public repository stores only its Git commit pointer and URL; the model, apartment, and runtime remain in the private repository. Contributors with access can run `git submodule update --init PROJECTS/neiri` after cloning. The generic demo, public CI, and add-on build do not require the private checkout. The remaining instance work is to complete deployment through the public module adapter contract.
+
+`PROJECTS/` is the home for subprojects of this repository: `PROJECTS/neiri` and `PROJECTS/haos` are tracked Git submodules, while local-only working material (Blender sources, reference archives) stays untracked and gitignored. See [PROJECTS/README.md](./PROJECTS/README.md).
 
 ## Quick Start
 

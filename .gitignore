@@ -11,3 +11,9 @@ Thumbs.db
 tmp/
 private/
 instances/*/private/
+
+# Local-only subprojects: working material and private assets, never published
+PROJECTS/blend/
+PROJECTS/legacy-neiri-pilot/
+PROJECTS/references/
+PROJECTS/motion-lab/
