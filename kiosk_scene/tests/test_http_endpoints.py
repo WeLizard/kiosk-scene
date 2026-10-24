@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import json
 import threading
 import unittest
@@ -9,6 +10,9 @@ from contextlib import contextmanager
 from http.server import ThreadingHTTPServer
 
 from .helpers import load_module, scene_env
+
+ADMIN = {"X-Scene-Admin": "1", "X-Scene-Client": "editor"}
+JSON_ADMIN = {**ADMIN, "Content-Type": "application/json"}
 
 
 @contextmanager
@@ -42,20 +46,37 @@ class ConfigServiceHttpTests(unittest.TestCase):
                     base + "/scene-editor-form/api/config",
                     "POST",
                     json.dumps({"config": payload, "expectedPackId": "demo"}).encode(),
-                    {"Content-Type": "application/json"},
+                    JSON_ADMIN,
                 )
                 self.assertEqual(status, 200, body)
-                status, body = request(base + "/scene-editor-form/api/config")
+                status, body = request(base + "/scene-editor-form/api/config", headers=ADMIN)
                 self.assertEqual(status, 200)
                 self.assertEqual(body["config"]["pages"][0]["id"], "A")
+
+    def test_config_api_requires_admin_and_json(self) -> None:
+        with scene_env(SCENE_EDITOR_PATH_PREFIX="/scene-editor-form"):
+            service = load_module("scene_config_service")
+            with serve(service.SceneConfigHandler) as base:
+                url = base + "/scene-editor-form/api/config"
+                self.assertEqual(request(url)[0], 403)
+                self.assertEqual(request(url, "POST", b"{}")[0], 403)
+                self.assertEqual(request(url, "POST", b"{}", ADMIN)[0], 415)
+                host, port = base.removeprefix("http://").split(":")
+                conn = http.client.HTTPConnection(host, int(port), timeout=5)
+                conn.request("GET", "/scene-editor-form/", headers=ADMIN)
+                response = conn.getresponse()
+                self.assertEqual(response.status, 302)
+                self.assertEqual(response.getheader("Location"), "../scene-editor/")
+                conn.close()
 
     def test_bad_requests_are_client_errors(self) -> None:
         with scene_env(SCENE_EDITOR_PATH_PREFIX="/scene-editor-form"):
             service = load_module("scene_config_service")
             with serve(service.SceneConfigHandler) as base:
                 url = base + "/scene-editor-form/api/config"
-                self.assertEqual(request(url, "POST", b"not json")[0], 400)
-                self.assertEqual(request(url, "POST", b"[1,2]")[0], 400)
+                self.assertEqual(request(url, "POST", b"not json", JSON_ADMIN)[0], 400)
+                self.assertEqual(request(url, "POST", b"[1,2]", JSON_ADMIN)[0], 400)
+                self.assertEqual(request(url, "POST", b'{"version":1,"pages":[],"x":NaN}', JSON_ADMIN)[0], 400)
                 # Claim an oversized body without sending it: the server must answer from
                 # the header alone instead of buffering the payload.
                 import http.client
@@ -63,6 +84,8 @@ class ConfigServiceHttpTests(unittest.TestCase):
                 host, port = base.removeprefix("http://").split(":")
                 conn = http.client.HTTPConnection(host, int(port), timeout=5)
                 conn.putrequest("POST", "/scene-editor-form/api/config")
+                conn.putheader("X-Scene-Admin", "1")
+                conn.putheader("X-Scene-Client", "editor")
                 conn.putheader("Content-Type", "application/json")
                 conn.putheader("Content-Length", str(service.MAX_CONFIG_BODY_BYTES + 10))
                 conn.endheaders()
@@ -75,7 +98,12 @@ class ConfigServiceHttpTests(unittest.TestCase):
             with serve(service.SceneConfigHandler) as base:
                 payload = {"config": {"version": 1, "pages": []}, "expectedPackId": "demo"}
                 (root / "active-pack.json").write_text('{"id": "other"}', encoding="utf-8")
-                status, body = request(base + "/scene-editor-form/api/config", "POST", json.dumps(payload).encode())
+                status, body = request(
+                    base + "/scene-editor-form/api/config",
+                    "POST",
+                    json.dumps(payload).encode(),
+                    JSON_ADMIN,
+                )
                 self.assertEqual(status, 409, body)
                 self.assertFalse((root / "scene-packs" / "other" / "scene.default.json").exists())
 
@@ -98,9 +126,13 @@ class HostServiceHttpTests(unittest.TestCase):
                     base + "/scene-api/avatar-pack?packId=x",
                     "POST",
                     b"{}",
-                    {"Content-Type": "application/json"},
+                    JSON_ADMIN,
                 )
                 self.assertIn(status, (400, 404))
+                self.assertEqual(
+                    request(base + "/scene-api/avatar-pack?packId=x", "POST", b"{}", {"Content-Type": "application/json"})[0],
+                    403,
+                )
 
     def test_scene_mutation_requires_admin_headers(self) -> None:
         with scene_env() as root:

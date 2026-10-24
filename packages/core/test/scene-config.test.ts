@@ -5,6 +5,10 @@ import {
   resolveSceneSelection,
   sanitizeControlV1,
   createPinnedPageControl,
+  createPinnedPageOverlay,
+  createViewPresetOverlay,
+  expireControlOverlay,
+  mergeControlV1,
   DEFAULT_CONTROL_V1,
 } from "@kiosk-scene/core";
 
@@ -72,6 +76,38 @@ describe("scene runtime config", () => {
     }, now);
     expect(control.page.mode).toBe("auto");
     expect(control.cue.cue).toBeNull();
+  });
+
+  it("keeps a remote pin, cue and preset when the UI overlay only changes the preset", () => {
+    const now = Date.now();
+    const remote = sanitizeControlV1({
+      version: 1,
+      revision: 7,
+      viewPreset: "head",
+      page: { mode: "pinned", target: "Home", until: new Date(now + 60_000).toISOString() },
+      cue: { cue: "greet", emotion: "happy", until: new Date(now + 60_000).toISOString() },
+    }, now);
+
+    const merged = mergeControlV1(remote, createViewPresetOverlay("torso"), now);
+
+    expect(merged.page.mode).toBe("pinned");
+    expect(merged.page.target).toBe("Home");
+    expect(merged.cue.cue).toBe("greet");
+    expect(merged.cue.emotion).toBe("happy");
+    expect(merged.viewPreset).toBe("torso");
+  });
+
+  it("expires only the local pin and reveals the remote pin again", () => {
+    const now = Date.now();
+    const remote = sanitizeControlV1({
+      page: { mode: "pinned", target: "remote", until: new Date(now + 600_000).toISOString() },
+    }, now);
+    const local = createPinnedPageOverlay("local", 5_000, now);
+
+    expect(mergeControlV1(remote, local, now).page.target).toBe("local");
+    const expired = expireControlOverlay(local, now + 6_000);
+    expect(expired.page).toBeUndefined();
+    expect(mergeControlV1(remote, expired, now + 6_000).page.target).toBe("remote");
   });
 });
 

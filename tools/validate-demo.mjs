@@ -2,6 +2,7 @@
 
 import path from "node:path";
 import process from "node:process";
+import fs from "node:fs";
 import { spawn } from "node:child_process";
 
 const rootDir = process.cwd();
@@ -54,6 +55,49 @@ async function runValidation([schemaPath, filePath]) {
 
 for (const pair of validations) {
   await runValidation(pair);
+}
+
+function assertSeedFile(seedDir, reference, label) {
+  if (typeof reference !== "string" || !reference.trim()) {
+    return;
+  }
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/i.test(reference)) {
+    return;
+  }
+  const target = path.resolve(seedDir, reference.replace(/^\.\//, ""));
+  if (!fs.existsSync(target)) {
+    throw new Error(`Seed pack ${label} points at a missing local file: ${reference}`);
+  }
+}
+
+const seedDir = path.join(rootDir, seed);
+const seedRenderer = JSON.parse(fs.readFileSync(path.join(seedDir, "renderer.kiosk-scene.json"), "utf8"));
+for (const [label, reference] of Object.entries({
+  scene: seedRenderer.scene?.configUrl,
+  avatar: seedRenderer.avatar?.manifestUrl,
+  state: seedRenderer.state?.stateUrl,
+  idle: seedRenderer.state?.idleLinesUrl,
+  entities: seedRenderer.state?.entityMapUrl,
+  control: seedRenderer.control?.controlUrl,
+  controlEntities: seedRenderer.control?.entityMapUrl,
+})) {
+  assertSeedFile(seedDir, reference, label);
+}
+
+const seedAvatar = JSON.parse(fs.readFileSync(path.join(seedDir, "avatar.manifest.json"), "utf8"));
+if (seedAvatar.adapter === "static") {
+  const image = seedAvatar.entry || seedAvatar.modelUrl || seedAvatar.fallbackPortrait;
+  if (!image) {
+    throw new Error("Seed static avatar has no entry/modelUrl/fallbackPortrait");
+  }
+  assertSeedFile(seedDir, image, "avatar image");
+}
+for (const [label, reference] of Object.entries({
+  avatarModel: seedAvatar.modelUrl,
+  avatarPortrait: seedAvatar.fallbackPortrait,
+  avatarMotionMap: seedAvatar.motionMapUrl,
+})) {
+  assertSeedFile(seedDir, reference, label);
 }
 
 console.log("All demo and add-on seed config validations passed.");

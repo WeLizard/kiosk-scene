@@ -25,6 +25,8 @@ class Settings:
     trust_local: bool = os.environ.get("DOMOVOY_TRUST_LOCAL", "1") != "0"
     ha_api_url: str = os.environ.get("DOMOVOY_HA_API_URL", "http://supervisor/core/api").rstrip("/")
     max_body_bytes: int = _int("DOMOVOY_MAX_BODY_BYTES", 8 * 1024 * 1024)
+    max_concurrent_requests: int = _int("DOMOVOY_MAX_CONCURRENT_REQUESTS", 64)
+    socket_timeout_s: float = float(os.environ.get("DOMOVOY_SOCKET_TIMEOUT", "30") or 30)
     backup_keep: int = _int("DOMOVOY_BACKUP_KEEP", 7)
 
     @property

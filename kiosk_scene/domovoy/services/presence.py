@@ -4,6 +4,7 @@ import threading
 import time
 from typing import Any
 
+from ..clock import time_to_minutes
 from ..text import norm_key
 
 ACTIVE_LIKE = {"printing", "on", "running", "heating", "cleaning", "washing", "drying", "active", "playing", "печатает", "работает"}
@@ -49,6 +50,9 @@ def in_window(local_time: Any, window: dict[str, str] | None) -> bool:
     """`window = {"from": "18:00", "to": "23:59"}`; wraps past midnight (`22:00`→`05:59`)."""
     if not window:
         return True
-    current = local_time.strftime("%H:%M")
-    start, end = window.get("from", "00:00"), window.get("to", "23:59")
+    start = time_to_minutes(window.get("from", "00:00"))
+    end = time_to_minutes(window.get("to", "23:59"))
+    if start is None or end is None:
+        return True
+    current = local_time.hour * 60 + local_time.minute
     return start <= current <= end if start <= end else current >= start or current <= end

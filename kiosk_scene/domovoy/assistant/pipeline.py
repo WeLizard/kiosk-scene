@@ -65,10 +65,22 @@ class CommandPipeline:
         if not self.app.review.claim(review_id):
             raise ValidationError("Already resolved", code="already_resolved")
         ctx = Ctx(actor="user", source="review", command_id=item["command_id"])
+        outcomes: list[Outcome] = []
         try:
-            outcomes = [self.executor.run(i, ctx, {}) for i in intents]
+            for intent in intents:
+                outcomes.append(self.executor.run(intent, ctx, {}))
         except Exception:
-            self.app.review.release(review_id)
+            if any(o.ok for o in outcomes):
+                # Earlier intents already changed the household. Releasing the review would let a retry apply
+                # them a second time, so close it as a partial approval and leave the rest to a deliberate undo.
+                results = [{"ok": o.ok, "message": o.message, "refs": o.refs} for o in outcomes]
+                self.app.review.resolve(review_id, "approved", "partly applied after an error", expected="applying")
+                if item["command_id"]:
+                    self.app.commands.finish(item["command_id"], status="partial", interpreter="review",
+                                             intents=intents, confidence=1.0,
+                                             reply=" ".join(o.message for o in outcomes), result=results)
+            else:
+                self.app.review.release(review_id)
             raise
         results = [{"ok": o.ok, "message": o.message, "refs": o.refs} for o in outcomes]
         ok, any_ok = all(o.ok for o in outcomes), any(o.ok for o in outcomes)

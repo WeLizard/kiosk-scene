@@ -47,7 +47,8 @@ A private skill in Yandex Dialogs whose webhook is `https://<your public host>/d
 (the exact path with your secret is shown, on request, in Integrations). The skill protocol is implemented:
 `ping`, welcome, follow-ups **without repeating the invocation**, «спасибо / хватит» ends the session, replies are made
 TTS-friendly and bounded, and slow processing gets an honest holding reply inside Alice's response budget (2.5 s by
-default). The skill can be limited to your Yandex user id (`alice.allowed_user_ids`).
+default). Add your Yandex user id to `alice.allowed_user_ids` in Integrations: while the list is empty the skill refuses
+commands and says it is not configured. Repeated wrong webhook secrets are rate-limited per real client.
 
 Requirements you must arrange (Domovoy cannot): a **public HTTPS** address with a valid certificate that Yandex can
 reach. Expose *only* that one path from your reverse proxy / tunnel — the rest of the API must stay on the LAN.

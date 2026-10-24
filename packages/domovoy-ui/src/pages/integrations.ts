@@ -6,7 +6,7 @@ import { formatDateTime } from "../util.js";
 import { both, emptyLine, formDialog, liveRefresh, pageHead, perform, read, smallButton, view } from "./common.js";
 
 const INTEGRATION_TITLES: Record<string, string> = {
-  home_assistant: "Home Assistant", telegram: "Telegram", caldav: "Календарь CalDAV", llm: "Языковая модель", speak: "Голос через колонки", stt: "Распознавание речи",
+  home_assistant: "Home Assistant", telegram: "Telegram", alice: "Алиса", caldav: "Календарь CalDAV", llm: "Языковая модель", speak: "Голос через колонки", stt: "Распознавание речи",
 };
 
 interface Loaded {
@@ -90,7 +90,8 @@ function testButton(runtime: ExtensionRuntime, name: string, onDone: () => void)
     if (!result.ok) {
       toast(result.error.message, "bad", 7000);
     } else if (result.data.ok) {
-      toast("Связь есть", "good");
+      const detail = result.data.detail as { username?: string } | undefined;
+      toast(detail?.username ? `Связь есть: @${detail.username}` : "Связь есть", "good");
     } else {
       toast(result.data.error?.message ?? "Не получилось", "bad", 7000);
     }
@@ -98,8 +99,19 @@ function testButton(runtime: ExtensionRuntime, name: string, onDone: () => void)
   });
 }
 
+const openSections = new Set<string>();
+
 function section(id: string, title: string, statusEl: HTMLElement | null, body: HTMLElement): HTMLElement {
-  return h("details", { class: "ks-card dv-section", id: `dv-${id}` }, h("summary", null, h("h2", null, title), statusEl), body);
+  const el = h("details", { class: "ks-card dv-section", id: `dv-${id}` }, h("summary", null, h("h2", null, title), statusEl), body);
+  el.open = openSections.has(id);
+  el.addEventListener("toggle", () => {
+    if (el.open) {
+      openSections.add(id);
+    } else {
+      openSections.delete(id);
+    }
+  });
+  return el;
 }
 
 /** A list stored as one settings key (speakers, rooms, places): table + add/edit/delete dialogs. */
@@ -158,7 +170,7 @@ function contactsSection(runtime: ExtensionRuntime, data: Loaded, refresh: () =>
         { name: "name", label: "Имя", required: true, value: contact?.name ?? "", wide: true },
         { name: "aliases", label: "Как ещё называют", value: (contact?.aliases ?? []).join(", "), hint: "Через запятую: «жена, Маша»", wide: true },
         { name: "chat_id", label: "Telegram chat_id", value: contact?.channels.telegram?.chat_id ?? "", hint: "Проще: пусть человек напишет боту, потом нажмите «Привязать» ниже.", wide: true },
-        { name: "is_self", label: "Это я", type: "checkbox", value: contact?.is_self ?? false },
+        { name: "is_self", label: "Это я", type: "checkbox", value: contact?.is_self ?? false, hint: "Только этот контакт может давать команды в Telegram." },
       ],
       async (values) => {
         const channels = { ...(contact?.channels ?? {}) } as Record<string, unknown>;
@@ -177,11 +189,35 @@ function contactsSection(runtime: ExtensionRuntime, data: Loaded, refresh: () =>
     );
   };
   const link = (chatId: string, label: string): void => {
+    const options = data.contacts.map((c) => ({ value: String(c.id), label: c.name }));
+    options.push({ value: "__new__", label: "Создать новый контакт…" });
     void formDialog(
       `Привязать ${label}`,
-      [{ name: "contact_id", label: "К контакту", type: "select", options: data.contacts.map((c) => ({ value: String(c.id), label: c.name })), required: true }],
+      [
+        { name: "contact_id", label: "К контакту", type: "select", options, required: true, value: data.contacts[0]?.id ? String(data.contacts[0].id) : "__new__", wide: true },
+        { name: "is_self", label: "Это я (владелец) — разрешить команды", type: "checkbox", value: false, hint: "Команды принимает только контакт с этой галочкой." },
+      ],
       async (values) => {
-        const result = await runtime.invokeAction("domovoy.actions", "contacts.link", { contact_id: Number(values.contact_id), chat_id: chatId });
+        const isSelf = values.is_self === true;
+        if (values.contact_id === "__new__") {
+          const created = await runtime.invokeAction<{ contact: Contact }>("domovoy.actions", "contacts.create", {
+            name: label, aliases: [], channels: { telegram: { chat_id: chatId } }, is_self: isSelf,
+          });
+          if (!created.ok) {
+            return created;
+          }
+          // The create action does not consume the pending link request; linking the new contact does.
+          const linked = await runtime.invokeAction("domovoy.actions", "contacts.link", {
+            contact_id: created.data.contact.id, chat_id: chatId, is_self: isSelf,
+          });
+          if (linked.ok) {
+            refresh();
+          }
+          return linked;
+        }
+        const result = await runtime.invokeAction("domovoy.actions", "contacts.link", {
+          contact_id: Number(values.contact_id), chat_id: chatId, is_self: isSelf,
+        });
         if (result.ok) {
           refresh();
         }
@@ -249,11 +285,7 @@ interface SecurityInfo {
   assist_secret: string;
 }
 
-/**
- * Keys for outside clients. They are fetched only when the person asks to see or copy one — never on page load —
- * so they are not in the page (or its memory) while nobody needs them.
- */
-function securitySection(runtime: ExtensionRuntime, refresh: () => void): HTMLElement {
+function securityControls(runtime: ExtensionRuntime, refresh: () => void) {
   const fetchSecurity = async (): Promise<SecurityInfo | null> => {
     const result = await read<SecurityInfo>(runtime, "api/security");
     if (!result.ok) {
@@ -294,17 +326,55 @@ function securitySection(runtime: ExtensionRuntime, refresh: () => void): HTMLEl
       ),
     );
   };
+  return { secretRow, fetchSecurity, copy };
+}
+
+function securitySection(runtime: ExtensionRuntime, refresh: () => void): HTMLElement {
+  const { secretRow, fetchSecurity, copy } = securityControls(runtime, refresh);
   return h(
     "div",
     null,
     h("p", { class: "ks-muted" }, "Из панели Home Assistant доступ уже открыт. Эти ключи нужны только для внешних клиентов: они не хранятся на странице, пока вы их не запросите."),
     secretRow("API-токен (Bearer)", (i) => i.api_token, "api_token"),
     secretRow("Секрет для Home Assistant (Assist)", (i) => i.assist_secret, "assist_secret"),
-    secretRow("Путь вебхука для навыка Алисы (добавьте ваш публичный https://-адрес перед ним)", (i) => i.alice_path, "alice_secret"),
     h("h3", null, "Голос через Home Assistant (фраза «домовой …»)"),
     h("p", { class: "ks-muted" }, "Если Home Assistant работает не на этом же устройстве, замените 127.0.0.1 на адрес, по которому он видит аддон."),
     h("pre", { class: "dv-code" }, haYaml(SECRET_PLACEHOLDER)),
     smallButton("Скопировать YAML с секретом", async () => { const info = await fetchSecurity(); if (info) { await copy(haYaml(info.assist_secret)); } }, "secondary"),
+  );
+}
+
+function aliceSection(runtime: ExtensionRuntime, refresh: () => void, settings: Settings): HTMLElement {
+  const { secretRow } = securityControls(runtime, refresh);
+  const check = smallButton("Проверить настройку", async () => {
+    const result = await runtime.invokeAction<{ ok: boolean; detail?: { reply?: string }; error?: { message: string } }>("domovoy.actions", "alice.test");
+    if (!result.ok) {
+      toast(result.error.message, "bad", 8000);
+    } else if (result.data.ok) {
+      toast("Настройка Алисы готова: навык отвечает локально. Публичный адрес и сам навык проверяются в Yandex Dialogs.", "good", 9000);
+    } else {
+      toast(result.data.error?.message ?? "Настройка не готова", "bad", 8000);
+    }
+    refresh();
+  }, "secondary");
+  return h(
+    "div",
+    null,
+    h("p", { class: "ks-muted" }, "Алиса подключается как приватный навык Yandex Dialogs. Домовой не создаёт навык за вас: нужен публичный HTTPS-адрес, который видит Яндекс."),
+    h("ol", { class: "ks-list" },
+      h("li", null, "Создайте приватный навык в Yandex Dialogs."),
+      h("li", null, "Вставьте полный webhook-адрес: ваш публичный https://-адрес + путь ниже."),
+      h("li", null, "Добавьте свой Yandex user id в поле «Кому можно говорить» и сохраните."),
+      h("li", null, "Нажмите «Проверить настройку»: она проверяет allow-list и локальный ответ навыка, но не доступность из интернета."),
+    ),
+    secretRow("Путь вебхука для навыка Алисы", (i) => i.alice_path, "alice_secret"),
+    h("p", { class: "ks-muted" }, "Полный адрес: https://<ваш публичный адрес> + путь выше. Если аддон доступен только в LAN, Яндекс не сможет открыть навык — нужен туннель или reverse proxy с HTTPS."),
+    h("h3", null, "Кому можно говорить"),
+    h("p", { class: "ks-muted" }, "Укажите Yandex user id (не логин и не email), по одному на строку или через запятую. Пустой список отключает команды: это защита от чужих людей, получивших ссылку на навык."),
+    settingsForm(runtime, [
+      { name: "allowed_user_ids", label: "Yandex user id", type: "textarea", rows: 3, value: lines(settings.alice?.allowed_user_ids), placeholder: "1234567890", hint: "Посмотреть id можно в профиле пользователя в консоли Yandex Dialogs.", wide: true },
+    ], (v) => ({ settings: { alice: { allowed_user_ids: splitLines(String(v.allowed_user_ids)) } } }), refresh),
+    h("div", { class: "ks-row" }, check),
   );
 }
 
@@ -357,10 +427,34 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         { name: "allowed_services", label: "Разрешённые сервисы управления", type: "textarea", rows: 4, value: lines(s.ha.allowed_services), placeholder: "light.turn_on\nlight.turn_off\nscript.turn_on", hint: "Дополнительно к базовым (свет, розетки, вентиляторы, шторы, сцены). Замки, сигнализация, скрипты и Supervisor запрещены всегда.", wide: true },
       ], (v) => ({ settings: { ha: { url: String(v.url).trim(), person_entity: entityValue(v, "person_entity", s.ha.person_entity), allowed_services: splitLines(String(v.allowed_services)) } }, secrets: { ha_token: String(v.ha_token) } }), refresh)));
 
-      const tg = section("telegram", "Telegram", status("telegram"), h("div", null, detail("telegram"), settingsForm(runtime, [
-        { name: "enabled", label: "Включён", type: "checkbox", value: s.telegram.enabled },
-        secretField("telegram_token", "Токен бота (от @BotFather)", data.secrets.telegram_token),
-      ], (v) => ({ settings: { telegram: { enabled: v.enabled === true } }, secrets: { telegram_token: String(v.telegram_token) } }), refresh), h("h3", null, "Контакты"), contactsSection(runtime, data, refresh)));
+      const tgStatus = h("span", { class: "ks-row" },
+        status("telegram"),
+        data.linkRequests.length ? badge(`${data.linkRequests.length} запрос(а)`, "warn") : null,
+      );
+      const tgTestMessage = smallButton("Отправить тестовое сообщение", async () => {
+        const result = await runtime.invokeAction<{ ok: boolean; detail?: { status?: string; last_error?: string }; error?: { message: string } }>(
+          "domovoy.actions", "telegram.test_message",
+        );
+        if (!result.ok) {
+          toast(result.error.message, "bad", 8000);
+        } else if (result.data.ok) {
+          toast("Тестовое сообщение отправлено в Telegram", "good");
+        } else {
+          toast(result.data.detail?.last_error ?? "Не удалось отправить: сообщение осталось в очереди", "bad", 9000);
+        }
+        refresh();
+      }, "secondary");
+      const tg = section("telegram", "Telegram", tgStatus, h("div", null,
+        h("p", { class: "ks-muted" }, "Бот принимает команды только в личном чате владельца — контакта с галочкой «Это я». Группы и другие контакты могут только получать сообщения."),
+        detail("telegram"),
+        h("div", { class: "ks-row" }, tgTestMessage),
+        settingsForm(runtime, [
+          { name: "enabled", label: "Включён", type: "checkbox", value: s.telegram.enabled },
+          secretField("telegram_token", "Токен бота (от @BotFather)", data.secrets.telegram_token),
+        ], (v) => ({ settings: { telegram: { enabled: v.enabled === true } }, secrets: { telegram_token: String(v.telegram_token) } }), refresh),
+        h("h3", null, "Контакты"),
+        contactsSection(runtime, data, refresh),
+      ));
 
       const cal = section("calendar", "Календарь", status("caldav"), h("div", null, detail("caldav"), settingsForm(runtime, [
         { name: "url", label: "CalDAV URL", type: "url", value: s.caldav.url, placeholder: "https://caldav.example.com/dav/user/calendar/", wide: true },
@@ -434,9 +528,10 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
           { name: "max_seconds", label: "Максимум секунд записи", type: "number", min: 3, max: 60, value: s.voice.stt.max_seconds },
         ], (v) => ({ settings: { voice: { stt: { base_url: String(v.base_url).trim(), model: String(v.model).trim(), language: String(v.language).trim() || "ru", max_seconds: Number(v.max_seconds) || 15 } } } }), refresh)));
 
-      const security = section("security", "Доступ, Алиса и Home Assistant", null, securitySection(runtime, refresh));
+      const alice = section("alice", "Алиса", status("alice"), aliceSection(runtime, refresh, s));
+      const security = section("security", "Доступ и Home Assistant", null, securitySection(runtime, refresh));
 
-      return h("div", { class: "dv-stack" }, statusGrid, ha, tg, cal, speakers, rooms, llm, stt, security);
+      return h("div", { class: "dv-stack" }, statusGrid, ha, tg, alice, cal, speakers, rooms, llm, stt, security);
     },
   });
 

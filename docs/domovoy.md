@@ -52,10 +52,10 @@ text ─► interpreter ─► intents ─► strict validation ─► policy �
 4. **Executor.** Each change goes through a service that writes the data, its **audit** row (before/after snapshots),
    the search index and the change-feed entry in one transaction; a command with several intents is not atomic as a
    whole (each intent is). Deletes are soft. **Undo** works for changes to items, places, notes, tasks, reminders and
-   local calendar events, and for events created in CalDAV (compensating delete). It is not offered for sent messages,
-   Home Assistant calls, edits of CalDAV events or "used" marks — those are recorded, not reversible. A place cannot be
-   undone while things are in it, and a bare «отмени» only reaches back to the current conversation or the last 15
-   minutes.
+   local calendar events, and for events created in CalDAV (compensating delete). Undoing a recurring-task completion
+   also removes the next occurrence it spawned. It is not offered for sent messages, Home Assistant calls, edits of
+   CalDAV events or "used" marks — those are recorded, not reversible. A place cannot be undone while things are in it,
+   and a bare «отмени» only reaches back to the current conversation or the last 15 minutes.
 5. **Feed.** Each write appends to a change log; the UI's long-poll turns it into live updates.
 
 Corrections in conversation («нет, десять», «не девять, а десять», «нет, в четвёртой коробке») refer to the last thing
@@ -91,6 +91,7 @@ Everything is optional and shown with an honest status (works / degraded / not a
 | Home Assistant | inside the add-on the supervisor token is used automatically — and only ever sent to the supervisor's own address, never to an address typed into the settings. Without any configuration the assistant may call a small default set (turn on/off/toggle for lights, switches and fans, open/close covers, activate scenes); the owner adds more in Integrations. `lock.*`, `alarm_control_panel.*`, `shell_command.*`, `python_script.*`, `hassio.*` and `homeassistant.stop/restart` are refused for every caller, speakers and notifications included |
 | Calendar | built-in local calendar; CalDAV (read/create/update/delete, edits patch the VEVENT so attendees and alarms survive); Home Assistant calendars can be read and can receive new events. One source failing shows a warning, never an empty page |
 | Telegram | bot token; `/start` in a private chat requests linking; the owner attaches the chat to a contact marked **Я / is_self** to allow commands. Other contacts are message recipients only. `/help`, `/today`, `/shopping` and ordinary Russian text use the existing pipeline and durable outbox. Groups, bots, non-text updates and unmatched senders cannot issue commands. Disabling Telegram pauses polling and queued Telegram deliveries without consuming retries |
+| Alice | a private skill with its own secret path. `alice.allowed_user_ids` must list at least one Yandex user id: the skill refuses commands while the list is empty. Repeated wrong secrets are rate-limited per real client |
 | Language model | any OpenAI-compatible server (`/chat/completions`, `/embeddings`), local or cloud; not required |
 | Speech to text | any OpenAI-compatible `/audio/transcriptions` server, only for the kiosk microphone |
 
@@ -104,8 +105,15 @@ an address typed into the settings can never be used to make the add-on hand a s
 * Requests through **Home Assistant ingress** or from the add-on's own host are trusted (HA already authenticated the
   person). nginx decides this and *always overwrites* the `X-Domovoy-Origin` header, so a client cannot claim it.
 * **Other LAN devices** need `Authorization: Bearer <api token>`, unless their address is listed in the add-on option
-  `domovoy_trusted_networks` (that is how a kiosk is allowed in without a login prompt). Failed logins are rate-limited
-  per real client address.
+  `domovoy_trusted_networks` (that is how a kiosk is allowed in without a login prompt). Such a device is marked
+  `kiosk`: it can use the household API, but cannot read or rotate API secrets. Failed logins are rate-limited per real
+  client address.
+* `GET /api/security` and `POST /api/security/rotate` accept only Home Assistant ingress, the add-on host, or a bearer
+  token — never a trusted LAN/kiosk address.
+* Import validates `cfg.*` setting keys and JSON shapes before it touches the database, and clears a saved integration
+  secret when the imported address points at a different origin. A corrupt `secrets.json` is preserved as
+  `secrets.json.corrupt` instead of being silently overwritten; a transient read error stops startup rather than
+  regenerating every key.
 * Every state-changing request needs the `X-Domovoy-Client` header (or a bearer token): a page on another website cannot
   add it without a CORS preflight, which the server never grants — the CSRF defence. JSON only; bodies are size-limited
   (1 MB JSON, 4 MB audio, 8 MB import).
@@ -117,6 +125,17 @@ an address typed into the settings can never be used to make the add-on hand a s
 
 * SQLite in WAL mode with migrations; consistent online backups every night (7 kept) and on demand; export/import as
   JSON (validated first, safety backup, one transaction — a bad file changes nothing).
+* Hourly retention prunes old operational history: commands and resolved reviews after 90 days, audit after 365,
+  sent/failed outbox rows and non-processing Telegram updates after 30. Pending/applying reviews, queued/sending
+  outbox rows and `processing` Telegram updates are never deleted. The windows are configurable through the
+  `retention` settings object.
+* The HTTP server caps concurrent requests (64 by default, `DOMOVOY_MAX_CONCURRENT_REQUESTS`) and times out idle
+  sockets; excess connections get 503 instead of an unbounded thread. Review approval that already applied an earlier
+  intent before an unexpected error is closed as a partial approval, so a retry cannot apply it twice; undo is
+  serialized so concurrent calls cannot repeat an external effect.
+* Telegram's 15-second long poll runs on its own single worker, so a slow Telegram API cannot delay reminders or the
+  outbox. Quiet hours and presence windows compare minutes (with midnight wrap), and Home Assistant calendar events
+  are sent with timezone-aware ISO timestamps.
 * Providers are isolated: a dead CalDAV or Telegram degrades that feature, records the error for the status page, and
   never breaks `/api/today`. Circuit breakers stop hammering a provider that is down.
 * Scheduler jobs are isolated from each other; a failing job is logged and retried on the next tick.

@@ -4,6 +4,7 @@ import datetime as dt
 import json
 import logging
 import re
+import threading
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11,17 +12,45 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from . import __version__
-from .auth import Authenticator, MUTATING, Principal
+from .auth import ADMIN_ORIGINS, Authenticator, MUTATING, Principal
 from .backup import create_backup, export_data, import_data, list_backups
 from .clock import from_iso, to_iso
 from .errors import DomovoyError, NotFoundError, PayloadTooLarge, ProviderError, UnauthorizedError, ValidationError
 from .services.context import Ctx
+from .services.settings import SECRET_BINDINGS, dig, origin_of
 
 LOG = logging.getLogger("domovoy.api")
 MAX_JSON_BYTES = 1024 * 1024
 MAX_AUDIO_BYTES = 4 * 1024 * 1024
 WRITABLE_SECRETS = ("telegram_token", "caldav_password", "ha_token", "llm_api_key")
 ROTATABLE = ("api_token", "alice_secret", "assist_secret")
+
+
+def _as_bool(value: Any, field: str = "value") -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None or value == "":
+        return False
+    if isinstance(value, (int, float)) and value in (0, 1):
+        return bool(value)
+    normalized = str(value).strip().lower()
+    if normalized in ("true", "1", "yes", "on"):
+        return True
+    if normalized in ("false", "0", "no", "off"):
+        return False
+    raise ValidationError(f"{field} must be true or false", fields={field: "Not a boolean"})
+
+
+def _int_value(value: Any, field: str, *, minimum: int = 1, maximum: int = 10_000_000, default: int | None = None) -> int:
+    if value in (None, "") and default is not None:
+        return default
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        raise ValidationError(f"{field} must be an integer", fields={field: "Not a number"}) from None
+    if number < minimum or number > maximum:
+        raise ValidationError(f"{field} is out of range", fields={field: f"{minimum}..{maximum}"})
+    return number
 
 
 class Request:
@@ -151,19 +180,25 @@ def build_router(ctx: "ApiContext") -> Router:
             leaf, _, _ = app.locations.resolve_path(path, create=True, ctx=req.ctx())
             return leaf
         value = body.get("location_id")
-        return int(value) if value not in (None, "") else None
+        return _int_value(value, "location_id") if value not in (None, "") else None
 
     def items_list(req: Request) -> dict[str, Any]:
         loc = req.query.get("location_id")
-        return {"items": app.items.list(location_id=int(loc) if loc else None, q=req.query.get("q", ""), limit=req.q_int("limit", 200, 1, 1000),
+        return {"items": app.items.list(location_id=_int_value(loc, "location_id") if loc else None, q=req.query.get("q", ""), limit=req.q_int("limit", 200, 1, 1000),
                                         offset=req.q_int("offset", 0), include_empty=req.query.get("include_empty", "1") != "0")}
     r.add("GET", "/api/items", items_list)
 
     def items_create(req: Request) -> dict[str, Any]:
         body = req.json()
-        item, outcome = app.items.create(req.ctx(), name=str(body.get("name", "")), quantity=body.get("quantity"), unit=str(body.get("unit", "")),
-                                         location_id=resolve_location(body, req), properties=body.get("properties"), notes=str(body.get("notes", "")),
-                                         category=str(body.get("category", "")), mode=body.get("mode", "set"), merge=bool(body.get("merge", False)))
+        name, quantity, properties = app.items.validate_new(
+            name=str(body.get("name", "")),
+            quantity=body.get("quantity"),
+            properties=body.get("properties"),
+        )
+        item, outcome = app.items.create(req.ctx(), name=name, quantity=quantity, unit=str(body.get("unit", "")),
+                                         location_id=resolve_location(body, req), properties=properties, notes=str(body.get("notes", "")),
+                                         category=str(body.get("category", "")), mode=body.get("mode", "set"),
+                                         merge=_as_bool(body.get("merge", False), "merge"))
         return {"item": item, "outcome": outcome}
     r.add("POST", "/api/items", items_create)
     r.add("GET", r"/api/items/(?P<id>\d+)", lambda req: {"item": app.items.get(req.int_param("id"))})
@@ -236,7 +271,7 @@ def build_router(ctx: "ApiContext") -> Router:
     r.add("POST", "/api/reminders", reminder_create)
     r.add("PATCH", r"/api/reminders/(?P<id>\d+)", lambda req: {"reminder": app.reminders.update(req.ctx(), req.int_param("id"), req.json())})
     r.add("POST", r"/api/reminders/(?P<id>\d+)/done", lambda req: {"reminder": app.reminders.complete(req.ctx(), req.int_param("id"))})
-    r.add("POST", r"/api/reminders/(?P<id>\d+)/snooze", lambda req: {"reminder": app.reminders.snooze(req.ctx(), req.int_param("id"), int(req.json().get("minutes", 10)))})
+    r.add("POST", r"/api/reminders/(?P<id>\d+)/snooze", lambda req: {"reminder": app.reminders.snooze(req.ctx(), req.int_param("id"), _int_value(req.json().get("minutes", 10), "minutes", maximum=10_080))})
 
     def reminder_delete(req: Request) -> dict[str, Any]:
         app.reminders.delete(req.ctx(), req.int_param("id"))
@@ -262,7 +297,7 @@ def build_router(ctx: "ApiContext") -> Router:
         except ValueError:
             raise ValidationError("start/end must be ISO-8601 with timezone", fields={"start": "Invalid"}) from None
         event = app.calendar.create(req.ctx(), title=str(body.get("title", "")), start=start.astimezone(app.clock.tz),
-                                    end=end.astimezone(app.clock.tz) if end else None, all_day=bool(body.get("all_day")),
+                                    end=end.astimezone(app.clock.tz) if end else None, all_day=_as_bool(body.get("all_day"), "all_day"),
                                     location=str(body.get("location", "")), notes=str(body.get("notes", "")), calendar=body.get("calendar"))
         return {"event": event.public()}
     r.add("POST", "/api/calendar/events", cal_create)
@@ -270,6 +305,8 @@ def build_router(ctx: "ApiContext") -> Router:
     def cal_patch(req: Request) -> dict[str, Any]:
         body = req.json()
         patch: dict[str, Any] = {k: body[k] for k in ("title", "location", "notes", "all_day") if k in body}
+        if "all_day" in patch:
+            patch["all_day"] = _as_bool(patch["all_day"], "all_day")
         for key in ("start", "end"):
             if body.get(key):
                 try:
@@ -287,7 +324,7 @@ def build_router(ctx: "ApiContext") -> Router:
     # ---- contacts, review, audit, outbox --------------------------------------------------------
     r.add("GET", "/api/contacts", lambda req: {"contacts": app.contacts.list(), "link_requests": app.db.get_setting("telegram.link_requests", []) or []})
     r.add("POST", "/api/contacts", lambda req: {"contact": app.contacts.create(req.ctx(), name=str(req.json().get("name", "")), aliases=req.json().get("aliases"),
-          channels=req.json().get("channels"), is_self=bool(req.json().get("is_self")), notes=str(req.json().get("notes", "")))})
+          channels=req.json().get("channels"), is_self=_as_bool(req.json().get("is_self"), "is_self"), notes=str(req.json().get("notes", "")))})
     r.add("PATCH", r"/api/contacts/(?P<id>\d+)", lambda req: {"contact": app.contacts.update(req.ctx(), req.int_param("id"), req.json())})
 
     def contact_delete(req: Request) -> dict[str, Any]:
@@ -297,15 +334,54 @@ def build_router(ctx: "ApiContext") -> Router:
 
     def contact_link(req: Request) -> dict[str, Any]:
         body = req.json()
-        chat_id = str(body.get("chat_id", ""))
-        contact = app.contacts.get(int(body.get("contact_id", 0)))
+        chat_id = str(body.get("chat_id", "")).strip()
+        if not chat_id:
+            raise ValidationError("chat_id is required", fields={"chat_id": "Required"})
+        contact = app.contacts.get(_int_value(body.get("contact_id"), "contact_id"))
         channels = dict(contact["channels"])
         channels["telegram"] = {"chat_id": chat_id}
-        updated = app.contacts.update(req.ctx(), contact["id"], {"channels": channels})
+        patch: dict[str, Any] = {"channels": channels}
+        if _as_bool(body.get("is_self"), "is_self"):
+            patch["is_self"] = True
+        updated = app.contacts.update(req.ctx(), contact["id"], patch)
         remaining = [x for x in (app.db.get_setting("telegram.link_requests", []) or []) if x.get("chat_id") != chat_id]
         app.db.set_setting("telegram.link_requests", remaining)
         return {"contact": updated}
     r.add("POST", "/api/contacts/link", contact_link)
+
+    def telegram_test_message(req: Request) -> dict[str, Any]:
+        if not app.settings.get("telegram").get("enabled") or not app.telegram.configured():
+            return {"ok": False, "error": {"code": "telegram_disabled",
+                                            "message": "Включите Telegram и задайте токен бота."}}
+        owner = next((contact for contact in app.contacts.list() if contact.get("is_self")), None)
+        if owner is None:
+            return {"ok": False, "error": {"code": "owner_not_linked",
+                                            "message": "Сначала создайте контакт «Это я» и привяжите к нему свой Telegram-чат."}}
+        try:
+            entry = app.delivery.send(Ctx(actor="user", source="ui"), channel="telegram", recipient="self",
+                                      text="Проверка связи. Домовой на месте.")
+            outcome = app.outbox.deliver_now(int(entry["id"]))
+        except DomovoyError as exc:
+            return {"ok": False, "error": {"code": exc.code, "message": exc.message}}
+        return {"ok": outcome.get("status") == "sent",
+                "detail": {"status": outcome.get("status"), "last_error": outcome.get("last_error")}}
+    r.add("POST", "/api/integrations/telegram/test_message", telegram_test_message, auth="admin")
+
+    def alice_test(req: Request) -> dict[str, Any]:
+        allowed = [str(item).strip() for item in (app.settings.get("alice").get("allowed_user_ids") or []) if str(item).strip()]
+        if not allowed:
+            return {"ok": False, "error": {"code": "not_configured",
+                                            "message": "Добавьте свой Yandex user id — без него навык отключён."}}
+        payload = {"meta": {"locale": "ru-RU"},
+                   "session": {"session_id": "self-test", "user": {"user_id": allowed[0]}, "new": True},
+                   "request": {"command": "", "original_utterance": "", "type": "SimpleUtterance"},
+                   "version": "1.0"}
+        response = ctx.alice.handle(payload)
+        text = str((response.get("response") or {}).get("text") or "")
+        if "приватный" in text.lower() or "не настроен" in text.lower():
+            return {"ok": False, "error": {"code": "alice_not_ready", "message": text}}
+        return {"ok": True, "detail": {"reply": text, "allowed_user_ids": len(allowed)}}
+    r.add("POST", "/api/alice/test", alice_test, auth="admin")
 
     r.add("GET", "/api/review", lambda req: {"items": app.review.list(status=req.query.get("status", "pending"))})
 
@@ -325,9 +401,9 @@ def build_router(ctx: "ApiContext") -> Router:
     r.add("PATCH", r"/api/review/(?P<id>\d+)", review_edit)
 
     r.add("GET", "/api/audit", lambda req: {"audit": app.audit.list(entity_type=req.query.get("entity_type") or None,
-          entity_id=int(req.query["entity_id"]) if req.query.get("entity_id") else None, limit=req.q_int("limit", 100, 1, 500),
+          entity_id=_int_value(req.query["entity_id"], "entity_id") if req.query.get("entity_id") else None, limit=req.q_int("limit", 100, 1, 500),
           before_id=req.q_int("before_id", 0) or None)})
-    r.add("POST", r"/api/audit/(?P<id>\d+)/undo", lambda req: {"audit": app.audit.undo(req.int_param("id"), req.ctx(), force=bool(req.json().get("force")))})
+    r.add("POST", r"/api/audit/(?P<id>\d+)/undo", lambda req: {"audit": app.audit.undo(req.int_param("id"), req.ctx(), force=_as_bool(req.json().get("force"), "force"))})
     r.add("GET", "/api/outbox", lambda req: {"messages": app.outbox.list(status=req.query.get("status") or None, limit=req.q_int("limit", 100, 1, 500))})
     r.add("POST", r"/api/outbox/(?P<id>\d+)/retry", lambda req: {"message": app.outbox.retry(req.int_param("id"))})
     r.add("POST", r"/api/outbox/(?P<id>\d+)/cancel", lambda req: {"message": app.outbox.cancel(req.int_param("id"))})
@@ -338,25 +414,13 @@ def build_router(ctx: "ApiContext") -> Router:
     # A stored secret is only ever sent to the address it was saved for. Pointing an integration somewhere else
     # forgets its secret, so an address typed into the settings cannot be used to make the add-on hand a saved key
     # to a stranger's server.
-    SECRET_BINDINGS = (("ha", ("url",), "ha_token"), ("telegram", ("base_url",), "telegram_token"), ("caldav", ("url",), "caldav_password"),
-                       ("ai", ("base_url",), "llm_api_key"), ("voice", ("stt", "base_url"), "llm_api_key"))
-
-    def _origin(url: Any) -> str:
-        parts = urlsplit(str(url or ""))
-        return f"{parts.scheme}://{(parts.hostname or '').lower()}:{parts.port or ''}" if parts.hostname else ""
-
-    def _dig(block: Any, path: tuple[str, ...]) -> Any:
-        for name in path:
-            block = block.get(name) if isinstance(block, dict) else None
-        return block
-
     def settings_put(req: Request) -> dict[str, Any]:
         body = req.json()
         before = app.settings.all()
         result = app.settings.update(body)
         cleared = []
         for key, path, secret in SECRET_BINDINGS:
-            if key in body and _origin(_dig(before[key], path)) != _origin(_dig(result[key], path)) and app.secrets.has(secret):
+            if key in body and origin_of(dig(before[key], path)) != origin_of(dig(result[key], path)) and app.secrets.has(secret):
                 app.secrets.set(secret, "")
                 cleared.append(secret)
         if "timezone" in body and body["timezone"]:
@@ -428,7 +492,7 @@ def build_router(ctx: "ApiContext") -> Router:
     def security(req: Request) -> dict[str, Any]:
         return {"api_token": app.secrets.get("api_token"), "alice_path": f"/domovoy-api/frontends/alice/{app.secrets.get('alice_secret')}",
                 "assist_secret": app.secrets.get("assist_secret")}
-    r.add("GET", "/api/security", security)
+    r.add("GET", "/api/security", security, auth="admin")
 
     def rotate(req: Request) -> dict[str, Any]:
         name = str(req.json().get("name", ""))
@@ -436,7 +500,7 @@ def build_router(ctx: "ApiContext") -> Router:
             raise ValidationError("Unknown secret", fields={"name": "Unknown"})
         app.secrets.rotate(name)
         return security(req)
-    r.add("POST", "/api/security/rotate", rotate)
+    r.add("POST", "/api/security/rotate", rotate, auth="admin")
 
     # ---- backup / export / import ---------------------------------------------------------------
     r.add("GET", "/api/export", lambda req: export_data(app))
@@ -459,7 +523,7 @@ def build_router(ctx: "ApiContext") -> Router:
             return voice.handle_audio(req.body, content_type, room=room, session_id=None)
         body = req.json()
         return voice.handle_transcript(str(body.get("text", "")), room=str(body.get("room") or room), session_id=body.get("session_id"),
-                                       require_trigger=bool(body.get("require_trigger", False)), source="voice")
+                                       require_trigger=_as_bool(body.get("require_trigger", False), "require_trigger"), source="voice")
     r.add("POST", "/api/voice/command", voice_command)
     r.add("GET", "/api/voice/status", lambda req: {"enabled": bool(voice.config().get("enabled")), "stt_configured": app.stt.configured(),
           "trigger_words": voice.config().get("trigger_words"), "window_s": voice.config().get("window_s"), "busy": app.gate.busy})
@@ -470,7 +534,11 @@ def build_router(ctx: "ApiContext") -> Router:
     # ---- realtime -------------------------------------------------------------------------------
     def events(req: Request) -> dict[str, Any]:
         since_raw = req.query.get("since")
-        timeout = min(30.0, max(0.0, float(req.query.get("timeout", 0) or 0)))
+        try:
+            requested_timeout = float(req.query.get("timeout", 0) or 0)
+        except ValueError:
+            raise ValidationError("timeout must be a number", fields={"timeout": "Invalid"}) from None
+        timeout = min(30.0, max(0.0, requested_timeout))
         if since_raw in (None, ""):
             return {"cursor": app.db.latest_seq, "events": []}
         try:
@@ -506,6 +574,8 @@ def _redact_path(path: str) -> str:
 class ApiHandler(BaseHTTPRequestHandler):
     server_version = f"Domovoy/{__version__}"
     protocol_version = "HTTP/1.1"
+    # A client that opens a connection and never finishes its request must not hold a thread forever.
+    timeout = 30
 
     @property
     def api(self) -> ApiContext:
@@ -564,14 +634,24 @@ class ApiHandler(BaseHTTPRequestHandler):
             principal = None
             if auth_kind == "user":  # reject before reading a potentially large body
                 principal = self.api.auth.authenticate(self.headers, method, peer_ip, remote_ip)
+            elif auth_kind == "admin":
+                principal = self.api.auth.authenticate(self.headers, method, peer_ip, remote_ip)
+                if principal.origin not in ADMIN_ORIGINS:
+                    raise UnauthorizedError("Admin access required", code="admin_required")
             body = self._read_body(limit) if method in MUTATING else b""
             body_consumed = True
             if auth_kind == "alice":
+                if self.api.auth.limiter.blocked(remote_ip):
+                    raise UnauthorizedError("Too many failed attempts, try again later", code="rate_limited")
                 if not self.api.auth.check_secret("alice_secret", params.get("secret", "")):
+                    self.api.auth.limiter.record_failure(remote_ip)
                     raise UnauthorizedError("Invalid skill secret")
             elif auth_kind == "assist":
+                if self.api.auth.limiter.blocked(remote_ip):
+                    raise UnauthorizedError("Too many failed attempts, try again later", code="rate_limited")
                 supplied = self.headers.get("X-Domovoy-Secret") or ""      # header only: a query string ends up in access logs
                 if not self.api.auth.check_secret("assist_secret", supplied):
+                    self.api.auth.limiter.record_failure(remote_ip)
                     principal = self.api.auth.authenticate(self.headers, method, peer_ip, remote_ip)
             request = Request(method, path, query, self.headers, body, principal, remote_ip)
             request.params = params
@@ -606,7 +686,33 @@ class ApiHandler(BaseHTTPRequestHandler):
 class ApiServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    request_queue_size = 64
 
-    def __init__(self, address: tuple[str, int], api_context: ApiContext) -> None:
+    def process_request(self, request: Any, client_address: Any) -> None:
+        if not self._request_slots.acquire(blocking=False):
+            try:
+                request.sendall(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            except OSError:
+                pass
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self._request_slots.release()
+            raise
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._request_slots.release()
+
+    def __init__(self, address: tuple[str, int], api_context: ApiContext, *, max_concurrent_requests: int = 64,
+                 socket_timeout: float = 30) -> None:
+        self.max_concurrent_requests = max(1, int(max_concurrent_requests))
+        self._request_slots = threading.BoundedSemaphore(self.max_concurrent_requests)
+        if socket_timeout > 0:
+            ApiHandler.timeout = socket_timeout
         super().__init__(address, ApiHandler)
         self.api_context = api_context

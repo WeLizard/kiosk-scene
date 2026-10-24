@@ -99,6 +99,10 @@ function scheduleDisplayPowerReplay(attemptsRemaining = 24): void {
 }
 
 window.addEventListener("message", (event) => {
+  // Display power is a same-origin control message; a cross-origin frame must not be able to drive it.
+  if (event.origin !== window.location.origin) {
+    return;
+  }
   const message = parseDisplayPowerMessage(event.data);
   if (!message) {
     return;

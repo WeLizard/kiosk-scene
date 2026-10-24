@@ -40,6 +40,8 @@ def strip_trigger(text: str, triggers: list[str]) -> tuple[bool, str]:
 
 
 class VoiceGateway:
+    MAX_WINDOWS = 128
+
     def __init__(self, app: Any, pipeline: Any, *, monotonic=time.monotonic) -> None:
         self.app, self.pipeline, self._now = app, pipeline, monotonic
         self._windows: dict[str, float] = {}
@@ -55,8 +57,14 @@ class VoiceGateway:
             return self._windows.get(room or "", 0) > self._now()
 
     def _open_window(self, room: str) -> None:
+        now = self._now()
         with self._lock:
-            self._windows[room or ""] = self._now() + float(self.config().get("window_s") or 20)
+            for key in [key for key, until in self._windows.items() if until <= now]:
+                self._windows.pop(key, None)
+            if len(self._windows) >= self.MAX_WINDOWS:
+                oldest = min(self._windows, key=self._windows.get)
+                self._windows.pop(oldest, None)
+            self._windows[room or ""] = now + float(self.config().get("window_s") or 20)
 
     def _close_window(self, room: str) -> None:
         with self._lock:

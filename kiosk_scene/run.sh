@@ -85,7 +85,7 @@ mkdir -p "$EXTENSIONS_DIR"
   while IFS= read -r network; do
     [ -z "$network" ] && continue
     if normalized=$(python3 -c 'import ipaddress, sys; print(ipaddress.ip_network(sys.argv[1].strip(), strict=False))' "$network" 2>/dev/null); then
-      echo "  ${normalized} local;"
+      echo "  ${normalized} kiosk;"
     else
       echo "WARNING: ignoring invalid domovoy_trusted_networks entry: ${network}" >&2
     fi
@@ -127,11 +127,31 @@ else
   echo "WARNING: Image runtime missing: ${SCENE_RUNTIME_DIR}/index.html"
 fi
 
-python3 /scene_host_service.py &
+# Restarts a scene service if it ever dies, with a growing pause. The wrapper stays alive so the
+# existing wait loop can keep supervising nginx and the optional Domovoy service independently.
+run_scene_service() {
+  local name="$1"; shift
+  local child="" delay=5 started=0
+  trap '[ -n "$child" ] && kill "$child" 2>/dev/null; exit 0' TERM INT
+  while true; do
+    started=$SECONDS
+    "$@" &
+    child=$!
+    wait "$child" || true
+    child=""
+    if [ $((SECONDS - started)) -gt 60 ]; then delay=5; fi
+    echo "WARNING: ${name} exited; restarting in ${delay}s"
+    sleep "$delay" &
+    wait $! || true
+    delay=$((delay * 2 > 60 ? 60 : delay * 2))
+  done
+}
+
+run_scene_service "scene_host_service" python3 /scene_host_service.py &
 SCENE_HOST_PID=$!
 echo "INFO: scene_host_service.py started (PID=${SCENE_HOST_PID})"
 
-python3 /scene_config_service.py &
+run_scene_service "scene_config_service" python3 /scene_config_service.py &
 SCENE_EDITOR_PID=$!
 echo "INFO: scene_config_service.py started (PID=${SCENE_EDITOR_PID})"
 

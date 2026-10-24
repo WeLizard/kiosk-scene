@@ -27,16 +27,39 @@ export const builtInWidgets: WidgetDefinition[] = [
   { id: "entity-summary", kind: "entity-summary" },
 ];
 
+const FALLBACKS = {
+  en: {
+    card: "Card", staticCard: "static card", clear: "Clear", pendingTasks: "pending tasks",
+    on: "On", off: "Off", deviceState: "device state", batteryLevel: "battery level",
+    throughput: "throughput", nextEvent: "next event", percent: "state percentage",
+    numeric: "numeric value", entityState: "entity state",
+    todoCount: (count: number) => `${count} item${count === 1 ? "" : "s"}`,
+    nothingPending: "nothing pending",
+  },
+  ru: {
+    card: "Карточка", staticCard: "статичная карточка", clear: "Нет дел", pendingTasks: "ожидают",
+    on: "Вкл", off: "Выкл", deviceState: "состояние устройства", batteryLevel: "заряд",
+    throughput: "скорость", nextEvent: "следующее событие", percent: "процент",
+    numeric: "число", entityState: "состояние сущности",
+    todoCount: (count: number) => `${count} шт.`,
+    nothingPending: "ничего не осталось",
+  },
+} as const;
+
+function fallbacksFor(locale: string) {
+  return locale.toLowerCase().startsWith("ru") ? FALLBACKS.ru : FALLBACKS.en;
+}
+
 function cardField(card: SceneCardV1, key: string, maxLength = 64): string {
   return trimText((card as Record<string, unknown>)[key], maxLength);
 }
 
-function formatNumber(value: unknown, digits = 0): string {
+function formatNumber(value: unknown, digits = 0, locale = "en-US"): string {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
     return "";
   }
-  return numeric.toLocaleString(undefined, {
+  return numeric.toLocaleString(locale, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -69,7 +92,8 @@ export function resolveSceneCard(
   states: EntityStateMap | null = null,
   locale = "en-US",
 ): ResolvedSceneCard {
-  const caption = cardField(card, "caption", 40) || cardField(card, "type", 24) || "Card";
+  const labels = fallbacksFor(locale);
+  const caption = cardField(card, "caption", 40) || cardField(card, "type", 24) || labels.card;
   const hint = cardField(card, "hint", 72);
   const type = cardField(card, "type", 32).toLowerCase() || "entity";
   const entityId = cardField(card, "entity", 255);
@@ -82,19 +106,19 @@ export function resolveSceneCard(
     return {
       caption,
       value: cardField(card, "value", 64) || "—",
-      hint: hint || "static card",
+      hint: hint || labels.staticCard,
     };
   }
 
   if (type === "todo") {
     const count = Number(stateObj?.state);
     if (!Number.isFinite(count) || count <= 0) {
-      return { caption, value: "Clear", hint: hint || "nothing pending" };
+      return { caption, value: labels.clear, hint: hint || labels.nothingPending };
     }
     return {
       caption,
-      value: `${count} item${count === 1 ? "" : "s"}`,
-      hint: hint || "pending tasks",
+      value: labels.todoCount(count),
+      hint: hint || labels.pendingTasks,
     };
   }
 
@@ -102,27 +126,27 @@ export function resolveSceneCard(
     const isOn = stateObj?.state === "on";
     return {
       caption,
-      value: isOn ? (cardField(card, "onText", 48) || "On") : (cardField(card, "offText", 48) || "Off"),
-      hint: hint || "device state",
+      value: isOn ? (cardField(card, "onText", 48) || labels.on) : (cardField(card, "offText", 48) || labels.off),
+      hint: hint || labels.deviceState,
     };
   }
 
   if (type === "battery") {
-    const battery = formatNumber(stateObj?.state, 0);
+    const battery = formatNumber(stateObj?.state, 0, locale);
     return {
       caption,
       value: battery ? `${battery}%` : "—",
-      hint: trimText(secondaryObj?.state, 48) || hint || "battery level",
+      hint: trimText(secondaryObj?.state, 48) || hint || labels.batteryLevel,
     };
   }
 
   if (type === "network") {
-    const down = formatNumber(downObj?.state, 0);
-    const up = formatNumber(upObj?.state, 0);
+    const down = formatNumber(downObj?.state, 0, locale);
+    const up = formatNumber(upObj?.state, 0, locale);
     return {
       caption,
       value: down || up ? `↓ ${down || "0"} · ↑ ${up || "0"}` : "—",
-      hint: hint || "throughput",
+      hint: hint || labels.throughput,
     };
   }
 
@@ -130,34 +154,34 @@ export function resolveSceneCard(
     return {
       caption,
       value: formatTime(stateObj?.state, locale) || "—",
-      hint: hint || "next event",
+      hint: hint || labels.nextEvent,
     };
   }
 
   if (type === "percent") {
-    const numeric = formatNumber(stateObj?.state, Number(cardField(card, "digits", 4)) || 0);
+    const numeric = formatNumber(stateObj?.state, Number(cardField(card, "digits", 4)) || 0, locale);
     return {
       caption,
       value: numeric ? `${numeric}%` : "—",
-      hint: hint || trimText(stateObj?.attributes?.friendly_name, 48) || "state percentage",
+      hint: hint || trimText(stateObj?.attributes?.friendly_name, 48) || labels.percent,
     };
   }
 
   if (type === "number") {
     const digits = Number(cardField(card, "digits", 4)) || 0;
-    const numeric = formatNumber(stateObj?.state, digits);
+    const numeric = formatNumber(stateObj?.state, digits, locale);
     const unit = cardField(card, "unit", 16) || trimText(stateObj?.attributes?.unit_of_measurement, 16);
     return {
       caption,
       value: numeric ? `${numeric}${unit ? ` ${unit}` : ""}` : "—",
-      hint: hint || trimText(stateObj?.attributes?.friendly_name, 48) || "numeric value",
+      hint: hint || trimText(stateObj?.attributes?.friendly_name, 48) || labels.numeric,
     };
   }
 
   return {
     caption,
     value: trimText(stateObj?.state, 64) || cardField(card, "value", 64) || "—",
-    hint: hint || trimText(stateObj?.attributes?.friendly_name, 48) || "entity state",
+    hint: hint || trimText(stateObj?.attributes?.friendly_name, 48) || labels.entityState,
   };
 }
 

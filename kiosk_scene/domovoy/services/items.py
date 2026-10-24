@@ -104,6 +104,13 @@ class ItemService:
 
     # ---- writes ------------------------------------------------------------------------------
 
+    def validate_new(self, *, name: str, quantity: float | None = None, properties: dict[str, Any] | None = None) -> tuple[str, float | None, dict[str, Any]]:
+        """Validate the fields that can be checked before a location path is created."""
+        name = clean_phrase(name)
+        if not name:
+            raise ValidationError("Name is required", fields={"name": "Required"})
+        return name, self._check_quantity(quantity), self._check_properties(properties)
+
     def create(
         self, ctx: Ctx, *, name: str, quantity: float | None = None, unit: str = "", location_id: int | None = None,
         properties: dict[str, Any] | None = None, notes: str = "", category: str = "", confidence: float | None = None,
@@ -113,13 +120,9 @@ class ItemService:
 
         Returns `(item, outcome)` where outcome is `created`, `increased` or `set`.
         """
-        name = clean_phrase(name)
-        if not name:
-            raise ValidationError("Name is required", fields={"name": "Required"})
-        quantity = self._check_quantity(quantity)
+        name, quantity, props = self.validate_new(name=name, quantity=quantity, properties=properties)
         if location_id is not None:
             self.locations.get(location_id)
-        props = self._check_properties(properties)
         with self.db.write() as conn:
             existing = None
             if merge:

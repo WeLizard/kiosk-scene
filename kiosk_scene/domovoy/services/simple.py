@@ -217,12 +217,12 @@ class TaskService:
             conn.execute(f"UPDATE tasks SET {', '.join(f'{k} = ?' for k in values)} WHERE id = ?", (*values.values(), task_id))
             after = row_to_dict(conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone())
             action = "complete" if "done" in patch and patch["done"] else "update"
-            self.audit.record(conn, ctx, "task", task_id, action, before, after, f"Задача «{row['title']}» {'выполнена' if action == 'complete' else 'изменена'}")
+            audit_id = self.audit.record(conn, ctx, "task", task_id, action, before, after, f"Задача «{row['title']}» {'выполнена' if action == 'complete' else 'изменена'}")
             self.search.reindex(conn, "task", task_id)
             self.db.emit(conn, "tasks.changed", {"id": task_id})
             # Recurring chore: completing it re-opens a fresh occurrence.
             if action == "complete" and row["recurrence"] and row["done_at"] is None:
-                self._spawn_next(conn, ctx, after or {})
+                self._spawn_next(conn, ctx, after or {}, caused_by=audit_id)
         return self.get(task_id)
 
     def delete(self, ctx: Ctx, task_id: int) -> None:
@@ -242,7 +242,7 @@ class TaskService:
         key = norm_key(title)
         return [t for t in self.list(list_name=list_name) if key and (key in norm_key(t["title"]) or norm_key(t["title"]) in key)]
 
-    def _spawn_next(self, conn: sqlite3.Connection, ctx: Ctx, done_row: dict[str, Any]) -> None:
+    def _spawn_next(self, conn: sqlite3.Connection, ctx: Ctx, done_row: dict[str, Any], *, caused_by: int | None = None) -> None:
         from ..nlu.datetimes import next_occurrence  # local import: nlu depends on nothing in services
         import datetime as dt
 
@@ -260,7 +260,7 @@ class TaskService:
         )
         new_id = int(cursor.lastrowid or 0)
         after = row_to_dict(conn.execute("SELECT * FROM tasks WHERE id = ?", (new_id,)).fetchone())
-        self.audit.record(conn, ctx, "task", new_id, "create", None, after, f"Повтор задачи: {done_row['title']}")
+        self.audit.record(conn, ctx, "task", new_id, "create", None, after, f"Повтор задачи: {done_row['title']}", caused_by=caused_by)
         self.search.reindex(conn, "task", new_id)
 
     def _doc(self, conn: sqlite3.Connection, task_id: int) -> tuple[str, str] | None:

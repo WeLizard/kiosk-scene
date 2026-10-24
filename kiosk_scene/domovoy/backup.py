@@ -1,35 +1,48 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any
 
 from .db import MIGRATIONS
 from .errors import ValidationError
+from .services.settings import DEFAULTS, SECRET_BINDINGS, SHAPES, SettingsService, _check_nested, dig, origin_of
 
 # Order matters for import (parents first). Secrets and derived tables (search, embeddings, change_log) are never exported.
 EXPORT_TABLES = ["locations", "items", "notes", "tasks", "contacts", "reminders", "calendar_events", "outbox", "commands",
                  "review_queue", "audit_log"]
 SCHEMA_VERSION = max(v for v, _ in MIGRATIONS)
+_BACKUP_LOCK = threading.Lock()
 
 
 def create_backup(app: Any) -> Path:
     """Consistent snapshot of the live database using SQLite's online backup API, with rotation."""
     backups = app.env.backups_dir
     backups.mkdir(parents=True, exist_ok=True)
-    stamp = app.clock.now().strftime("%Y%m%d-%H%M%S")
-    target = backups / f"domovoy-{stamp}.db"
-    with app.db.read() as source:
-        dest = sqlite3.connect(str(target))
+    with _BACKUP_LOCK:
+        stamp = app.clock.now().strftime("%Y%m%d-%H%M%S")
+        target = backups / f"domovoy-{stamp}.db"
+        suffix = 2
+        while target.exists():
+            target = backups / f"domovoy-{stamp}-{suffix}.db"
+            suffix += 1
         try:
-            source.backup(dest)
-        finally:
-            dest.close()
-    existing = sorted(backups.glob("domovoy-*.db"))
-    for old in existing[: max(0, len(existing) - app.env.backup_keep)]:
-        old.unlink(missing_ok=True)
-    return target
+            with app.db.read() as source:
+                dest = sqlite3.connect(str(target))
+                try:
+                    source.backup(dest)
+                finally:
+                    dest.close()
+        except BaseException:
+            target.unlink(missing_ok=True)
+            raise
+        existing = sorted(backups.glob("domovoy-*.db"))
+        for old in existing[: max(0, len(existing) - app.env.backup_keep)]:
+            old.unlink(missing_ok=True)
+        return target
 
 
 def list_backups(app: Any) -> list[dict[str, Any]]:
@@ -70,7 +83,26 @@ def import_data(app: Any, payload: dict[str, Any]) -> dict[str, int]:
     settings = payload.get("settings") or {}
     if not isinstance(settings, dict) or any(not str(k).startswith("cfg.") for k in settings):
         raise ValidationError("Invalid settings block", code="bad_export")
+    for key, raw in settings.items():
+        name = key[4:]
+        if name not in DEFAULTS:
+            raise ValidationError(f"Unknown setting in export: {name}", code="bad_export")
+        if not isinstance(raw, str):
+            raise ValidationError(f"Setting {name} must be a JSON string", code="bad_export")
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            raise ValidationError(f"Setting {name} is not valid JSON", code="bad_export") from None
+        expected = SHAPES[name]
+        if isinstance(parsed, bool) or not isinstance(parsed, expected):
+            raise ValidationError(f"Setting {name} has the wrong type", code="bad_export")
+        if isinstance(DEFAULTS[name], dict):
+            if set(parsed) - set(DEFAULTS[name]):
+                raise ValidationError(f"Setting {name} has unknown fields", code="bad_export")
+            _check_nested(name, DEFAULTS[name], parsed)
+        SettingsService._check(name, parsed)
 
+    before = app.settings.all()
     create_backup(app)
     counts: dict[str, int] = {}
     with app.db.write() as conn:
@@ -89,4 +121,12 @@ def import_data(app: Any, payload: dict[str, Any]) -> dict[str, int]:
         conn.execute("DELETE FROM sessions")
         app.db.emit(conn, "data.reset", counts)
     app.search.rebuild_all()
+    app.outbox.recover()
+    after = app.settings.all()
+    for key, path, secret in SECRET_BINDINGS:
+        if origin_of(dig(before[key], path)) != origin_of(dig(after[key], path)) and app.secrets.has(secret):
+            app.secrets.set(secret, "")
+    if after.get("timezone"):
+        app.clock.set_timezone(after["timezone"])
+    app.refresh_embedder()
     return counts

@@ -35,11 +35,12 @@ class AliceFrontend:
 
         cfg = self.app.settings.get("alice")
         allowed = [str(x) for x in cfg.get("allowed_user_ids") or []]
-        if allowed:
-            ids = {str((session.get("user") or {}).get("user_id", "")), str(session.get("user_id", "")),
-                   str((session.get("application") or {}).get("application_id", ""))}
-            if not ids & set(allowed):
-                return self._response(payload, "Этот навык приватный.", end=True)
+        if not allowed:
+            return self._response(payload, "Навык не настроен: добавьте свой Yandex user id в настройках Домового.", end=True)
+        ids = {str((session.get("user") or {}).get("user_id", "")), str(session.get("user_id", "")),
+               str((session.get("application") or {}).get("application_id", ""))}
+        if not ids & set(allowed):
+            return self._response(payload, "Этот навык приватный.", end=True)
 
         if not command:
             return self._response(payload, "Слушаю. Скажите, что запомнить, найти или добавить в календарь.")

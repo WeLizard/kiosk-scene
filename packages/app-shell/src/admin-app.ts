@@ -213,7 +213,8 @@ export function mountAdminApp(root: HTMLElement, options: AdminAppOptions): Admi
     const host = h("div", { class: "ks-page", dataset: { page: page.id } }, spinner());
     replaceChildren(view, host);
     try {
-      const mounted = await page.mount(host, route.params, runtime);
+      const owner = registry.ownerOf(page.id);
+      const mounted = await page.mount(host, route.params, owner ? runtime.forExtension(owner) : runtime);
       if (disposed || sequence !== navigationSeq) {
         mounted.dispose();
         return;

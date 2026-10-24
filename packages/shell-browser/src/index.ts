@@ -4,8 +4,9 @@ import { createModuleAdapter } from "@kiosk-scene/adapter-module";
 import {
   buildAssistantPresentationModel,
   createExtensionRuntime,
-  createPinnedPageControl,
-  createViewPresetControl,
+  createPinnedPageOverlay,
+  createViewPresetOverlay,
+  expireControlOverlay,
   DEFAULT_CONTROL_V1,
   DEFAULT_STATE_V1,
   mergeControlV1,
@@ -27,6 +28,7 @@ import {
   type AssistantPresentationModel,
   type AvatarAdapter,
   type AvatarManifestV1,
+  type ControlOverlayV1,
   type ControlV1,
   type ExtensionRuntime,
   type MountedView,
@@ -140,7 +142,7 @@ export class BrowserSceneShellApp {
   private hassStates: HomeAssistantStates | null = null;
   private currentState!: StateV1;
   private remoteControl: ControlV1 = DEFAULT_CONTROL_V1;
-  private uiControl: ControlV1 = DEFAULT_CONTROL_V1;
+  private uiControl: ControlOverlayV1 = {};
   private currentControl: ControlV1 = DEFAULT_CONTROL_V1;
   private idleLines: string[] = [];
   private activeIndex = 0;
@@ -152,6 +154,7 @@ export class BrowserSceneShellApp {
   private avatarAdapter: AvatarAdapter | null = null;
   private refreshIntervalHandle: number | null = null;
   private lastWeatherRefreshAt = 0;
+  private weatherRefreshInFlight: Promise<void> | null = null;
   private orderedPages: ScenePageV1[] = [];
   private carouselDragState: CarouselDragState | null = null;
 
@@ -372,6 +375,7 @@ export class BrowserSceneShellApp {
     this.slides.clear();
     await this.avatarAdapter?.dispose();
     this.avatarAdapter = null;
+    this.weatherRefreshInFlight = null;
   }
 
   /**
@@ -416,7 +420,7 @@ export class BrowserSceneShellApp {
     for (const button of this.presetButtons) {
       button.addEventListener("click", () => {
         const preset = button.dataset.avatarPreset as ViewPreset;
-        this.uiControl = createViewPresetControl(this.uiControl, preset || "full");
+        this.uiControl = { ...this.uiControl, ...createViewPresetOverlay(preset || "full") };
         void this.refreshNow();
       });
     }
@@ -530,16 +534,28 @@ export class BrowserSceneShellApp {
     this.carouselShellEl.addEventListener("lostpointercapture", finalizePointer);
   }
 
-  private async refreshWeatherIfStale(maxAgeMs = 10 * 60 * 1000): Promise<void> {
+  private refreshWeatherIfStale(maxAgeMs = 10 * 60 * 1000): Promise<void> {
+    if (this.weatherRefreshInFlight) {
+      return this.weatherRefreshInFlight;
+    }
     if (Date.now() - this.lastWeatherRefreshAt < maxAgeMs) {
-      return;
+      return Promise.resolve();
     }
-    try {
-      this.weatherData = await this.readWeatherData();
-      this.lastWeatherRefreshAt = Date.now();
-    } catch {
-      // Weather refresh is best-effort.
-    }
+    const run = (async () => {
+      try {
+        this.weatherData = await this.readWeatherData();
+        this.lastWeatherRefreshAt = Date.now();
+      } catch {
+        // Weather refresh is best-effort.
+      }
+    })();
+    this.weatherRefreshInFlight = run;
+    void run.finally(() => {
+      if (this.weatherRefreshInFlight === run) {
+        this.weatherRefreshInFlight = null;
+      }
+    });
+    return run;
   }
 
   private async runRefreshCycle(): Promise<void> {
@@ -560,7 +576,7 @@ export class BrowserSceneShellApp {
     this.remoteControl = remoteControl;
     this.updateDataHealth();
 
-    this.uiControl = mergeControlV1(DEFAULT_CONTROL_V1, this.uiControl);
+    this.uiControl = expireControlOverlay(this.uiControl);
     this.currentControl = mergeControlV1(this.remoteControl, this.uiControl);
 
     const effectiveState = mergeControlCueIntoState(this.currentState, this.currentControl);
@@ -774,7 +790,7 @@ export class BrowserSceneShellApp {
     entry.signature = signature;
     entry.appPropsKey = propsKey;
 
-    if (!available || !definition || !this.extensionRuntime) {
+    if (!registry || !available || !definition || !this.extensionRuntime) {
       entry.el.innerHTML = `
         <div class="app-slide slide-body">
           <div class="slide-top"><div><h1 class="headline">${escapeHtml(trimText(page.title, 64) || appId)}</h1></div></div>
@@ -789,7 +805,8 @@ export class BrowserSceneShellApp {
       return;
     }
     const generation = entry.generation;
-    const runtime = this.extensionRuntime;
+    const owner = registry.ownerOf(appId);
+    const runtime = owner ? this.extensionRuntime.forExtension(owner) : this.extensionRuntime;
     void (async () => {
       try {
         const view = await definition.mount(host, (page.props ?? {}) as Record<string, unknown>, runtime);
@@ -808,15 +825,18 @@ export class BrowserSceneShellApp {
   }
 
   private async mountWidget(mount: WidgetMount, props: Record<string, unknown>): Promise<void> {
-    const definition = mount.widgetId ? this.options.extensions?.getWidget(mount.widgetId) : null;
-    if (!definition || !this.extensionRuntime) {
+    const registry = this.options.extensions;
+    const definition = mount.widgetId ? registry?.getWidget(mount.widgetId) : null;
+    if (!registry || !definition || !this.extensionRuntime) {
       mount.failed = true;
       mount.slot.classList.add("is-unavailable");
       mount.slot.textContent = this.labels.extensionUnavailable;
       return;
     }
     try {
-      const view = await definition.mount(mount.slot, props, this.extensionRuntime);
+      const owner = registry.ownerOf(mount.widgetId);
+      const runtime = owner ? this.extensionRuntime.forExtension(owner) : this.extensionRuntime;
+      const view = await definition.mount(mount.slot, props, runtime);
       if (mount.disposed || this.disposed) {
         view.dispose();
         return;
@@ -980,7 +1000,7 @@ export class BrowserSceneShellApp {
       return;
     }
     const ttlMs = Math.max(18_000, this.sceneRuntimeConfig.rotation.defaultDwellMs * 2);
-    this.uiControl = createPinnedPageControl(this.uiControl, target.id, ttlMs);
+    this.uiControl = { ...this.uiControl, ...createPinnedPageOverlay(target.id, ttlMs) };
     this.activeIndex = index;
     this.lastAutoRotateAt = Date.now();
     this.updateCarouselPosition();

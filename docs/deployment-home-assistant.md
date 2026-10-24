@@ -6,7 +6,6 @@ For a Home Assistant kiosk deployment, keep the kiosk entrypoint stable and host
 
 - `HAOS-kiosk` opens the stable hosted scene URL
 - `Kiosk Scene` hosts the generic `kiosk-scene` runtime under `/scene/`
-- `OpenClawHomeAssistant` remains the gateway/control-plane add-on
 - `kiosk-scene` fetches `/scene-api/bootstrap`
 - the active pack lives under `/config/kiosk-scene/scene-packs/<pack-id>/`
 
@@ -42,7 +41,7 @@ prevents an older HAOS-kiosk add-on from replacing the Kiosk Scene runtime when 
 
 Recommended order:
 
-- primary: platform-provided state/control from an external control-plane such as `OpenClawHomeAssistant`
+- primary: platform-provided state/control from the pack's configured source (Home Assistant helpers, a JSON state file, or an external control plane)
 - bridge: Home Assistant helper entities via `provider-ha`
 - fallback: JSON state snapshot via `provider-json`
 
@@ -64,7 +63,7 @@ changes for installations that leave it off.
 | --- | --- |
 | `domovoy_enabled` | start the service, load the extension, show the administration UI |
 | `domovoy_kiosk_mic` / `domovoy_kiosk_room` | let the kiosk browser listen for «домовой …» ([docs/voice.md](./voice.md)); the room name picks the nearest speaker |
-| `domovoy_trusted_networks` | LAN addresses / subnets (IPv4/IPv6, validated at start; invalid entries are skipped with a warning) that may use the API without a token — normally just the kiosk. The Home Assistant panel never needs a token |
+| `domovoy_trusted_networks` | LAN addresses / subnets (IPv4/IPv6, validated at start; invalid entries are skipped with a warning) that may use the API without a token and load scene/avatar files — normally just the kiosk. They are marked `kiosk`: household API and pack assets only, not secret viewing/rotation. The Home Assistant panel never needs a token |
 
 Paths added by the add-on:
 
@@ -77,7 +76,13 @@ Paths added by the add-on:
 
 Who is trusted: requests arriving through Home Assistant ingress (`172.30.32.2`) or from the add-on host itself are
 trusted; every other LAN client needs the API token (Integrations → Доступ) or must be listed in
-`domovoy_trusted_networks`. nginx decides this and overwrites the `X-Domovoy-Origin` header on every request.
+`domovoy_trusted_networks`. Such a client is marked `kiosk` and can use the household API and load pack/avatar files,
+but not read or rotate secrets. nginx decides this and overwrites the `X-Domovoy-Origin` header on every request.
+
+The add-on port is a LAN service. Scene and avatar files are served only to the HA host, ingress, or a network listed in
+`domovoy_trusted_networks` (the kiosk needs them); other LAN clients get 403. Do not expose port `48123` to the
+internet; on an untrusted LAN, firewall it or put an authenticating reverse proxy in front. Scene/avatar changes
+themselves require ingress/local admin access.
 
 Home Assistant access uses the supervisor token automatically (`homeassistant_api: true`), but only for the supervisor's
 own address. A small default set of control services works out of the box (lights, switches, fans, covers, scenes); the

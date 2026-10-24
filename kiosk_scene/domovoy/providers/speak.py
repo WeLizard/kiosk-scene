@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..clock import time_to_minutes
 from ..errors import ProviderError, ProviderNotConfigured
 from ..text import norm_key, speakable
 from .base import HealthTracker
@@ -27,10 +28,13 @@ class SpeakSender:
 
     def in_quiet_hours(self) -> bool:
         cfg = self.settings.get("speak")
-        start, end, now = cfg.get("quiet_from") or "", cfg.get("quiet_to") or "", self.clock.local_now().strftime("%H:%M")
-        if not start or not end or start == end:
+        start = time_to_minutes(cfg.get("quiet_from") or "")
+        end = time_to_minutes(cfg.get("quiet_to") or "")
+        if start is None or end is None or start == end:
             return False
-        return start <= now < end if start < end else now >= start or now < end
+        now = self.clock.local_now()
+        current = now.hour * 60 + now.minute
+        return start <= current < end if start < end else current >= start or current < end
 
     def choose(self, target: dict[str, Any]) -> list[dict[str, Any]]:
         speakers = [s for s in self.settings.get("speakers") if s.get("entity_id")]

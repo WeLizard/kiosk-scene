@@ -1,5 +1,6 @@
 import type { SceneCardV1, SceneConfigV1, ScenePageV1 } from "@kiosk-scene/core";
 import { getHomeAssistantHandle, type HomeAssistantStateEntity, type HomeAssistantStates } from "@kiosk-scene/provider-ha";
+import { captureFocusState, restoreFocusState } from "./focus-state";
 
 type UiLang = "ru" | "en";
 
@@ -183,6 +184,7 @@ const COMMON_CARD_FIELDS = ["caption", "hint"] as const;
 type CardTypeOption = (typeof CARD_TYPE_OPTIONS)[number];
 const LEGACY_LIVE2D_PREFIX = "/local/live2d/";
 const SCENE_LEGACY_LIVE2D_PREFIX = "/scene-legacy/live2d/";
+const SCENE_CLIENT_HEADERS = { "X-Scene-Client": "editor" } as const;
 
 const CARD_TYPE_DESCRIPTIONS: Record<UiLang, Record<CardTypeOption, string>> = {
   ru: {
@@ -926,7 +928,7 @@ function initialSelectedPageId(config: SceneConfigV1): string | null {
 }
 
 async function loadConfig(apiUrl: string): Promise<{ config: SceneConfigV1; packId: string }> {
-  const response = await fetch(apiUrl, { cache: "no-store" });
+  const response = await fetch(apiUrl, { cache: "no-store", headers: SCENE_CLIENT_HEADERS });
   const payload = await response.json() as { success?: boolean; config?: SceneConfigV1; packId?: string };
   if (!response.ok || payload.success === false || !payload.config || !payload.packId) {
     throw new Error(`GET ${apiUrl} failed: HTTP ${response.status}`);
@@ -937,7 +939,7 @@ async function loadConfig(apiUrl: string): Promise<{ config: SceneConfigV1; pack
 async function saveConfig(apiUrl: string, config: SceneConfigV1, expectedPackId: string): Promise<SceneConfigV1> {
   const response = await fetch(apiUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...SCENE_CLIENT_HEADERS },
     body: JSON.stringify({ config, expectedPackId }),
   });
   const payload = await response.json() as { success?: boolean; config?: SceneConfigV1; error?: string };
@@ -1276,6 +1278,7 @@ async function importAvatarPack(url: string, archive: File): Promise<AvatarPackS
       );
       const response = await fetch(target, {
         method: "POST",
+        headers: SCENE_CLIENT_HEADERS,
         body: formData,
       });
       const payload = await response.json() as AvatarImportPayload;
@@ -1295,6 +1298,7 @@ async function importAvatarPack(url: string, archive: File): Promise<AvatarPackS
   formData.set("archive", archive, archive.name);
   const response = await fetch(target, {
     method: "POST",
+    headers: SCENE_CLIENT_HEADERS,
     body: formData,
   });
   const payload = await response.json() as AvatarImportPayload;
@@ -1350,7 +1354,7 @@ async function saveAvatarPackDetails(url: string, details: AvatarPackDetails): P
   }
   const response = await fetch(`${target}?packId=${encodeURIComponent(details.packId)}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...SCENE_CLIENT_HEADERS },
     body: JSON.stringify({ motionMap: details.motionMap }),
   });
   const payload = await response.json() as {
@@ -1638,19 +1642,19 @@ function renderCard(
   const gridFieldsHtml = isGridPage ? `
     <div class="field">
       <label>${escapeHtml(copy.fieldCardCol)}</label>
-      <input type="number" min="0" data-card-index="${index}" data-card-field="col" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "col"))}">
+      <input id="card-${index}-field-col" type="number" min="0" data-card-index="${index}" data-card-field="col" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "col"))}">
     </div>
     <div class="field">
       <label>${escapeHtml(copy.fieldCardRow)}</label>
-      <input type="number" min="0" data-card-index="${index}" data-card-field="row" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "row"))}">
+      <input id="card-${index}-field-row" type="number" min="0" data-card-index="${index}" data-card-field="row" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "row"))}">
     </div>
     <div class="field">
       <label>${escapeHtml(copy.fieldCardW)}</label>
-      <input type="number" min="1" data-card-index="${index}" data-card-field="w" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "w") || "1")}">
+      <input id="card-${index}-field-w" type="number" min="1" data-card-index="${index}" data-card-field="w" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "w") || "1")}">
     </div>
     <div class="field">
       <label>${escapeHtml(copy.fieldCardH)}</label>
-      <input type="number" min="1" data-card-index="${index}" data-card-field="h" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "h") || "1")}">
+      <input id="card-${index}-field-h" type="number" min="1" data-card-index="${index}" data-card-field="h" value="${escapeHtml(fieldValue(card as Record<string, unknown>, "h") || "1")}">
     </div>
   ` : "";
   return `
@@ -1666,7 +1670,7 @@ function renderCard(
         ${gridFieldsHtml}
         <div class="field is-wide">
           <label>${escapeHtml(copy.cardType)}</label>
-          <select data-card-index="${index}" data-card-field="type">
+          <select id="card-${index}-field-type" data-card-index="${index}" data-card-field="type">
             ${CARD_TYPE_OPTIONS.map((item) => `<option value="${item}"${item === type ? " selected" : ""}>${escapeHtml(cardTypeLabel(copy, item))}</option>`).join("")}
           </select>
         </div>
@@ -1681,6 +1685,7 @@ function renderCard(
                 <label>${escapeHtml(labelForField(copy, field))}</label>
                 <div class="field-binding-row">
                   <input
+                    id="card-${index}-field-${escapeHtml(field)}"
                     type="text"
                     data-card-index="${index}"
                     data-card-field="${escapeHtml(field)}"
@@ -1702,6 +1707,7 @@ function renderCard(
             <div class="field ${field === "hint" ? "is-wide" : ""}">
               <label>${escapeHtml(labelForField(copy, field))}</label>
               <input
+                id="card-${index}-field-${escapeHtml(field)}"
                 type="${field === "digits" ? "number" : "text"}"
                 data-card-index="${index}"
                 data-card-field="${escapeHtml(field)}"
@@ -2669,6 +2675,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
   previewMutationObserver?.observe(appRoot, { childList: true, subtree: true });
 
   const render = (): void => {
+    const focusState = captureFocusState(dashboardHost);
     const config = state.config;
     const ordered = config ? orderedPages(config) : [];
     const selectedPage = ordered.find((page) => page.id === state.selectedPageId) || ordered[0] || null;
@@ -2996,6 +3003,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
 
     applyPreviewLayout();
     syncPreviewSelection();
+    restoreFocusState(dashboardHost, focusState);
   };
 
   const setStatus = (text: string, tone: EditorState["statusTone"]): void => {
@@ -3411,16 +3419,21 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         if (currentPack.packId !== loadedPackId) {
           throw new Error(`Active scene changed from ${loadedPackId} to ${currentPack.packId}. Reload the editor before saving.`);
         }
+        // Save the primary scene first: if the separate avatar motion map then fails, the user is told that
+        // the scene itself was saved instead of leaving the two resources in an unknown order.
+        state.config = await saveConfig(options.sceneApiUrl, cloneConfig(state.config), loadedPackId);
+        state.dirty = false;
         if (state.avatarPackDirty && state.avatarPackDetails && options.avatarPackApiUrl) {
           try {
             state.avatarPackDetails = await saveAvatarPackDetails(options.avatarPackApiUrl, state.avatarPackDetails);
           } catch (error) {
-            throw new Error(`${copy.avatarMappingSaveError}: ${String(error)}`);
+            state.saving = false;
+            state.avatarPackSaving = false;
+            setStatus(`${copy.statusSaved}. ${copy.avatarMappingSaveError}: ${String(error)}`, "bad");
+            return;
           }
           state.avatarPackDirty = false;
         }
-        state.config = await saveConfig(options.sceneApiUrl, cloneConfig(state.config), loadedPackId);
-        state.dirty = false;
         state.saving = false;
         state.avatarPackSaving = false;
         syncSelection();
@@ -3501,7 +3514,7 @@ export async function mountNativeEditorShell(options: NativeEditorShellOptions):
         return;
       }
       const deleteUrl = `${options.avatarPackApiUrl}?packId=${encodeURIComponent(packId)}`;
-      void fetch(deleteUrl, { method: "DELETE" }).then(async (resp) => {
+      void fetch(deleteUrl, { method: "DELETE", headers: SCENE_CLIENT_HEADERS }).then(async (resp) => {
         if (!resp.ok) {
           const body = await resp.json().catch(() => ({})) as Record<string, unknown>;
           console.warn("Failed to delete avatar pack", packId, body);

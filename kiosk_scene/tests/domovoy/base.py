@@ -20,7 +20,7 @@ class AppCase(unittest.TestCase):
     """Fresh on-disk database + fake clock (Monday 28 Sep 2026, 10:00 Sofia) per test."""
 
     def setUp(self) -> None:
-        self._tmp = tempfile.TemporaryDirectory(prefix="domovoy-test-")
+        self._tmp = tempfile.TemporaryDirectory(prefix="domovoy-test-", ignore_cleanup_errors=True)
         self.addCleanup(self._tmp.cleanup)
         self.data_dir = Path(self._tmp.name)
         self.clock = FixedClock(dt.datetime(2026, 9, 28, 10, 0, tzinfo=TZ), tz="Europe/Sofia")

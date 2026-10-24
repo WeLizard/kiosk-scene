@@ -51,7 +51,7 @@ def fold(line: str) -> str:
 
 
 def escape(text: str) -> str:
-    return text.replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\n", "\\n")
+    return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\n", "\\n")
 
 
 def unescape(text: str) -> str:

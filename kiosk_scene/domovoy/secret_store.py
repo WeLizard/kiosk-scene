@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets as pysecrets
 import threading
 from pathlib import Path
 
 KNOWN = ("api_token", "alice_secret", "assist_secret", "telegram_token", "caldav_password", "ha_token", "llm_api_key")
+LOG = logging.getLogger("domovoy.secrets")
 
 
 class SecretsStore:
@@ -26,10 +28,22 @@ class SecretsStore:
 
     def _load(self) -> dict[str, str]:
         try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-            return {k: str(v) for k, v in data.items()} if isinstance(data, dict) else {}
-        except (OSError, ValueError):
+            text = self.path.read_text(encoding="utf-8")
+        except FileNotFoundError:
             return {}
+        # A transient read error must not be mistaken for "no secrets": regenerating and saving here would
+        # overwrite a readable file with new API tokens and drop every integration token.
+        try:
+            data = json.loads(text)
+        except ValueError:
+            corrupt = self.path.with_name(self.path.name + ".corrupt")
+            try:
+                os.replace(self.path, corrupt)
+            except OSError:
+                pass
+            LOG.warning("secrets file is corrupt; preserved as %s and regenerated", corrupt)
+            return {}
+        return {k: str(v) for k, v in data.items()} if isinstance(data, dict) else {}
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

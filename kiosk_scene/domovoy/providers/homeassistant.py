@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote
 
-from ..clock import UTC
+from ..clock import UTC, to_iso
 from ..errors import ForbiddenError, ProviderError, ProviderNotConfigured, ValidationError
 from ..text import similarity, tokens
 from .base import HealthTracker, json_request
@@ -141,7 +141,7 @@ class HomeAssistantProvider:
         if all_day:
             data["start_date"], data["end_date"] = start.date().isoformat(), max(end.date(), start.date() + dt.timedelta(days=1)).isoformat()
         else:
-            data["start_date_time"], data["end_date_time"] = start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S")
+            data["start_date_time"], data["end_date_time"] = to_iso(start), to_iso(end)
         if location:
             data["location"] = location
         if notes:

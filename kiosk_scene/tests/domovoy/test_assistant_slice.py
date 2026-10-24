@@ -4,6 +4,7 @@ from __future__ import annotations
 import datetime as dt
 
 from ..helpers import ADDON_DIR  # noqa: F401
+from domovoy.errors import ProviderError
 from domovoy.scheduler import Scheduler
 from domovoy.services.context import Ctx
 from .base import TZ, AppCase
@@ -64,6 +65,17 @@ class Calendar(AppCase):
             self.assertEqual(len(dav.resources), 1)
             self.say("отмени")                                                                  # undo creates → DELETE on the server
             self.assertEqual(dav.resources, {})
+
+    def test_caldav_rejects_event_hrefs_on_another_origin(self) -> None:
+        with FakeCalDAV() as dav:
+            self.app.settings.update({"caldav": {"url": dav.url + "/cal/anna/personal/", "username": dav.USER}, "calendar": {"default": "caldav"}})
+            self.app.secrets.set("caldav_password", dav.PASSWORD)
+            self.assertEqual(self.say("Добавь в календарь врача на следующий четверг в 12:00")["status"], "applied")
+            ics, etag = next(iter(dav.resources.values()))
+            dav.resources["https://evil.example/steal.ics"] = (ics, etag)
+
+            with self.assertRaises(ProviderError):
+                self.app.caldav.list_events(self.clock.now(), self.clock.now() + dt.timedelta(days=30))
 
     def test_caldav_outage_is_reported_and_nothing_is_lost(self) -> None:
         with FakeCalDAV() as dav:
@@ -295,7 +307,11 @@ class Messaging(AppCase):
     def test_unknown_telegram_chats_become_link_requests(self) -> None:
         self.tg.updates = [{"update_id": 5, "message": {"chat": {"id": 555, "type": "private", "first_name": "Борис"},
                                                      "from": {"id": 555, "is_bot": False}, "text": "/start"}}]
-        Scheduler(self.app, interval=1).tick()
+        sched = Scheduler(self.app, interval=1)
+        self.addCleanup(sched.stop)
+        sched._last_telegram = -100
+        sched.tick()
+        sched._telegram_future.result(timeout=2)                                         # Telegram polling is off-thread
         requests = self.app.db.get_setting("telegram.link_requests")
         self.assertEqual((requests[0]["chat_id"], requests[0]["name"]), ("555", "Борис"))
         self.assertEqual(self.app.db.get_setting("telegram.offset"), 6)

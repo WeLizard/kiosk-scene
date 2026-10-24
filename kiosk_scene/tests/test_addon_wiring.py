@@ -45,6 +45,18 @@ class ShippedDomovoyPort(unittest.TestCase):
         self.assertIn("COPY scene-runtime-seed /opt/kiosk-scene/scene-runtime", dockerfile)
         self.assertNotIn("IMAGE_SCENE_RUNTIME_SEED_DIR", RUN_SH)
 
+    def test_scene_services_are_supervised(self) -> None:
+        self.assertIn('run_scene_service "scene_host_service"', RUN_SH)
+        self.assertIn('run_scene_service "scene_config_service"', RUN_SH)
+        self.assertIn("watchdog:", (ADDON_DIR / "config.yaml").read_text(encoding="utf-8"))
+
+    def test_private_pack_assets_reject_untrusted_lan(self) -> None:
+        nginx = (ADDON_DIR / "nginx.conf").read_text(encoding="utf-8")
+        self.assertIn("set $scene_asset_allowed", nginx)
+        for path in ("/scene-legacy/live2d/", "/scene-packs/", "/avatar-packs/"):
+            location = nginx[nginx.index(f"location ^~ {path}"):]
+            self.assertIn("if ($scene_asset_allowed = 0) { return 403; }", location[:400], path)
+
 
 def free_port() -> int:
     with socket.socket() as s:
@@ -117,8 +129,8 @@ class OriginFile(unittest.TestCase):
         conf = run_block(self.root, networks="192.168.1.40\n10.0.0.0/24\n1.2.3.4; } evil { \nnot-an-ip\nfd00::/8\n\n"
                                              "999.1.1.1\n1.2.3.0/33\nabcd\n123\n192.168.5.9/24\n")
         text = conf.read_text(encoding="utf-8")
-        for good in ("192.168.1.40/32 local;", "10.0.0.0/24 local;", "fd00::/8 local;", "127.0.0.1/32 local;", "172.30.32.2/32 ingress;",
-                     "default lan;", "192.168.5.0/24 local;"):
+        for good in ("192.168.1.40/32 kiosk;", "10.0.0.0/24 kiosk;", "fd00::/8 kiosk;", "127.0.0.1/32 local;", "172.30.32.2/32 ingress;",
+                     "default lan;", "192.168.5.0/24 kiosk;"):
             self.assertIn(good, text)
         for bad in ("evil", "not-an-ip", "999.1.1.1", "1.2.3.0/33", "abcd", " 123 "):
             self.assertNotIn(bad, text)

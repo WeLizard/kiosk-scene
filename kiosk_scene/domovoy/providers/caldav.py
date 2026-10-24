@@ -73,7 +73,13 @@ class CalDavProvider:
             raise ProviderError("caldav: response is not valid XML", code="bad_response", retryable=True, provider="caldav") from None
 
     def _href_url(self, event_id: str) -> str:
-        return urljoin(self._base(), event_id)
+        target = urljoin(self._base(), event_id)
+        base = urlsplit(self._base())
+        parts = urlsplit(target)
+        if (parts.scheme, parts.netloc) != (base.scheme, base.netloc):
+            raise ProviderError("caldav: event href points outside the configured calendar", code="bad_response",
+                                retryable=False, provider="caldav")
+        return target
 
     # ---- operations --------------------------------------------------------------------------
 
@@ -101,13 +107,18 @@ class CalDavProvider:
         _, _, data = self._request("REPORT", self._base(), body=body, headers={"Depth": "1", "Content-Type": "application/xml; charset=utf-8"})
         root = self._xml(data)
         events: list[CalEvent] = []
-        base_path = urlsplit(self._base()).path
+        base_parts = urlsplit(self._base())
         for response in root.findall("d:response", NS):
             href = (response.findtext("d:href", default="", namespaces=NS) or "").strip()
             calendar_data = response.findtext(".//c:calendar-data", default="", namespaces=NS)
             if not href or not calendar_data:
                 continue
-            relative = href[len(base_path):] if href.startswith(base_path) else href
+            absolute = urljoin(self._base(), href)
+            parts = urlsplit(absolute)
+            if (parts.scheme, parts.netloc) != (base_parts.scheme, base_parts.netloc):
+                raise ProviderError("caldav: server returned an event href on another origin", code="bad_response",
+                                    retryable=False, provider="caldav")
+            relative = parts.path + (f"?{parts.query}" if parts.query else "")
             for parsed in parse_events(calendar_data, self._tz()):
                 if parsed.end <= start or parsed.start >= end:
                     continue

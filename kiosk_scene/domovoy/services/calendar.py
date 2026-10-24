@@ -136,6 +136,13 @@ class CalendarService:
             self.db.emit(conn, "calendar.changed", {"calendar": LOCAL, "id": event_id})
         return self._to_event(self._row(event_id))
 
+    @staticmethod
+    def _local_event_id(native: str) -> int:
+        try:
+            return int(native)
+        except (TypeError, ValueError):
+            raise ValidationError("Invalid local event reference", code="bad_ref") from None
+
     def update(self, ctx: Ctx, ref: str, patch: dict[str, Any]) -> CalEvent:
         source, native = split_ref(ref)
         if source != LOCAL:
@@ -147,7 +154,7 @@ class CalendarService:
                     self.db.emit(conn, "calendar.changed", {"calendar": "caldav"})
                 return event
             raise ValidationError("This calendar is read-only for Domovoy", code="read_only")
-        event_id = int(native)
+        event_id = self._local_event_id(native)
         with self.db.write() as conn:
             row = conn.execute("SELECT * FROM calendar_events WHERE id = ? AND deleted_at IS NULL", (event_id,)).fetchone()
             if row is None:
@@ -192,7 +199,7 @@ class CalendarService:
                     self.db.emit(conn, "calendar.changed", {"calendar": "caldav"})
                 return
             raise ValidationError("This calendar is read-only for Domovoy", code="read_only")
-        event_id = int(native)
+        event_id = self._local_event_id(native)
         with self.db.write() as conn:
             row = conn.execute("SELECT * FROM calendar_events WHERE id = ? AND deleted_at IS NULL", (event_id,)).fetchone()
             if row is None:

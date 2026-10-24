@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ExtensionRegistry, type AvatarAdapter, type ExtensionHost } from "@kiosk-scene/core";
+import { ExtensionRegistry, type AvatarAdapter, type ExtensionHost, type ExtensionRuntime } from "@kiosk-scene/core";
 import { BrowserSceneShellApp } from "../src/index";
 import { BASE, defaultFiles, installFakeFetch, mountPoint, settle } from "./harness";
 
@@ -164,6 +164,37 @@ describe("refresh lifecycle", () => {
     vi.useRealTimers();
   });
 
+  it("never starts a second weather request while one is in flight", async () => {
+    let calls = 0;
+    let primed = false;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const weatherReader = async () => {
+      calls += 1;
+      if (!primed) {
+        primed = true;
+        return {};
+      }
+      await gate;
+      return {};
+    };
+    installFakeFetch();
+    const { shell } = await start({ weatherReader, defaultWeather: {} });
+    calls = 0;
+    const internals = shell as unknown as { refreshWeatherIfStale: (maxAgeMs: number) => Promise<void> };
+
+    const first = internals.refreshWeatherIfStale(0);
+    await settle(2);
+    const second = internals.refreshWeatherIfStale(0);
+    await settle(2);
+
+    expect(calls).toBe(1);
+    release();
+    await Promise.all([first, second]);
+  });
+
   it("marks the display stale after repeated connectivity failures and recovers", async () => {
     const backend = installFakeFetch();
     const { root, shell } = await start({ staleAfterFailures: 2 });
@@ -249,6 +280,61 @@ describe("refresh lifecycle", () => {
   });
 });
 
+describe("remote display control", () => {
+  function captureAdapter(log: { cues: unknown[]; presets: string[] }): AvatarAdapter {
+    return {
+      id: "capture",
+      mount: async () => undefined,
+      dispose: async () => undefined,
+      setState: async () => undefined,
+      setCue: async (cue) => {
+        log.cues.push(cue);
+      },
+      setViewPreset: async (preset) => {
+        log.presets.push(preset);
+      },
+      showBubble: async () => undefined,
+      getCapabilities: () => ({ supportsEmotion: true, supportsMotion: true, supportsViewPresets: true, supportsLipSync: true }),
+    };
+  }
+
+  function pinnedControlFiles(): Record<string, unknown> {
+    const files = defaultFiles();
+    files["control.json"] = {
+      version: 1,
+      revision: 5,
+      viewPreset: "head",
+      page: { mode: "pinned", target: "second", until: new Date(Date.now() + 60_000).toISOString() },
+      cue: { cue: "greet", emotion: "happy", until: new Date(Date.now() + 60_000).toISOString() },
+    };
+    return files;
+  }
+
+  it("applies a remote page pin, cue and preset instead of overwriting them with UI defaults", async () => {
+    installFakeFetch(pinnedControlFiles());
+    const log: { cues: unknown[]; presets: string[] } = { cues: [], presets: [] };
+    const { root } = await start({ avatarAdapterFactory: () => captureAdapter(log) });
+
+    expect(root.querySelector('[data-slide-id="second"]')?.getAttribute("data-active")).toBe("true");
+    expect(log.cues.at(-1)).toMatchObject({ cue: "greet", emotion: "happy" });
+    expect(log.presets.at(-1)).toBe("head");
+  });
+
+  it("lets a local preset change keep the remote pinned page", async () => {
+    installFakeFetch(pinnedControlFiles());
+    const log: { cues: unknown[]; presets: string[] } = { cues: [], presets: [] };
+    const { root, shell } = await start({ avatarAdapterFactory: () => captureAdapter(log) });
+
+    (root.querySelector('[data-avatar-preset="torso"]') as HTMLButtonElement).click();
+    await shell.refreshNow();
+    await settle();
+
+    expect(root.querySelector('[data-slide-id="second"]')?.getAttribute("data-active")).toBe("true");
+    expect(log.presets.at(-1)).toBe("torso");
+    expect(log.cues.at(-1)).toMatchObject({ cue: "greet", emotion: "happy" });
+  });
+});
+
 describe("auto rotation vs user interaction", () => {
   it("does not rotate away while a field inside the carousel has focus", async () => {
     installFakeFetch(defaultFiles({ rotation: { order: ["cards", "second"], defaultDwellSeconds: 5 } }));
@@ -280,8 +366,36 @@ describe("extension pages and widgets", () => {
     return registry;
   }
 
-  it("mounts an app page once, keeps it across refreshes, and disposes it with the shell", async () => {
+  it("gives an app page the config from its extension.json", async () => {
     installFakeFetch(defaultFiles({
+      rotation: { order: ["today"], defaultDwellSeconds: 20 },
+      pages: [{ id: "today", kind: "app", title: "Today", app: "demo.today" }],
+    }));
+    const registry = new ExtensionRegistry();
+    let seen: Record<string, unknown> | null = null;
+    await registry.load({
+      manifest: { id: "demo", title: "Demo", version: "1", apiVersion: 1 },
+      activate(host: ExtensionHost) {
+        host.registerPage({
+          id: "demo.today",
+          title: "Today",
+          modes: ["kiosk"],
+          mount: (el: HTMLElement, _params: Record<string, unknown>, runtime: ExtensionRuntime) => {
+            seen = runtime.config;
+            el.textContent = "ready";
+            return { dispose: () => undefined };
+          },
+        });
+      },
+    }, { mic: { room: "кухня" } });
+
+    await start({ extensions: registry });
+    await settle();
+
+    expect(seen).toEqual({ mic: { room: "кухня" } });
+  });
+
+  it("mounts an app page once, keeps it across refreshes, and disposes it with the shell", async () => {    installFakeFetch(defaultFiles({
       rotation: { order: ["today", "cards"], defaultDwellSeconds: 20 },
       pages: [
         { id: "today", kind: "app", title: "Today", app: "demo.today", props: { compact: true } },

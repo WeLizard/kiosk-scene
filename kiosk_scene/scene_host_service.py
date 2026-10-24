@@ -1156,6 +1156,9 @@ class SceneHostHandler(BaseHTTPRequestHandler):
     def do_DELETE(self) -> None:
         parsed = urlsplit(self.path)
         path = parsed.path.rstrip("/") or "/"
+        if not self.scene_admin_allowed():
+            self.send_json({"success": False, "error": "Admin access required."}, status=HTTPStatus.FORBIDDEN)
+            return
         if path == f"{PATH_PREFIX}/avatar-pack":
             try:
                 pack_id = resolve_pack_id(parsed.query)
@@ -1231,6 +1234,9 @@ class SceneHostHandler(BaseHTTPRequestHandler):
         return self.headers.get("X-Scene-Admin") == "1" and bool(self.headers.get("X-Scene-Client"))
 
     def handle_avatar_import(self) -> None:
+        if not self.scene_admin_allowed():
+            self.send_json({"success": False, "error": "Admin access required."}, status=HTTPStatus.FORBIDDEN)
+            return
         try:
             content_length = parse_content_length(self.headers.get("Content-Length"))
         except ValueError as exc:
@@ -1314,6 +1320,9 @@ class SceneHostHandler(BaseHTTPRequestHandler):
             )
 
     def handle_avatar_pack_save(self, query_string: str) -> None:
+        if not self.scene_admin_allowed():
+            self.send_json({"success": False, "error": "Admin access required."}, status=HTTPStatus.FORBIDDEN)
+            return
         try:
             content_length = parse_content_length(self.headers.get("Content-Length"))
         except ValueError as exc:

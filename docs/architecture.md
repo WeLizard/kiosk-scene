@@ -82,8 +82,9 @@ The adapter contract should support:
 Backends may include:
 
 - Live2D
-- Unity WebGL
+- a pack-supplied ES module (for example a three.js room)
 - static portrait
+- Unity WebGL (contract stub; the factory currently refuses to mount)
 
 The current Live2D path is intentionally pragmatic: `packages/adapter-live2d` hosts the existing browser runtime through an iframe bridge and translates generic scene commands into the legacy `postMessage` protocol. That keeps migration risk low while the instance repo is being split from the old prototype.
 

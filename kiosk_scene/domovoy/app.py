@@ -26,6 +26,7 @@ from .services.locations import LocationService
 from .services.outbox import OutboxService
 from .services.presence import PresenceService
 from .services.reminders import ReminderService
+from .services.retention import RetentionService
 from .services.search import SearchService
 from .services.settings import SettingsService
 from .services.simple import ContactService, NoteService, TaskService
@@ -97,6 +98,7 @@ class Domovoy:
         self.commands = CommandLog(self.db, self.clock)
         self.sessions = SessionStore(self.db, self.clock)
         self.review = ReviewQueue(self.db, self.clock)
+        self.retention = RetentionService(self.db, self.clock, lambda: self.settings.get("retention"))
         self.refresh_embedder()
         from .frontends.telegram import TelegramFrontend
         self.telegram_frontend = TelegramFrontend(self)
@@ -140,6 +142,14 @@ class Domovoy:
             elif health.status == "unconfigured":
                 health.status = "ok" if health.last_ok else "degraded" if health.last_error else "unknown"
             result.append({**health.public(), "configured": configured})
+        alice_allowed = [str(item).strip() for item in (self.settings.get("alice").get("allowed_user_ids") or []) if str(item).strip()]
+        result.append({
+            "name": "alice", "status": "configured" if alice_allowed else "unconfigured",
+            "detail": f"Разрешено user id: {len(alice_allowed)}; проверьте навык в Yandex Dialogs" if alice_allowed
+            else "Список user id пуст — команды отключены",
+            "last_ok": None, "last_error": None, "last_error_at": None, "consecutive_failures": 0,
+            "configured": bool(alice_allowed),
+        })
         return result
 
     def close(self) -> None:

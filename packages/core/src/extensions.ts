@@ -98,6 +98,8 @@ export interface ExtensionRuntime {
   refresh(): void;
   /** Extension-scoped configuration from `extension.json`. */
   config: Record<string, unknown>;
+  /** A view of this runtime scoped to one extension's own config. */
+  forExtension(extensionId: string): ExtensionRuntime;
 }
 
 export interface MountedView {
@@ -206,6 +208,7 @@ export class ExtensionRegistry {
   private readonly pages = new Map<string, Owned<PageDefinition>>();
   private readonly realtimeSources = new Map<string, Owned<RealtimeSource>>();
   private readonly services = new Map<string, Owned<ServiceDefinition>>();
+  private readonly configs = new Map<string, Record<string, unknown>>();
   private readonly listeners = new Set<RegistryListener>();
 
   /**
@@ -219,11 +222,19 @@ export class ExtensionRegistry {
       throw new ExtensionRegistryError(`Extension already loaded: ${id}`);
     }
     this.extensions.set(id, extension);
+    this.configs.set(id, { ...config });
     try {
       await extension.activate(this.createHost(id, config));
+      if (!this.extensions.has(id)) {
+        // The loader timed the activation out and unloaded the id while it was still running. Anything it
+        // registered after that must not stay behind as an orphan contribution.
+        this.removeContributions(id);
+        throw new ExtensionRegistryError(`Extension ${id} was unloaded during activation.`);
+      }
     } catch (error) {
       this.removeContributions(id);
       this.extensions.delete(id);
+      this.configs.delete(id);
       throw error;
     }
     this.emit();
@@ -240,6 +251,7 @@ export class ExtensionRegistry {
     } finally {
       this.removeContributions(id);
       this.extensions.delete(id);
+      this.configs.delete(id);
       this.emit();
     }
   }
@@ -277,6 +289,14 @@ export class ExtensionRegistry {
       ?? this.realtimeSources.get(contributionId)?.owner
       ?? null
     );
+  }
+
+  ownerOfService(serviceId: string): string | null {
+    return this.services.get(serviceId)?.owner ?? null;
+  }
+
+  getExtensionConfig(extensionId: string): Record<string, unknown> {
+    return { ...(this.configs.get(extensionId) ?? {}) };
   }
 
   listPages(mode?: ExtensionMode): PageDefinition[] {
@@ -415,10 +435,11 @@ export function createExtensionRuntime(options: {
     }
   };
 
-  return {
+  const buildRuntime = (config: Record<string, unknown>): ExtensionRuntime => ({
     mode: options.mode,
     locale: options.locale || "en-US",
-    config: options.config ?? {},
+    config,
+    forExtension: (extensionId) => buildRuntime(registry.getExtensionConfig(extensionId)),
     resolveUrl: options.resolveUrl ?? ((url) => url),
     readData: <T>(providerId: string, params?: unknown, context?: ProviderCallContext) => {
       const provider = registry.getDataProvider(providerId);
@@ -447,7 +468,9 @@ export function createExtensionRuntime(options: {
     },
     navigate: options.navigate ?? (() => undefined),
     refresh: options.refresh ?? (() => undefined),
-  };
+  });
+
+  return buildRuntime(options.config ?? {});
 }
 
 /**
@@ -503,8 +526,10 @@ export class ServiceRunner {
         continue;
       }
       this.starting.add(id);
+      const owner = this.registry.ownerOfService(id);
+      const runtime = owner ? this.runtime.forExtension(owner) : this.runtime;
       void Promise.resolve()
-        .then(() => service.start(this.runtime))
+        .then(() => service.start(runtime))
         .then((stop) => {
           this.starting.delete(id);
           if (this.stopped || !this.registry.listServices(this.mode).some((item) => item.id === id)) {

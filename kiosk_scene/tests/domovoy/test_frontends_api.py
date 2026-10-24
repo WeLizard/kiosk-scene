@@ -16,7 +16,7 @@ from domovoy.text import speakable
 from domovoy.frontends.assist import AssistFrontend
 from domovoy.server import build
 from .base import AppCase
-from .fakes import FakeHA, FakeLLM, FakeSTT
+from .fakes import FakeHA, FakeLLM, FakeSTT, FakeTelegram
 
 REMEMBER = "запомни девять резисторов 10 кОм лежат в третьей коробке нижнего шкафа"
 
@@ -29,6 +29,7 @@ def alice_request(command: str, *, new: bool = False, user: str = "u1", session:
 class AliceSkill(AppCase):
     def setUp(self) -> None:
         super().setUp()
+        self.app.settings.update({"alice": {"allowed_user_ids": ["u1"]}})
         _, self.scheduler = build(self.app)
         self.alice = AliceFrontend(self.app, self.pipeline, self.voice)
 
@@ -63,6 +64,12 @@ class AliceSkill(AppCase):
         self.assertEqual(self.app.items.list(), [])
         self.assertIn("Записано", self.alice.handle(alice_request(REMEMBER, user="owner"))["response"]["text"])
 
+    def test_empty_allow_list_refuses_commands(self) -> None:
+        self.app.settings.update({"alice": {"allowed_user_ids": []}})
+        denied = self.alice.handle(alice_request(REMEMBER))
+        self.assertIn("не настроен", denied["response"]["text"])
+        self.assertEqual(self.app.items.list(), [])
+
     def test_slow_processing_gets_an_honest_holding_reply_within_alices_budget(self) -> None:
         self.app.settings.update({"alice": {"budget_s": 0.2}})
         original = self.pipeline.handle
@@ -96,6 +103,15 @@ class KioskMicrophone(AppCase):
     def hear(self, text: str, room: str = "кухня") -> dict:
         self.stt.text = text
         return self.voice.handle_audio(b"RIFFfakewav", "audio/wav", room=room)
+
+    def test_voice_windows_do_not_accumulate(self) -> None:
+        for index in range(200):
+            self.voice._open_window(f"room-{index}")
+        self.assertLessEqual(len(self.voice._windows), self.voice.MAX_WINDOWS)
+
+        self._t[0] = 2000.0
+        self.voice._open_window("кухня")
+        self.assertEqual(list(self.voice._windows), ["кухня"])
 
     def test_trigger_word_gates_everything(self) -> None:
         self.assertEqual(self.hear("какая сегодня погода в Париже").get("reason"), "no_trigger")   # ambient talk: ignored
@@ -217,6 +233,84 @@ class HttpApi(AppCase):
         status, err = self.call("PATCH", "/api/state", {})
         self.assertEqual(status, 405)
 
+    def test_boolean_and_integer_parameters_are_strict(self) -> None:
+        status, first = self.call("POST", "/api/items", {"name": "винт", "merge": "false"})
+        self.assertEqual(status, 200)
+        status, second = self.call("POST", "/api/items", {"name": "винт", "merge": "false"})
+        self.assertEqual(status, 200)
+        self.assertNotEqual(first["item"]["id"], second["item"]["id"])
+
+        status, contact = self.call("POST", "/api/contacts", {"name": "Ирина", "is_self": "false"})
+        self.assertEqual(status, 200)
+        self.assertFalse(contact["contact"]["is_self"])
+
+        status, event = self.call("POST", "/api/calendar/events", {
+            "title": "Врач",
+            "start": "2026-09-29T10:00:00+03:00",
+            "end": "2026-09-29T11:00:00+03:00",
+            "all_day": "false",
+        })
+        self.assertEqual(status, 200)
+        self.assertFalse(event["event"]["all_day"])
+
+        self.assertEqual(self.call("POST", "/api/reminders/1/snooze", {"minutes": "abc"})[0], 422)
+        self.assertEqual(self.call("GET", "/api/items?location_id=abc")[0], 422)
+        self.assertEqual(self.call("GET", "/api/audit?entity_id=abc")[0], 422)
+        self.assertEqual(self.call("POST", "/api/contacts/link", {"contact_id": "abc", "chat_id": "1"})[0], 422)
+        self.assertEqual(self.call("POST", "/api/contacts/link", {"contact_id": 1, "chat_id": ""})[0], 422)
+        self.assertEqual(self.call("GET", "/events?since=1&timeout=abc")[0], 422)
+        self.assertEqual(self.call("PATCH", "/api/calendar/event?ref=local:abc", {})[0], 422)
+        self.assertEqual(self.call("DELETE", "/api/calendar/event?ref=local:abc")[0], 422)
+
+    def test_failed_item_create_does_not_leave_a_location(self) -> None:
+        status, err = self.call("POST", "/api/items", {"name": "", "location_path": ["Новая комната"]})
+        self.assertEqual((status, err["error"]["code"]), (422, "validation_error"))
+        status, locations = self.call("GET", "/api/locations")
+        self.assertNotIn("Новая комната", [item["name"] for item in locations["locations"]])
+
+    def test_request_concurrency_limit_returns_503(self) -> None:
+        server = self.server
+        server._request_slots = threading.BoundedSemaphore(1)
+        server._request_slots.acquire()
+        closed: list[object] = []
+        server.shutdown_request = lambda req: closed.append(req)                     # type: ignore[method-assign]
+
+        class FakeRequest:
+            sent = b""
+
+            def sendall(self, data: bytes) -> None:
+                self.sent += data
+
+        request = FakeRequest()
+        server.process_request(request, ("203.0.113.5", 1234))
+        self.assertIn(b"503 Service Unavailable", request.sent)
+        self.assertEqual(len(closed), 1)
+        server._request_slots.release()
+
+    def test_alice_and_telegram_setup_endpoints(self) -> None:
+        from domovoy.services.context import Ctx
+
+        status, result = self.call("POST", "/api/alice/test", {})
+        self.assertEqual((status, result["ok"]), (200, False))
+        self.app.settings.update({"alice": {"allowed_user_ids": ["u1"]}})
+        status, result = self.call("POST", "/api/alice/test", {})
+        self.assertEqual((status, result["ok"]), (200, True))
+
+        status, result = self.call("POST", "/api/integrations/telegram/test_message", {})
+        self.assertEqual((status, result["ok"]), (200, False))
+        contact = self.app.contacts.create(Ctx(actor="test", source="test"), name="Я", is_self=True,
+                                           channels={"telegram": {"chat_id": "555"}})
+        status, linked = self.call("POST", "/api/contacts/link", {"contact_id": contact["id"], "chat_id": "555", "is_self": True})
+        self.assertEqual(status, 200)
+        self.assertTrue(linked["contact"]["is_self"])
+
+        with FakeTelegram() as tg:
+            self.app.settings.update({"telegram": {"base_url": tg.url}})
+            self.app.secrets.set("telegram_token", FakeTelegram.TOKEN)
+            status, result = self.call("POST", "/api/integrations/telegram/test_message", {})
+            self.assertEqual((status, result["ok"]), (200, True))
+            self.assertEqual(len(tg.sent), 1)
+
     def test_lan_access_needs_a_token_and_csrf_is_blocked(self) -> None:
         # nginx marks direct LAN requests as origin "lan"; ingress/local are trusted
         status, err = self.call("GET", "/api/state", headers={"X-Domovoy-Origin": "lan"})
@@ -236,12 +330,23 @@ class HttpApi(AppCase):
         self.assertEqual((status, err["error"]["code"]), (422, "bad_content_type"))
         self.assertEqual(self.call("GET", "/health", headers={"X-Domovoy-Origin": "lan"})[0], 200)   # health is public
 
+    def test_secret_endpoint_is_admin_only(self) -> None:
+        status = self.call("GET", "/api/security", headers={"X-Domovoy-Origin": "kiosk"})[0]
+        self.assertEqual(status, 401)
+        status, body = self.call("GET", "/api/security", headers={"X-Domovoy-Origin": "local"})
+        self.assertEqual(status, 200)
+        self.assertTrue(body["api_token"])
+
     def test_alice_endpoint_is_protected_by_its_own_secret(self) -> None:
         secret = self.app.secrets.get("alice_secret")
         wrong = self.call("POST", "/frontends/alice/not-the-secret", alice_request("ping"), headers={"X-Domovoy-Origin": "lan"})
         self.assertEqual(wrong[0], 401)
         ok = self.call("POST", f"/frontends/alice/{secret}", alice_request("ping"), headers={"X-Domovoy-Origin": "lan", "X-Domovoy-Client": ""})
         self.assertEqual(ok[1]["response"]["text"], "pong")
+        for _ in range(10):
+            self.call("POST", "/frontends/alice/not-the-secret", alice_request("ping"), headers={"X-Domovoy-Origin": "lan"})
+        blocked = self.call("POST", "/frontends/alice/not-the-secret", alice_request("ping"), headers={"X-Domovoy-Origin": "lan"})
+        self.assertEqual((blocked[0], blocked[1]["error"]["code"]), (401, "rate_limited"))
 
     def test_ha_assist_endpoint_accepts_only_its_secret_header_or_a_trusted_caller(self) -> None:
         # this is exactly what the rest_command shown on the Integrations page sends

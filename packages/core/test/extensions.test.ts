@@ -128,9 +128,42 @@ describe("createExtensionRuntime", () => {
     runtime.onRealtimeStatus("x.y", (status) => seen.push(status));
     expect(seen).toEqual(["offline"]);
   });
+
+  it("scopes config to the extension that owns the contribution", async () => {
+    const registry = new ExtensionRegistry();
+    await registry.load(makeExtension("demo", () => undefined), { mic: { room: "кухня" } });
+    const runtime = createExtensionRuntime({ registry, mode: "admin", config: { global: true } });
+
+    expect(runtime.config).toEqual({ global: true });
+    expect(runtime.forExtension("demo").config).toEqual({ mic: { room: "кухня" } });
+    expect(runtime.forExtension("missing").config).toEqual({});
+  });
 });
 
 describe("services", () => {
+  it("gives every background service its own extension config", async () => {
+    const { ServiceRunner } = await import("@kiosk-scene/core");
+    const registry = new ExtensionRegistry();
+    const seen: Record<string, unknown>[] = [];
+    await registry.load(makeExtension("demo", (host) => {
+      host.registerService({
+        id: "demo.svc",
+        title: "Service",
+        modes: ["kiosk"],
+        start: (runtime) => {
+          seen.push(runtime.config);
+          return () => undefined;
+        },
+      });
+    }), { mic: true });
+    const runtime = createExtensionRuntime({ registry, mode: "kiosk" });
+    const runner = new ServiceRunner(registry, "kiosk", runtime);
+    runner.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(seen).toEqual([{ mic: true }]);
+    runner.stop();
+  });
   it("runs background services per mode, follows late-loading extensions and stops them", async () => {
     const { ServiceRunner } = await import("@kiosk-scene/core");
     const registry = new ExtensionRegistry();

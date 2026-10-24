@@ -127,6 +127,16 @@ class MemorySlice(AppCase):
                 import_data(self.app, bad)
         self.assertEqual(self.app.items.list()[0]["quantity"], 9)       # rejected imports changed nothing
 
+        bad_settings = json.loads(json.dumps(dump))
+        bad_settings["settings"]["cfg.ai"] = "not-json"
+        with self.assertRaises(ValidationError):
+            import_data(self.app, bad_settings)
+        unknown = json.loads(json.dumps(dump))
+        unknown["settings"]["cfg.nope"] = "1"
+        with self.assertRaises(ValidationError):
+            import_data(self.app, unknown)
+        self.assertEqual(self.app.items.list()[0]["quantity"], 9)
+
 
 class Policy(AppCase):
     def test_uncertain_writes_go_to_the_review_queue_not_the_database(self) -> None:

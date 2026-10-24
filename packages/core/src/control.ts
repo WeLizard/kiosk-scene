@@ -1,4 +1,4 @@
-import type { ControlV1, StateV1, ViewPreset } from "./contracts.js";
+import type { ControlPageV1, ControlV1, StateV1, ViewPreset } from "./contracts.js";
 import { deepMergeObject, isObjectRecord, parseIsoTime, trimText } from "./utils.js";
 
 export const DEFAULT_CONTROL_V1: ControlV1 = {
@@ -64,6 +64,45 @@ export function mergeControlV1(base: unknown, override: unknown, now = Date.now(
     sanitizeControlV1(base, now),
     isObjectRecord(override) ? override : {},
   ), now);
+}
+
+/**
+ * Only the fields the display itself changed. A full ControlV1 cannot be used for this: its defaults
+ * (`page.mode: "auto"`, null preset/cue) would overwrite a remote pin or cue on every merge.
+ */
+export interface ControlOverlayV1 {
+  viewPreset?: ViewPreset | null;
+  page?: ControlPageV1;
+}
+
+export function createViewPresetOverlay(viewPreset: ViewPreset | null): ControlOverlayV1 {
+  return { viewPreset };
+}
+
+export function createPinnedPageOverlay(pageId: string, ttlMs = 30_000, now = Date.now()): ControlOverlayV1 {
+  const target = trimText(pageId, 40);
+  const until = new Date(now + Math.max(5_000, Number(ttlMs) || 0)).toISOString();
+
+  return {
+    page: {
+      mode: target ? "pinned" : "auto",
+      target: target || null,
+      until: target ? until : null,
+    },
+  };
+}
+
+/** Drops an expired local pin while leaving every other overlay field (and the remote control) intact. */
+export function expireControlOverlay(overlay: ControlOverlayV1 | null | undefined, now = Date.now()): ControlOverlayV1 {
+  const next: ControlOverlayV1 = { ...(overlay || {}) };
+  const page = next.page;
+  if (page?.mode === "pinned") {
+    const pageUntil = parseIsoTime(page.until);
+    if (!page.target || (page.until && (!pageUntil || pageUntil <= now))) {
+      delete next.page;
+    }
+  }
+  return next;
 }
 
 export function createViewPresetControl(

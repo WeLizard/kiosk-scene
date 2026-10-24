@@ -27,7 +27,7 @@
     },
     {
       "id": "week",
-      "kind": "cards",
+      "kind": "forecast+cards",
       "slot": 0,
       "cardStyle": "mini",
       "title": "Ритм недели",
@@ -113,8 +113,5 @@
         }
       ]
     }
-  ],
-  "avatar": {
-    "packId": "haru-pro"
-  }
+  ]
 }

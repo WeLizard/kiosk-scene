@@ -11,7 +11,7 @@ export const T = {
   statuses: {
     applied: "выполнено", answered: "ответ", clarify: "нужно уточнение", review: "на проверке", rejected: "не понял", failed: "ошибка", partial: "частично",
     pending: "ожидает", fired: "сработало", done: "готово", cancelled: "отменено", queued: "в очереди", sending: "отправляется", sent: "отправлено",
-    ok: "работает", degraded: "сбои", down: "не отвечает", unconfigured: "не настроено", unknown: "неизвестно", approved: "принято",
+    ok: "работает", configured: "настроено", degraded: "сбои", down: "не отвечает", unconfigured: "не настроено", unknown: "неизвестно", approved: "принято",
   } as Record<string, string>,
   kinds: { item: "вещь", location: "место", note: "заметка", task: "задача", event: "событие" } as Record<string, string>,
   channels: { ui: "на экране", speak: "голосом (колонка)", telegram: "Telegram", ha_notify: "уведомление HA" } as Record<string, string>,
@@ -25,6 +25,9 @@ export function statusLabel(status: string): string {
 export function statusTone(status: string): "good" | "warn" | "bad" | "info" | "neutral" {
   if (["applied", "answered", "done", "sent", "ok", "approved"].includes(status)) {
     return "good";
+  }
+  if (status === "configured") {
+    return "info";
   }
   if (["clarify", "review", "pending", "queued", "sending", "partial", "degraded", "fired"].includes(status)) {
     return "warn";

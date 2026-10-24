@@ -1,21 +1,16 @@
 {
   "version": 1,
-  "adapter": "live2d",
-  "assetRoot": "/avatar-packs/haru/runtime",
-  "runtimeUrl": "./avatar.html",
-  "modelUrl": "./haru.model3.json",
-  "fallbackPortrait": "./haru.1024/texture_00.png",
-  "motionMapUrl": "./motion-map.json",
-  "presetThumbs": {
-    "full": "./assets/preset-full.svg",
-    "torso": "./assets/preset-torso.svg",
-    "head": "./assets/preset-head.svg"
-  },
+  "name": "Kiosk Scene starter",
+  "adapter": "static",
+  "assetRoot": "./",
+  "entry": "./avatar-placeholder.svg",
+  "modelUrl": "./avatar-placeholder.svg",
+  "fallbackPortrait": "./avatar-placeholder.svg",
   "capabilities": {
-    "supportsEmotion": true,
-    "supportsMotion": true,
+    "supportsEmotion": false,
+    "supportsMotion": false,
     "supportsViewPresets": true,
-    "supportsLipSync": true,
-    "supportsPointerFocus": true
+    "supportsLipSync": false,
+    "supportsPointerFocus": false
   }
 }

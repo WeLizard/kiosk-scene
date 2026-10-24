@@ -6,7 +6,7 @@ The project is designed for Home Assistant kiosk deployments, but the core must 
 
 - the kiosk runtime only opens a URL and controls the screen;
 - the scene engine owns layout, carousel, widgets, orchestration, and avatar lifecycle;
-- avatar rendering is adapter-based, so Live2D, Unity WebGL, a static portrait, or a pack-supplied module (for example a three.js room with a character) can plug into the same scene contract;
+- avatar rendering is adapter-based, so Live2D, a static portrait, or a pack-supplied module (for example a three.js room with a character) can plug into the same scene contract; Unity WebGL remains a documented contract stub;
 - private models and branded assets stay outside the public core.
 
 The shell contract for the current Home Assistant deployment is also explicit:

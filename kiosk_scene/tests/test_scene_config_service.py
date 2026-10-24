@@ -92,6 +92,25 @@ class SceneConfigPersistenceTests(unittest.TestCase):
             json.loads((pack / "scene.default.json").read_text(encoding="utf-8"))
             json.loads((pack / "scene.display.json").read_text(encoding="utf-8"))
 
+    def test_save_keeps_the_previous_source_as_a_backup(self) -> None:
+        with scene_env() as root:
+            service = load_module("scene_config_service")
+            service.save_scene_config(CASES[0]["input"])
+            pack = root / "scene-packs" / "demo"
+            first = (pack / "scene.default.json").read_text(encoding="utf-8")
+
+            service.save_scene_config(CASES[1]["input"])
+
+            self.assertEqual((pack / "scene.default.json.bak").read_text(encoding="utf-8"), first)
+
+    def test_non_finite_numbers_in_a_stored_config_are_rejected(self) -> None:
+        with scene_env() as root:
+            service = load_module("scene_config_service")
+            pack = root / "scene-packs" / "demo"
+            (pack / "scene.default.json").write_text('{"version":1,"pages":[],"bad":NaN}', encoding="utf-8")
+            with self.assertRaises(ValueError):
+                service.load_scene_config()
+
     def test_save_rejects_non_object_payloads(self) -> None:
         with scene_env():
             service = load_module("scene_config_service")

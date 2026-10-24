@@ -234,6 +234,12 @@ MIGRATIONS: list[tuple[int, str]] = [
           completed_at TEXT
         );
     """),
+    (
+        3,
+        """
+        ALTER TABLE audit_log ADD COLUMN caused_by INTEGER;
+        """,
+    ),
 ]
 
 FTS_STATEMENT = (

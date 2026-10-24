@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 import datetime as dt
 import logging
 import threading
@@ -25,6 +26,8 @@ class Scheduler:
         self._last_housekeeping = 0.0
         self._last_backup_day: str = ""
         self._last_telegram = 0.0
+        self._telegram_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="domovoy-telegram")
+        self._telegram_future: concurrent.futures.Future[int] | None = None
         self.last_activity_at = 0.0     # set by the API on every command; embedding backfill waits for quiet
 
     # ---- lifecycle -----------------------------------------------------------------------------
@@ -40,6 +43,7 @@ class Scheduler:
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=5)
+        self._telegram_pool.shutdown(wait=True)
 
     def _loop(self) -> None:
         while not self._stop.is_set():
@@ -91,7 +95,18 @@ class Scheduler:
         if not self.app.settings.get("telegram").get("enabled") or not self.app.telegram.configured() or time.monotonic() - self._last_telegram < 15:
             return 0
         self._last_telegram = time.monotonic()
-        handled = self.app.telegram_frontend.poll()
+        if self._telegram_future is not None and not self._telegram_future.done():
+            return 0
+        # A 15-second long poll must not delay reminders or the outbox: run it on its own single worker.
+        self._telegram_future = self._telegram_pool.submit(self._poll_telegram)
+        return 0
+
+    def _poll_telegram(self) -> int:
+        try:
+            handled = self.app.telegram_frontend.poll()
+        except Exception as exc:  # noqa: BLE001 - provider health already records the failure
+            LOG.warning("Telegram poll failed: %s", exc)
+            return 0
         if handled:
             self.last_activity_at = time.monotonic()
         return handled
@@ -107,6 +122,9 @@ class Scheduler:
             return "skipped"
         self._last_housekeeping = now
         self.app.db.trim_change_log()
+        pruned = self.app.retention.prune()
+        if any(pruned.values()):
+            LOG.info("Retention pruned: %s", pruned)
         today = self.app.clock.local_now().strftime("%Y-%m-%d")
         if today != self._last_backup_day and self.app.clock.local_now().hour >= 3:
             from .backup import create_backup

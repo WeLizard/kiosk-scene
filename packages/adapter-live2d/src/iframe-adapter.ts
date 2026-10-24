@@ -383,6 +383,7 @@ class Live2dIframeAdapter implements AvatarAdapter {
       supportsViewPresets: true,
       supportsLipSync: true,
       supportsPointerFocus: true,
+      rendersStateMessage: true,
     };
   }
 

@@ -45,6 +45,33 @@ describe("loadExtensions", () => {
     expect(registry.listExtensions().map((m) => m.id)).toEqual(["alpha"]);              // and the first one is untouched
   });
 
+  it("removes contributions from an activation that finished after its timeout", async () => {
+    const registry = new ExtensionRegistry();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const reports = await loadExtensions(
+      registry,
+      [{ id: "slow", moduleUrl: "/slow.js" }],
+      {
+        importModule: async () => ({
+          default: extension("slow", async (host) => {
+            host.registerWidget({ id: "slow.card", title: "c", mount: () => ({ dispose() {} }) });
+            await gate;
+            host.registerPage({ id: "slow.page", title: "P", modes: ["kiosk"], mount: () => ({ dispose() {} }) });
+          }),
+        }),
+        timeoutMs: 20,
+      },
+    );
+    expect(reports[0]).toMatchObject({ id: "slow", ok: false });
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(registry.getWidget("slow.card")).toBeNull();
+    expect(registry.getPage("slow.page")).toBeNull();
+  });
+
   it("rolls back what a throwing activate() had registered", async () => {
     const registry = new ExtensionRegistry();
     const reports = await loadExtensions(

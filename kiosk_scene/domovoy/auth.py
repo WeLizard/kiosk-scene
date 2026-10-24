@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 from .errors import UnauthorizedError
 
-TRUSTED_ORIGINS = {"ingress", "local"}
+TRUSTED_ORIGINS = {"ingress", "local", "kiosk"}
+ADMIN_ORIGINS = {"ingress", "local", "token"}
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 
 
@@ -18,21 +19,43 @@ class Principal:
 
 
 class RateLimiter:
+    MAX_KEYS = 4096
+
     def __init__(self, limit: int = 10, window: float = 60.0) -> None:
         self.limit, self.window = limit, window
         self._hits: dict[str, list[float]] = {}
         self._lock = threading.Lock()
 
+    def _prune(self, now: float) -> None:
+        for key in list(self._hits):
+            hits = [t for t in self._hits[key] if now - t < self.window]
+            if hits:
+                self._hits[key] = hits
+            else:
+                self._hits.pop(key, None)
+        if len(self._hits) > self.MAX_KEYS:
+            oldest = sorted(self._hits, key=lambda key: max(self._hits[key], default=0))
+            for key in oldest[: len(self._hits) - self.MAX_KEYS]:
+                self._hits.pop(key, None)
+
     def blocked(self, key: str) -> bool:
         now = time.monotonic()
         with self._lock:
             hits = [t for t in self._hits.get(key, []) if now - t < self.window]
-            self._hits[key] = hits
+            if hits:
+                self._hits[key] = hits
+            else:
+                self._hits.pop(key, None)
+            if len(self._hits) > self.MAX_KEYS:
+                self._prune(now)
             return len(hits) >= self.limit
 
     def record_failure(self, key: str) -> None:
+        now = time.monotonic()
         with self._lock:
-            self._hits.setdefault(key, []).append(time.monotonic())
+            if len(self._hits) >= self.MAX_KEYS:
+                self._prune(now)
+            self._hits.setdefault(key, []).append(now)
 
 
 class Authenticator:

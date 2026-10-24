@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 UTC = dt.timezone.utc
@@ -28,6 +29,17 @@ def from_iso(value: str) -> dt.datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
+
+
+def time_to_minutes(value: Any) -> int | None:
+    """`"9:00"` / `"09:00"` → 540; None for anything malformed."""
+    try:
+        hour, minute = (int(part) for part in str(value).split(":", 1))
+    except (TypeError, ValueError):
+        return None
+    if not 0 <= hour <= 23 or not 0 <= minute <= 59:
+        return None
+    return hour * 60 + minute
 
 
 class Clock:

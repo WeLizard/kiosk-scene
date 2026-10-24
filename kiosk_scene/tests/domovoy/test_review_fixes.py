@@ -231,6 +231,50 @@ class ReviewQueue(AppCase):
         self.assertTrue(result["still_pending"])
         self.assertEqual(self.app.review.get(review_id)["status"], "pending")                      # nothing changed, nothing lost
 
+    def test_an_error_after_an_applied_intent_does_not_leave_a_retryable_review(self) -> None:
+        review_id = self.app.review.add(command_id=None, proposal=[
+            {"type": "add_note", "text": "первая", "confidence": 0.9},
+            {"type": "add_note", "text": "вторая", "confidence": 0.9},
+        ], reason="t", confidence=0.6)
+        original = self.pipeline.executor.run
+        calls = {"n": 0}
+
+        def flaky(intent, ctx, extra):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("boom")
+            return original(intent, ctx, extra)
+
+        self.pipeline.executor.run = flaky                                           # type: ignore[method-assign]
+        with self.assertRaises(RuntimeError):
+            self.pipeline.approve_review(review_id)
+
+        self.assertEqual(len(self.app.notes.list()), 1)
+        self.assertEqual(self.app.review.get(review_id)["status"], "approved")
+        with self.assertRaises(ValidationError):
+            self.pipeline.approve_review(review_id)                                  # no second application
+
+    def test_concurrent_undo_of_a_custom_effect_runs_it_once(self) -> None:
+        from domovoy.services.context import Ctx
+
+        self.app.notes.create(Ctx(actor="test", source="test"), body="заметка")
+        audit_id = self.app.audit.list(entity_type="note")[0]["id"]
+        calls: list[dict] = []
+        self.app.audit.on_custom_undo("note", lambda after: calls.append(after))
+        errors: list[Exception] = []
+
+        def worker() -> None:
+            try:
+                self.app.audit.undo(audit_id, Ctx(actor="test", source="test"))
+            except Exception as exc:  # noqa: BLE001 - conflicts are expected for the losing callers
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(6)]
+        [thread.start() for thread in threads]
+        [thread.join() for thread in threads]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(errors), 5)
+
     def test_items_claimed_when_the_process_died_are_put_back(self) -> None:
         review_id = self.app.review.add(command_id=None, proposal=[{"type": "add_note", "text": "x", "confidence": 0.6}], reason="t", confidence=0.6)
         self.assertTrue(self.app.review.claim(review_id))
@@ -239,6 +283,19 @@ class ReviewQueue(AppCase):
 
 
 class Undo(AppCase):
+    def test_undoing_a_recurring_completion_removes_the_spawned_occurrence(self) -> None:
+        from domovoy.services.context import Ctx
+
+        task, _ = self.app.tasks.create(Ctx(actor="test", source="test"), title="Полить цветы",
+                                        due_date="2026-09-28", recurrence={"freq": "daily", "interval": 1})
+        self.app.tasks.update(Ctx(actor="test", source="test"), task["id"], {"done": True})
+        self.assertEqual(len(self.app.tasks.list()), 1)                                      # the spawned occurrence
+
+        completion = next(a for a in self.app.audit.list(entity_type="task", entity_id=task["id"]) if a["action"] == "complete")
+        self.app.audit.undo(completion["id"], Ctx(actor="test", source="test"))
+
+        self.assertEqual([item["id"] for item in self.app.tasks.list()], [task["id"]])
+        self.assertEqual([item["done"] for item in self.app.tasks.list()], [False])
     def test_a_place_cannot_be_undone_while_things_are_in_it(self) -> None:
         from domovoy.services.context import Ctx
 

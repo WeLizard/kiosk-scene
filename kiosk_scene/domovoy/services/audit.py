@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import sqlite3
+import threading
 from typing import Any, Callable
 
 from ..clock import Clock, to_iso
@@ -33,6 +34,9 @@ class AuditLog:
         self.clock = clock
         self._after_undo: dict[str, Callable[[sqlite3.Connection, int], None]] = {}
         self._custom_undo: dict[str, Callable[[dict[str, Any]], None]] = {}
+        # External undo handlers (CalDAV) are not transactional. Serialize undo so two callers cannot both
+        # perform the same external DELETE before either marks the audit row as undone.
+        self._undo_lock = threading.Lock()
 
     def on_undo(self, entity_type: str, hook: Callable[[sqlite3.Connection, int], None]) -> None:
         """Services register a hook (e.g. reindex search) that runs after an entity is restored."""
@@ -55,15 +59,16 @@ class AuditLog:
         summary: str,
         *,
         undoable: bool = True,
+        caused_by: int | None = None,
     ) -> int:
         cursor = conn.execute(
             """INSERT INTO audit_log(ts, actor, source, entity_type, entity_id, action, before, after, summary,
-                                     command_id, undoable) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                                     command_id, undoable, caused_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 self.clock.now_iso(), ctx.actor, ctx.source, entity_type, entity_id, action,
                 dumps(before) if before is not None else None,
                 dumps(after) if after is not None else None,
-                summary, ctx.command_id, 1 if undoable else 0,
+                summary, ctx.command_id, 1 if undoable else 0, caused_by,
             ),
         )
         audit_id = int(cursor.lastrowid or 0)
@@ -107,6 +112,10 @@ class AuditLog:
     # ---- undo --------------------------------------------------------------------------------
 
     def undo(self, audit_id: int, ctx: Ctx, *, force: bool = False) -> dict[str, Any]:
+        with self._undo_lock:
+            return self._undo_impl(audit_id, ctx, force=force)
+
+    def _undo_impl(self, audit_id: int, ctx: Ctx, *, force: bool = False) -> dict[str, Any]:
         with self.db.read() as conn:
             peek = conn.execute("SELECT * FROM audit_log WHERE id = ?", (audit_id,)).fetchone()
         if peek is not None and peek["entity_type"] in self._custom_undo:
@@ -120,6 +129,10 @@ class AuditLog:
         return self.get(audit_id)
 
     def undo_command(self, command_id: int, ctx: Ctx, *, force: bool = False) -> int:
+        with self._undo_lock:
+            return self._undo_command_impl(command_id, ctx, force=force)
+
+    def _undo_command_impl(self, command_id: int, ctx: Ctx, *, force: bool = False) -> int:
         """Undo every undoable change made by one command, newest first. Returns how many were undone."""
         with self.db.read() as conn:
             rows = conn.execute(
@@ -139,6 +152,8 @@ class AuditLog:
                 if not row["undoable"] or row["entity_type"] in self._custom_undo:
                     continue
                 fresh = conn.execute("SELECT * FROM audit_log WHERE id = ?", (row["id"],)).fetchone()
+                if fresh is None or fresh["undone_by"] is not None:
+                    continue
                 self._undo_row(conn, fresh, ctx, force=force)
                 count += 1
         return count
@@ -166,7 +181,11 @@ class AuditLog:
             row = conn.execute(sql + " ORDER BY id DESC LIMIT 1", params).fetchone()
         return int(row["command_id"]) if row else None
 
-    def _undo_row(self, conn: sqlite3.Connection, row: sqlite3.Row, ctx: Ctx, *, force: bool) -> None:
+    def _undo_row(self, conn: sqlite3.Connection, row: sqlite3.Row, ctx: Ctx, *, force: bool, seen: set[int] | None = None) -> None:
+        seen = seen or set()
+        if int(row["id"]) in seen:
+            return
+        seen.add(int(row["id"]))
         if row["undone_by"] is not None:
             raise ConflictError("Already undone")
         if not row["undoable"]:
@@ -188,6 +207,16 @@ class AuditLog:
             ).fetchone()[0]
             if busy:
                 raise ConflictError("The place is not empty: move or delete its contents first", code="location_not_empty")
+        # A recurring task completion creates the next occurrence. Undoing the completion must also remove
+        # that occurrence, otherwise every undo leaves an extra open task behind.
+        dependents = conn.execute(
+            "SELECT * FROM audit_log WHERE caused_by = ? AND undone_by IS NULL AND action != 'undo' ORDER BY id DESC",
+            (row["id"],),
+        ).fetchall()
+        for dependent in dependents:
+            if dependent["entity_type"] in self._custom_undo:
+                continue
+            self._undo_row(conn, dependent, ctx, force=force, seen=seen)
         if row["action"] == "create":
             restored = dict(after or current or {})
             restored["deleted_at"] = self.clock.now_iso()

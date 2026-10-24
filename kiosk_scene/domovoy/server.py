@@ -31,7 +31,8 @@ def main() -> None:
     env = Settings()
     app = Domovoy(env)
     context, scheduler = build(app)
-    server = ApiServer((env.host, env.port), context)
+    server = ApiServer((env.host, env.port), context, max_concurrent_requests=env.max_concurrent_requests,
+                       socket_timeout=env.socket_timeout_s)
     scheduler.start()
     stop = threading.Event()
 

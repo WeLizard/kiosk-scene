@@ -27,6 +27,7 @@ DEFAULTS: dict[str, Any] = {
     "rooms": [],
     "places": [],
     "alice": {"allowed_user_ids": [], "budget_s": 2.5},
+    "retention": {"commands_days": 90, "audit_days": 365, "outbox_days": 30, "telegram_updates_days": 30, "review_days": 90},
 }
 
 # Only these top-level keys may be written through the API; each value is validated for shape.
@@ -34,8 +35,27 @@ SHAPES: dict[str, type | tuple[type, ...]] = {
     "timezone": str, "language": str, "default_reminder_hour": int, "default_event_minutes": int,
     "auto_apply_confidence": (int, float), "review_confidence": (int, float),
     "ai": dict, "voice": dict, "calendar": dict, "caldav": dict, "ha": dict, "telegram": dict, "messaging": dict,
-    "speakers": list, "speak": dict, "rooms": list, "places": list, "alice": dict,
+    "speakers": list, "speak": dict, "rooms": list, "places": list, "alice": dict, "retention": dict,
 }
+
+SECRET_BINDINGS = (
+    ("ha", ("url",), "ha_token"),
+    ("telegram", ("base_url",), "telegram_token"),
+    ("caldav", ("url",), "caldav_password"),
+    ("ai", ("base_url",), "llm_api_key"),
+    ("voice", ("stt", "base_url"), "llm_api_key"),
+)
+
+
+def origin_of(url: Any) -> str:
+    parts = urlsplit(str(url or ""))
+    return f"{parts.scheme}://{(parts.hostname or '').lower()}:{parts.port or ''}" if parts.hostname else ""
+
+
+def dig(block: Any, path: tuple[str, ...]) -> Any:
+    for name in path:
+        block = block.get(name) if isinstance(block, dict) else None
+    return block
 
 
 class SettingsService:

@@ -57,6 +57,8 @@ export const ACTIONS: Record<string, Spec> = {
   "settings.update": { title: "Сохранить настройки", method: "PUT", path: () => "api/settings", body: (i) => i },
   "secrets.set": { title: "Сохранить секрет", method: "PUT", path: () => "api/integrations/secrets", body: (i) => i },
   "integration.test": { title: "Проверить интеграцию", method: "POST", path: (i) => `api/integrations/${i.name}/test`, body: () => ({}) },
+  "telegram.test_message": { title: "Тестовое сообщение в Telegram", method: "POST", path: () => "api/integrations/telegram/test_message", body: () => ({}) },
+  "alice.test": { title: "Проверить настройку Алисы", method: "POST", path: () => "api/alice/test", body: () => ({}) },
   "security.rotate": { title: "Сменить секрет", method: "POST", path: () => "api/security/rotate", body: (i) => ({ name: i.name }), destructive: true },
   "backup.create": { title: "Сделать резервную копию", method: "POST", path: () => "api/backup", body: () => ({}) },
   "data.import": { title: "Импортировать данные", method: "POST", path: () => "api/import", body: (i) => i.data, destructive: true },
