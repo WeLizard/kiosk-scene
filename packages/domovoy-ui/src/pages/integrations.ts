@@ -451,7 +451,8 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         settingsForm(runtime, [
           { name: "enabled", label: "Включён", type: "checkbox", value: s.telegram.enabled },
           secretField("telegram_token", "Токен бота (от @BotFather)", data.secrets.telegram_token),
-        ], (v) => ({ settings: { telegram: { enabled: v.enabled === true } }, secrets: { telegram_token: String(v.telegram_token) } }), refresh),
+          { name: "proxy", label: "HTTP-прокси для Telegram", type: "url", value: s.telegram.proxy ?? "", placeholder: "http://127.0.0.1:9080", hint: "Только для Telegram. Для Tor add-on включите http_tunnel: true и укажите http://127.0.0.1:9080. Пусто — прямое подключение.", wide: true },
+        ], (v) => ({ settings: { telegram: { enabled: v.enabled === true, proxy: String(v.proxy).trim() } }, secrets: { telegram_token: String(v.telegram_token) } }), refresh),
         h("h3", null, "Контакты"),
         contactsSection(runtime, data, refresh),
       ));

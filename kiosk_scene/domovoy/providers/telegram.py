@@ -19,10 +19,11 @@ class TelegramProvider:
     DEFAULT_BASE = "https://api.telegram.org"
 
     def __init__(self, token: Callable[[], str], health: HealthTracker, *, base_url: str | Callable[[], str] = DEFAULT_BASE,
-                 timeout: float = 10.0) -> None:
+                 timeout: float = 10.0, proxy: str | Callable[[], str] | None = None) -> None:
         self._token = token
         self.health = health
         self._base_url = base_url
+        self._proxy = proxy
         self.timeout = timeout
 
     @property
@@ -30,6 +31,11 @@ class TelegramProvider:
         """Read on every call, so an address changed in the settings applies at once (no restart)."""
         value = self._base_url() if callable(self._base_url) else self._base_url
         return (value if isinstance(value, str) and value else self.DEFAULT_BASE).rstrip("/")
+
+    @property
+    def proxy(self) -> str:
+        value = self._proxy() if callable(self._proxy) else self._proxy
+        return value if isinstance(value, str) else ""
 
     @base_url.setter
     def base_url(self, value: str | Callable[[], str]) -> None:
@@ -45,7 +51,7 @@ class TelegramProvider:
         try:
             data = json_request(
                 "POST", f"{self.base_url}/bot{token}/{method}", payload=payload, timeout=timeout or self.timeout,
-                provider="telegram", secrets=[token],
+                provider="telegram", secrets=[token], proxy=self.proxy,
             )
         except ProviderError as exc:
             self.health.fail(exc, [token])

@@ -97,13 +97,15 @@ def redact(text: str, secrets: list[str]) -> str:
 
 def http_request(
     method: str, url: str, *, headers: dict[str, str] | None = None, body: bytes | None = None,
-    timeout: float = 10.0, provider: str = "", secrets: list[str] | None = None,
+    timeout: float = 10.0, provider: str = "", secrets: list[str] | None = None, proxy: str | None = None,
 ) -> tuple[int, dict[str, str], bytes]:
     """One HTTP call. Non-2xx → ProviderError with `retryable` set by status; never leaks secrets in messages."""
     request = urllib.request.Request(url, data=body, method=method, headers={"User-Agent": USER_AGENT, **(headers or {})})
     secret_list = secrets or []
+    proxy = (proxy or "").strip()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({"http": proxy, "https": proxy})) if proxy else urllib.request.build_opener()
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with opener.open(request, timeout=timeout) as response:
             return response.status, {k.lower(): v for k, v in response.headers.items()}, response.read()
     except urllib.error.HTTPError as exc:
         payload = exc.read()[:2000]
@@ -120,12 +122,13 @@ def http_request(
 
 
 def json_request(method: str, url: str, *, payload: Any = None, headers: dict[str, str] | None = None, timeout: float = 10.0,
-                 provider: str = "", secrets: list[str] | None = None) -> Any:
+                 provider: str = "", secrets: list[str] | None = None, proxy: str | None = None) -> Any:
     body = None if payload is None else json.dumps(payload).encode("utf-8")
     merged = {"Accept": "application/json", **(headers or {})}
     if body is not None:
         merged["Content-Type"] = "application/json"
-    _, _, data = http_request(method, url, headers=merged, body=body, timeout=timeout, provider=provider, secrets=secrets)
+    _, _, data = http_request(method, url, headers=merged, body=body, timeout=timeout, provider=provider, secrets=secrets,
+                              proxy=proxy)
     if not data:
         return None
     try:

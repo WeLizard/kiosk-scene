@@ -446,35 +446,35 @@ function Re(e, n) {
   const t = document.createElement("style");
   t.id = e, t.textContent = n, document.head.appendChild(t);
 }
-const Ct = 1, qt = '.ks-admin,.ks-dialog,.ks-toasts,.ks-scope{--ks-bg: #f5f7f9;--ks-surface: #ffffff;--ks-surface-2: #eef2f5;--ks-border: #d5dde4;--ks-text: #1c2833;--ks-muted: #5c6b78;--ks-accent: #2464a8;--ks-accent-text: #ffffff;--ks-good: #1f7a4d;--ks-warn: #9a6100;--ks-bad: #b3261e;--ks-info: #2464a8;--ks-radius: 10px;--ks-shadow: 0 1px 2px rgba(20, 30, 40, .06), 0 4px 14px rgba(20, 30, 40, .06);--ks-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;font-family:var(--ks-font);color:var(--ks-text)}@media(prefers-color-scheme:dark){.ks-admin,.ks-dialog,.ks-toasts,.ks-scope:not([data-theme=kiosk]){--ks-bg: #12181e;--ks-surface: #1a222a;--ks-surface-2: #222c36;--ks-border: #33404c;--ks-text: #e6ecf1;--ks-muted: #96a5b2;--ks-accent: #5b9be0;--ks-accent-text: #0b1620;--ks-good: #5cc493;--ks-warn: #e0a84a;--ks-bad: #f08a83;--ks-info: #5b9be0;--ks-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .35)}}.ks-admin *,.ks-dialog *,.ks-toasts *,.ks-scope *{box-sizing:border-box}.ks-scope[data-theme=kiosk]{--ks-bg: transparent;--ks-surface: rgba(255, 255, 255, .72);--ks-surface-2: rgba(32, 48, 65, .06);--ks-border: rgba(32, 48, 65, .12);--ks-text: #203041;--ks-muted: rgba(32, 48, 65, .66)}.ks-admin{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;min-height:100dvh;background:var(--ks-bg);font-size:15px;line-height:1.45}.ks-sidebar{position:sticky;top:0;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:8px;padding:16px 12px;background:var(--ks-surface);border-right:1px solid var(--ks-border);overflow-y:auto}.ks-brand{padding:4px 10px 12px;font-weight:700;font-size:17px;letter-spacing:-.01em}.ks-nav-list{display:flex;flex-direction:column;gap:2px}.ks-nav-group{margin:12px 10px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ks-muted)}.ks-nav-item,.ks-bottom-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--ks-text);text-decoration:none;min-height:40px}.ks-nav-item:hover{background:var(--ks-surface-2)}.ks-nav-item[aria-current=page]{background:color-mix(in srgb,var(--ks-accent) 14%,transparent);color:var(--ks-accent);font-weight:600}.ks-nav-icon{width:22px;text-align:center;flex:none}.ks-nav-footer{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:12px;border-top:1px solid var(--ks-border)}.ks-nav-footer-link{padding:6px 10px;color:var(--ks-muted);text-decoration:none;font-size:13px}.ks-content{min-width:0;display:flex;flex-direction:column}.ks-topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px 20px;background:color-mix(in srgb,var(--ks-bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--ks-border)}.ks-topbar-title{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ks-menu-button,.ks-bottom-nav,.ks-scrim{display:none}.ks-main-view{flex:1;padding:20px;outline:none;max-width:1200px;width:100%}.ks-conn{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-muted);white-space:nowrap}.ks-conn[data-state=live]{color:var(--ks-good)}.ks-conn[data-state=reconnecting],.ks-conn[data-state=connecting]{color:var(--ks-warn)}.ks-conn[data-state=offline]{color:var(--ks-bad);border-color:var(--ks-bad)}@media(max-width:899px){.ks-admin{display:block;padding-bottom:64px}.ks-sidebar{position:fixed;inset:0 auto 0 0;z-index:30;width:min(84vw,300px);transform:translate(-102%);transition:transform .18s ease;box-shadow:var(--ks-shadow)}.ks-admin:not([data-menu=open]) .ks-sidebar{visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s}.ks-admin[data-menu=open] .ks-sidebar{transform:none}.ks-admin[data-menu=open] .ks-scrim{display:block;position:fixed;inset:0;z-index:20;background:#0006}.ks-menu-button{display:inline-flex}.ks-topbar{padding:10px 12px}.ks-topbar-title{font-size:17px}.ks-main-view{padding:14px 12px}.ks-bottom-nav{position:fixed;inset:auto 0 0;z-index:10;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ks-surface);border-top:1px solid var(--ks-border);padding-bottom:env(safe-area-inset-bottom,0)}.ks-bottom-item{flex-direction:column;gap:2px;justify-content:center;padding:8px 4px;font-size:11px;border-radius:0;min-height:56px;color:var(--ks-muted)}.ks-bottom-item[aria-current=page]{color:var(--ks-accent);font-weight:600}.ks-bottom-item .ks-nav-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.ks-page{display:flex;flex-direction:column;gap:16px}.ks-card{background:var(--ks-surface);border:1px solid var(--ks-border);border-radius:var(--ks-radius);padding:16px;box-shadow:var(--ks-shadow);min-width:0}.ks-card>h2,.ks-card>header>h2{margin:0 0 10px;font-size:15px;font-weight:700}.ks-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.ks-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}.ks-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.ks-row-spread{justify-content:space-between}.ks-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ks-toolbar .ks-grow{flex:1;min-width:180px}.ks-muted{color:var(--ks-muted)}.ks-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.ks-list>li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--ks-border);min-width:0}.ks-list>li:last-child{border-bottom:0}.ks-list .ks-grow{flex:1;min-width:0}.ks-list .ks-title{font-weight:600;overflow-wrap:anywhere}.ks-list .ks-sub{color:var(--ks-muted);font-size:13px;overflow-wrap:anywhere}.ks-done{text-decoration:line-through;color:var(--ks-muted)}.ks-tree{list-style:none;margin:0;padding-left:18px;border-left:1px dashed var(--ks-border)}.ks-tree.ks-tree-root{padding-left:0;border-left:0}.ks-tree-node{padding:3px 0}.ks-btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;font:inherit;font-size:14px;min-height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer;touch-action:manipulation}.ks-btn:hover:not(:disabled){background:var(--ks-surface-2)}.ks-btn:focus-visible,.ks-field input:focus-visible,.ks-field select:focus-visible,.ks-field textarea:focus-visible,.ks-nav-item:focus-visible,.ks-bottom-item:focus-visible{outline:2px solid var(--ks-accent);outline-offset:1px}.ks-btn:disabled{opacity:.55;cursor:default}.ks-btn-primary{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text);font-weight:600}.ks-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--ks-accent) 88%,black)}.ks-btn-danger{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 50%,var(--ks-border))}.ks-btn-ghost{border-color:transparent;background:transparent}.ks-btn-sm{min-height:30px;padding:0 10px;font-size:13px}.ks-form{display:flex;flex-direction:column;gap:12px}.ks-form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}.ks-form-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.ks-form-error,.ks-field-error{color:var(--ks-bad);font-size:13px}.ks-field{display:flex;flex-direction:column;gap:4px;min-width:0}.ks-field-wide{grid-column:1 / -1}.ks-field label{font-size:13px;font-weight:600;color:var(--ks-muted)}.ks-field input:not([type=checkbox]),.ks-field select,.ks-field textarea,.ks-input{font:inherit;font-size:16px;width:100%;min-height:40px;padding:8px 10px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text)}.ks-field-check{flex-direction:row;align-items:center;gap:8px}.ks-field.has-error input,.ks-field.has-error select,.ks-field.has-error textarea{border-color:var(--ks-bad)}.ks-field-hint{color:var(--ks-muted);font-size:12px}.ks-required{color:var(--ks-bad)}.ks-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--ks-border);background:var(--ks-surface-2);color:var(--ks-muted);white-space:nowrap}.ks-badge-good{color:var(--ks-good);border-color:color-mix(in srgb,var(--ks-good) 40%,var(--ks-border))}.ks-badge-warn{color:var(--ks-warn);border-color:color-mix(in srgb,var(--ks-warn) 40%,var(--ks-border))}.ks-badge-bad{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 40%,var(--ks-border))}.ks-badge-info{color:var(--ks-info);border-color:color-mix(in srgb,var(--ks-info) 40%,var(--ks-border))}.ks-empty,.ks-loading,.ks-error{padding:28px 16px;text-align:center;color:var(--ks-muted)}.ks-empty strong,.ks-error strong{display:block;color:var(--ks-text);margin-bottom:4px}.ks-error{color:var(--ks-bad);display:flex;flex-direction:column;align-items:center;gap:8px}.ks-spinner{display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-3px;border:2px solid var(--ks-border);border-top-color:var(--ks-accent);border-radius:50%;animation:ks-spin .8s linear infinite}@keyframes ks-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ks-spinner{animation-duration:3s}}.ks-stale-banner{padding:8px 12px;margin-bottom:10px;border-radius:8px;background:color-mix(in srgb,var(--ks-warn) 14%,var(--ks-surface));color:var(--ks-warn);font-size:13px}.ks-table-wrap{overflow-x:auto}.ks-table{width:100%;border-collapse:collapse;font-size:14px}.ks-table th,.ks-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--ks-border);vertical-align:top}.ks-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ks-muted)}@media(max-width:640px){.ks-table thead{display:none}.ks-table,.ks-table tbody,.ks-table tr,.ks-table td{display:block;width:100%}.ks-table tr{padding:8px 0;border-bottom:1px solid var(--ks-border)}.ks-table td{border:0;padding:2px 4px}.ks-table td:before{content:attr(data-label) ": ";color:var(--ks-muted);font-size:12px}.ks-table td[data-label=""]:before{content:none}}.ks-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:#00000073}.ks-dialog{width:min(560px,100%);max-height:92vh;overflow:auto;background:var(--ks-surface);border-radius:14px;box-shadow:var(--ks-shadow);border:1px solid var(--ks-border)}.ks-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ks-border)}.ks-dialog-head h2{margin:0;font-size:16px}.ks-dialog-body{padding:16px}.ks-toasts{position:fixed;z-index:120;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}.ks-toast{padding:10px 14px;border-radius:10px;background:var(--ks-text);color:var(--ks-bg);box-shadow:var(--ks-shadow);font-size:14px}.ks-toast-good{background:var(--ks-good);color:#fff}.ks-toast-bad{background:var(--ks-bad);color:#fff}@media(max-width:899px){.ks-toasts{bottom:72px}}.ks-chip{font:inherit;font-size:14px;min-height:34px;padding:4px 12px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer}.ks-chip.is-active{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text)}.ks-link{font:inherit;padding:0;border:0;background:none;color:var(--ks-accent);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}.ks-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}.ks-filters .ks-field{flex:1 1 200px;min-width:0}.ks-list-click>li{cursor:pointer}.ks-list-click>li:hover,.ks-list-click>li:focus-visible{background:var(--ks-surface-2);outline:none}@media(max-width:640px){.ks-hide-narrow{display:none}}', Ot = qt, it = "domovoy.api", st = "domovoy.actions", be = "domovoy.events", Y = (e, n = ["id"]) => Object.fromEntries(Object.entries(e).filter(([t]) => !n.includes(t))), B = (e) => (n) => `${e}/${encodeURIComponent(String(n.id))}`, Be = {
+const Ct = 1, qt = '.ks-admin,.ks-dialog,.ks-toasts,.ks-scope{--ks-bg: #f5f7f9;--ks-surface: #ffffff;--ks-surface-2: #eef2f5;--ks-border: #d5dde4;--ks-text: #1c2833;--ks-muted: #5c6b78;--ks-accent: #2464a8;--ks-accent-text: #ffffff;--ks-good: #1f7a4d;--ks-warn: #9a6100;--ks-bad: #b3261e;--ks-info: #2464a8;--ks-radius: 10px;--ks-shadow: 0 1px 2px rgba(20, 30, 40, .06), 0 4px 14px rgba(20, 30, 40, .06);--ks-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;font-family:var(--ks-font);color:var(--ks-text)}@media(prefers-color-scheme:dark){.ks-admin,.ks-dialog,.ks-toasts,.ks-scope:not([data-theme=kiosk]){--ks-bg: #12181e;--ks-surface: #1a222a;--ks-surface-2: #222c36;--ks-border: #33404c;--ks-text: #e6ecf1;--ks-muted: #96a5b2;--ks-accent: #5b9be0;--ks-accent-text: #0b1620;--ks-good: #5cc493;--ks-warn: #e0a84a;--ks-bad: #f08a83;--ks-info: #5b9be0;--ks-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .35)}}.ks-admin *,.ks-dialog *,.ks-toasts *,.ks-scope *{box-sizing:border-box}.ks-scope[data-theme=kiosk]{--ks-bg: transparent;--ks-surface: rgba(255, 255, 255, .72);--ks-surface-2: rgba(32, 48, 65, .06);--ks-border: rgba(32, 48, 65, .12);--ks-text: #203041;--ks-muted: rgba(32, 48, 65, .66)}.ks-admin{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;min-height:100dvh;background:var(--ks-bg);font-size:15px;line-height:1.45}.ks-sidebar{position:sticky;top:0;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:8px;padding:16px 12px;background:var(--ks-surface);border-right:1px solid var(--ks-border);overflow-y:auto}.ks-brand{padding:4px 10px 12px;font-weight:700;font-size:17px;letter-spacing:-.01em}.ks-nav-list{display:flex;flex-direction:column;gap:2px}.ks-nav-group{margin:12px 10px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ks-muted)}.ks-nav-item,.ks-bottom-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--ks-text);text-decoration:none;min-height:40px}.ks-nav-item:hover{background:var(--ks-surface-2)}.ks-nav-item[aria-current=page]{background:color-mix(in srgb,var(--ks-accent) 14%,transparent);color:var(--ks-accent);font-weight:600}.ks-nav-icon{width:22px;text-align:center;flex:none}.ks-nav-footer{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:12px;border-top:1px solid var(--ks-border)}.ks-nav-footer-link{padding:6px 10px;color:var(--ks-muted);text-decoration:none;font-size:13px}.ks-content{min-width:0;display:flex;flex-direction:column}.ks-topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px 20px;background:color-mix(in srgb,var(--ks-bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--ks-border)}.ks-topbar-title{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ks-menu-button,.ks-bottom-nav,.ks-scrim{display:none}.ks-main-view{flex:1;padding:20px;outline:none;max-width:1200px;width:100%}.ks-conn{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-muted);white-space:nowrap}.ks-conn[data-state=live]{color:var(--ks-good)}.ks-conn[data-state=reconnecting],.ks-conn[data-state=connecting]{color:var(--ks-warn)}.ks-conn[data-state=offline]{color:var(--ks-bad);border-color:var(--ks-bad)}@media(max-width:899px){.ks-admin{display:block;padding-bottom:64px}.ks-sidebar{position:fixed;inset:0 auto 0 0;z-index:30;width:min(84vw,300px);transform:translate(-102%);transition:transform .18s ease;box-shadow:var(--ks-shadow)}.ks-admin:not([data-menu=open]) .ks-sidebar{visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s}.ks-admin[data-menu=open] .ks-sidebar{transform:none}.ks-admin[data-menu=open] .ks-scrim{display:block;position:fixed;inset:0;z-index:20;background:#0006}.ks-menu-button{display:inline-flex}.ks-topbar{padding:10px 12px}.ks-topbar-title{font-size:17px}.ks-main-view{padding:14px 12px}.ks-bottom-nav{position:fixed;inset:auto 0 0;z-index:10;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ks-surface);border-top:1px solid var(--ks-border);padding-bottom:env(safe-area-inset-bottom,0)}.ks-bottom-item{flex-direction:column;gap:2px;justify-content:center;padding:8px 4px;font-size:11px;border-radius:0;min-height:56px;color:var(--ks-muted)}.ks-bottom-item[aria-current=page]{color:var(--ks-accent);font-weight:600}.ks-bottom-item .ks-nav-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.ks-page{display:flex;flex-direction:column;gap:16px}.ks-card{background:var(--ks-surface);border:1px solid var(--ks-border);border-radius:var(--ks-radius);padding:16px;box-shadow:var(--ks-shadow);min-width:0}.ks-card>h2,.ks-card>header>h2{margin:0 0 10px;font-size:15px;font-weight:700}.ks-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.ks-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}.ks-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.ks-row-spread{justify-content:space-between}.ks-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ks-toolbar .ks-grow{flex:1;min-width:180px}.ks-muted{color:var(--ks-muted)}.ks-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.ks-list>li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--ks-border);min-width:0}.ks-list>li:last-child{border-bottom:0}.ks-list .ks-grow{flex:1;min-width:0}.ks-list .ks-title{font-weight:600;overflow-wrap:anywhere}.ks-list .ks-sub{color:var(--ks-muted);font-size:13px;overflow-wrap:anywhere}.ks-done{text-decoration:line-through;color:var(--ks-muted)}.ks-tree{list-style:none;margin:0;padding-left:18px;border-left:1px dashed var(--ks-border)}.ks-tree.ks-tree-root{padding-left:0;border-left:0}.ks-tree-node{padding:3px 0}.ks-btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;font:inherit;font-size:14px;min-height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer;touch-action:manipulation}.ks-btn:hover:not(:disabled){background:var(--ks-surface-2)}.ks-btn:focus-visible,.ks-field input:focus-visible,.ks-field select:focus-visible,.ks-field textarea:focus-visible,.ks-nav-item:focus-visible,.ks-bottom-item:focus-visible{outline:2px solid var(--ks-accent);outline-offset:1px}.ks-btn:disabled{opacity:.55;cursor:default}.ks-btn-primary{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text);font-weight:600}.ks-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--ks-accent) 88%,black)}.ks-btn-danger{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 50%,var(--ks-border))}.ks-btn-ghost{border-color:transparent;background:transparent}.ks-btn-sm{min-height:30px;padding:0 10px;font-size:13px}.ks-form{display:flex;flex-direction:column;gap:12px}.ks-form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}.ks-form-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.ks-form-error,.ks-field-error{color:var(--ks-bad);font-size:13px}.ks-field{display:flex;flex-direction:column;gap:4px;min-width:0}.ks-field-wide{grid-column:1 / -1}.ks-field label{font-size:13px;font-weight:600;color:var(--ks-muted)}.ks-field input:not([type=checkbox]),.ks-field select,.ks-field textarea,.ks-input{font:inherit;font-size:16px;width:100%;min-height:40px;padding:8px 10px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text)}.ks-field-check{flex-direction:row;align-items:center;gap:8px}.ks-field.has-error input,.ks-field.has-error select,.ks-field.has-error textarea{border-color:var(--ks-bad)}.ks-field-hint{color:var(--ks-muted);font-size:12px}.ks-required{color:var(--ks-bad)}.ks-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--ks-border);background:var(--ks-surface-2);color:var(--ks-muted);white-space:nowrap}.ks-badge-good{color:var(--ks-good);border-color:color-mix(in srgb,var(--ks-good) 40%,var(--ks-border))}.ks-badge-warn{color:var(--ks-warn);border-color:color-mix(in srgb,var(--ks-warn) 40%,var(--ks-border))}.ks-badge-bad{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 40%,var(--ks-border))}.ks-badge-info{color:var(--ks-info);border-color:color-mix(in srgb,var(--ks-info) 40%,var(--ks-border))}.ks-empty,.ks-loading,.ks-error{padding:28px 16px;text-align:center;color:var(--ks-muted)}.ks-empty strong,.ks-error strong{display:block;color:var(--ks-text);margin-bottom:4px}.ks-error{color:var(--ks-bad);display:flex;flex-direction:column;align-items:center;gap:8px}.ks-spinner{display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-3px;border:2px solid var(--ks-border);border-top-color:var(--ks-accent);border-radius:50%;animation:ks-spin .8s linear infinite}@keyframes ks-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ks-spinner{animation-duration:3s}}.ks-stale-banner{padding:8px 12px;margin-bottom:10px;border-radius:8px;background:color-mix(in srgb,var(--ks-warn) 14%,var(--ks-surface));color:var(--ks-warn);font-size:13px}.ks-table-wrap{overflow-x:auto}.ks-table{width:100%;border-collapse:collapse;font-size:14px}.ks-table th,.ks-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--ks-border);vertical-align:top}.ks-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ks-muted)}@media(max-width:640px){.ks-table thead{display:none}.ks-table,.ks-table tbody,.ks-table tr,.ks-table td{display:block;width:100%}.ks-table tr{padding:8px 0;border-bottom:1px solid var(--ks-border)}.ks-table td{border:0;padding:2px 4px}.ks-table td:before{content:attr(data-label) ": ";color:var(--ks-muted);font-size:12px}.ks-table td[data-label=""]:before{content:none}}.ks-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:#00000073}.ks-dialog{width:min(560px,100%);max-height:92vh;overflow:auto;background:var(--ks-surface);border-radius:14px;box-shadow:var(--ks-shadow);border:1px solid var(--ks-border)}.ks-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ks-border)}.ks-dialog-head h2{margin:0;font-size:16px}.ks-dialog-body{padding:16px}.ks-toasts{position:fixed;z-index:120;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}.ks-toast{padding:10px 14px;border-radius:10px;background:var(--ks-text);color:var(--ks-bg);box-shadow:var(--ks-shadow);font-size:14px}.ks-toast-good{background:var(--ks-good);color:#fff}.ks-toast-bad{background:var(--ks-bad);color:#fff}@media(max-width:899px){.ks-toasts{bottom:72px}}.ks-chip{font:inherit;font-size:14px;min-height:34px;padding:4px 12px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer}.ks-chip.is-active{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text)}.ks-link{font:inherit;padding:0;border:0;background:none;color:var(--ks-accent);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}.ks-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}.ks-filters .ks-field{flex:1 1 200px;min-width:0}.ks-list-click>li{cursor:pointer}.ks-list-click>li:hover,.ks-list-click>li:focus-visible{background:var(--ks-surface-2);outline:none}@media(max-width:640px){.ks-hide-narrow{display:none}}', Ot = qt, it = "domovoy.api", st = "domovoy.actions", be = "domovoy.events", Y = (e, n = ["id"]) => Object.fromEntries(Object.entries(e).filter(([t]) => !n.includes(t))), H = (e) => (n) => `${e}/${encodeURIComponent(String(n.id))}`, He = {
   "command.send": { title: "Отправить команду", method: "POST", path: () => "api/command", body: (e) => e },
   "command.undo": { title: "Отменить команду", method: "POST", path: (e) => `api/commands/${e.id}/undo`, body: () => ({}) },
   "items.create": { title: "Добавить предмет", method: "POST", path: () => "api/items", body: (e) => e },
-  "items.update": { title: "Изменить предмет", method: "PATCH", path: B("api/items"), body: (e) => Y(e) },
-  "items.delete": { title: "Удалить предмет", method: "DELETE", path: B("api/items"), destructive: !0 },
+  "items.update": { title: "Изменить предмет", method: "PATCH", path: H("api/items"), body: (e) => Y(e) },
+  "items.delete": { title: "Удалить предмет", method: "DELETE", path: H("api/items"), destructive: !0 },
   "items.move": { title: "Переместить предмет", method: "POST", path: (e) => `api/items/${e.id}/move`, body: (e) => Y(e) },
   "items.consume": { title: "Списать", method: "POST", path: (e) => `api/items/${e.id}/consume`, body: (e) => Y(e) },
   "locations.create": { title: "Добавить место", method: "POST", path: () => "api/locations", body: (e) => e },
-  "locations.update": { title: "Изменить место", method: "PATCH", path: B("api/locations"), body: (e) => Y(e) },
-  "locations.delete": { title: "Удалить место", method: "DELETE", path: B("api/locations"), destructive: !0 },
+  "locations.update": { title: "Изменить место", method: "PATCH", path: H("api/locations"), body: (e) => Y(e) },
+  "locations.delete": { title: "Удалить место", method: "DELETE", path: H("api/locations"), destructive: !0 },
   "notes.create": { title: "Добавить заметку", method: "POST", path: () => "api/notes", body: (e) => e },
-  "notes.update": { title: "Изменить заметку", method: "PATCH", path: B("api/notes"), body: (e) => Y(e) },
-  "notes.delete": { title: "Удалить заметку", method: "DELETE", path: B("api/notes"), destructive: !0 },
+  "notes.update": { title: "Изменить заметку", method: "PATCH", path: H("api/notes"), body: (e) => Y(e) },
+  "notes.delete": { title: "Удалить заметку", method: "DELETE", path: H("api/notes"), destructive: !0 },
   "tasks.create": { title: "Добавить задачу", method: "POST", path: () => "api/tasks", body: (e) => e },
-  "tasks.update": { title: "Изменить задачу", method: "PATCH", path: B("api/tasks"), body: (e) => Y(e) },
+  "tasks.update": { title: "Изменить задачу", method: "PATCH", path: H("api/tasks"), body: (e) => Y(e) },
   "tasks.complete": { title: "Отметить задачу", method: "POST", path: (e) => `api/tasks/${e.id}/complete`, body: (e) => ({ done: e.done ?? !0 }) },
-  "tasks.delete": { title: "Удалить задачу", method: "DELETE", path: B("api/tasks"), destructive: !0 },
+  "tasks.delete": { title: "Удалить задачу", method: "DELETE", path: H("api/tasks"), destructive: !0 },
   "reminders.create": { title: "Добавить напоминание", method: "POST", path: () => "api/reminders", body: (e) => e },
-  "reminders.update": { title: "Изменить напоминание", method: "PATCH", path: B("api/reminders"), body: (e) => Y(e) },
+  "reminders.update": { title: "Изменить напоминание", method: "PATCH", path: H("api/reminders"), body: (e) => Y(e) },
   "reminders.done": { title: "Напоминание выполнено", method: "POST", path: (e) => `api/reminders/${e.id}/done`, body: () => ({}) },
   "reminders.snooze": { title: "Отложить напоминание", method: "POST", path: (e) => `api/reminders/${e.id}/snooze`, body: (e) => ({ minutes: e.minutes }) },
-  "reminders.delete": { title: "Удалить напоминание", method: "DELETE", path: B("api/reminders"), destructive: !0 },
+  "reminders.delete": { title: "Удалить напоминание", method: "DELETE", path: H("api/reminders"), destructive: !0 },
   "calendar.create": { title: "Добавить событие", method: "POST", path: () => "api/calendar/events", body: (e) => e },
   "calendar.update": { title: "Изменить событие", method: "PATCH", path: () => "api/calendar/event", body: (e) => Y(e, ["ref"]), query: (e) => ({ ref: e.ref }) },
   "calendar.delete": { title: "Удалить событие", method: "DELETE", path: () => "api/calendar/event", query: (e) => ({ ref: e.ref }), destructive: !0 },
   "contacts.create": { title: "Добавить контакт", method: "POST", path: () => "api/contacts", body: (e) => e },
-  "contacts.update": { title: "Изменить контакт", method: "PATCH", path: B("api/contacts"), body: (e) => Y(e) },
-  "contacts.delete": { title: "Удалить контакт", method: "DELETE", path: B("api/contacts"), destructive: !0 },
+  "contacts.update": { title: "Изменить контакт", method: "PATCH", path: H("api/contacts"), body: (e) => Y(e) },
+  "contacts.delete": { title: "Удалить контакт", method: "DELETE", path: H("api/contacts"), destructive: !0 },
   "contacts.link": { title: "Привязать Telegram", method: "POST", path: () => "api/contacts/link", body: (e) => e },
   "review.approve": { title: "Подтвердить", method: "POST", path: (e) => `api/review/${e.id}/approve`, body: (e) => e.proposal ? { proposal: e.proposal } : {} },
   "review.reject": { title: "Отклонить", method: "POST", path: (e) => `api/review/${e.id}/reject`, body: () => ({}) },
@@ -523,10 +523,10 @@ function Mt(e) {
   }, actions: {
     id: st,
     describe() {
-      return Object.entries(Be).map(([s, o]) => ({ id: s, title: o.title, destructive: o.destructive }));
+      return Object.entries(He).map(([s, o]) => ({ id: s, title: o.title, destructive: o.destructive }));
     },
     async invoke(s, o, r) {
-      const u = Be[s];
+      const u = He[s];
       if (!u)
         return { ok: !1, error: { code: "unknown_action", message: `Unknown action ${s}` } };
       const d = o ?? {};
@@ -673,7 +673,7 @@ function he(e) {
 function Le(e, n = "") {
   return e == null ? "" : `${Number.isInteger(e) ? String(e) : String(Math.round(e * 1e3) / 1e3)} ${n}`.trim();
 }
-const He = ["ui", "telegram", "speak", "ha_notify"], xe = ["tasks", "shopping", "chores"], we = {
+const Be = ["ui", "telegram", "speak", "ha_notify"], xe = ["tasks", "shopping", "chores"], we = {
   add_item: { title: "Запомнить вещь", fields: [{ name: "name", label: "Название", kind: "str" }, { name: "quantity", label: "Количество", kind: "num" }, { name: "unit", label: "Ед.", kind: "str" }, { name: "location_path", label: "Место (через →)", kind: "path" }, { name: "notes", label: "Заметки", kind: "str" }, { name: "mode", label: "Как менять количество", kind: "enum", options: ["set", "add"] }] },
   place_item: { title: "Положить вещь", fields: [{ name: "name", label: "Название", kind: "str" }, { name: "quantity", label: "Количество", kind: "num" }, { name: "unit", label: "Ед.", kind: "str" }, { name: "location_path", label: "Место (через →)", kind: "path" }] },
   move_item: { title: "Переместить вещь", fields: [{ name: "name", label: "Название", kind: "str" }, { name: "location_path", label: "Новое место (через →)", kind: "path" }, { name: "use_last", label: "Последнюю упомянутую", kind: "bool" }] },
@@ -685,7 +685,7 @@ const He = ["ui", "telegram", "speak", "ha_notify"], xe = ["tasks", "shopping", 
   list_location: { title: "Что лежит в месте", fields: [{ name: "location_path", label: "Место (через →)", kind: "path" }] },
   add_note: { title: "Заметка", fields: [{ name: "title", label: "Заголовок", kind: "str" }, { name: "text", label: "Текст", kind: "str" }] },
   query_memory: { title: "Вспомнить", fields: [{ name: "query", label: "Запрос", kind: "str" }] },
-  create_reminder: { title: "Напоминание", fields: [{ name: "text", label: "О чём", kind: "str" }, { name: "when", label: "Когда", kind: "iso" }, { name: "channel", label: "Как", kind: "enum", options: He }, { name: "recipient", label: "Кому", kind: "str" }, { name: "trigger", label: "Условие", kind: "json" }, { name: "recurrence", label: "Повтор", kind: "json" }] },
+  create_reminder: { title: "Напоминание", fields: [{ name: "text", label: "О чём", kind: "str" }, { name: "when", label: "Когда", kind: "iso" }, { name: "channel", label: "Как", kind: "enum", options: Be }, { name: "recipient", label: "Кому", kind: "str" }, { name: "trigger", label: "Условие", kind: "json" }, { name: "recurrence", label: "Повтор", kind: "json" }] },
   query_reminders: { title: "Активные напоминания", fields: [] },
   complete_reminder: { title: "Выполнить напоминание", fields: [{ name: "reminder_id", label: "Номер", kind: "num" }] },
   snooze_reminder: { title: "Отложить напоминание", fields: [{ name: "reminder_id", label: "Номер", kind: "num" }, { name: "minutes", label: "Минут", kind: "num" }] },
@@ -694,7 +694,7 @@ const He = ["ui", "telegram", "speak", "ha_notify"], xe = ["tasks", "shopping", 
   update_event: { title: "Перенести/изменить событие", fields: [{ name: "title", label: "Какое событие", kind: "str" }, { name: "new_title", label: "Новое название", kind: "str" }, { name: "new_start", label: "Новое начало", kind: "iso" }, { name: "new_end", label: "Новый конец", kind: "iso" }] },
   delete_event: { title: "Удалить событие", fields: [{ name: "title", label: "Какое событие", kind: "str" }] },
   query_calendar: { title: "Что в календаре", fields: [{ name: "start", label: "С", kind: "iso" }, { name: "end", label: "По", kind: "iso" }] },
-  send_message: { title: "Сообщение", fields: [{ name: "recipient", label: "Кому", kind: "str" }, { name: "text", label: "Текст", kind: "str" }, { name: "channel", label: "Как", kind: "enum", options: He }, { name: "when", label: "Когда", kind: "iso" }] },
+  send_message: { title: "Сообщение", fields: [{ name: "recipient", label: "Кому", kind: "str" }, { name: "text", label: "Текст", kind: "str" }, { name: "channel", label: "Как", kind: "enum", options: Be }, { name: "when", label: "Когда", kind: "iso" }] },
   add_task: { title: "Задача", fields: [{ name: "title", label: "Название", kind: "str" }, { name: "list", label: "Список", kind: "enum", options: xe }, { name: "due_date", label: "Срок (ГГГГ-ММ-ДД)", kind: "str" }] },
   add_shopping: { title: "В список покупок", fields: [{ name: "items", label: "Что купить (через запятую)", kind: "list" }] },
   complete_task: { title: "Отметить задачу", fields: [{ name: "title", label: "Какая", kind: "str" }, { name: "list", label: "Список", kind: "enum", options: xe }] },
@@ -750,7 +750,7 @@ async function A(e, n, t, i = {}) {
   const s = await ut(e, n, t);
   return s.ok ? i.success && C(i.success, "good") : C(s.error.message, "bad", 7e3), s;
 }
-function H(e, n, t, i, s = 250, o) {
+function B(e, n, t, i, s = 250, o) {
   let r = !1;
   const u = () => {
     const c = document.activeElement;
@@ -831,7 +831,7 @@ function Nt(e) {
 function Rt(e) {
   return e.split(/→|->|>|\//).map((n) => n.trim()).filter(Boolean);
 }
-function Bt(e) {
+function Ht(e) {
   if (typeof e != "string" || e.trim() === "")
     return null;
   const n = Number(e.replace(",", "."));
@@ -841,12 +841,12 @@ async function fe(e, n) {
   const [t, i] = await Promise.all([e, n]);
   return t.ok ? i.ok ? { ok: !0, data: [t.data, i.data] } : i : t;
 }
-const Ht = [["audit", "Изменения"], ["commands", "Команды"], ["outbox", "Отправка сообщений"]];
+const Bt = [["audit", "Изменения"], ["commands", "Команды"], ["outbox", "Отправка сообщений"]];
 function Ut(e, n, t) {
   const i = new I(), s = a("div"), o = a("div", { class: "ks-row dv-chips", role: "tablist" });
   let r = "audit", u = null;
   const d = () => {
-    u?.dispose(), Ie(o, () => S(o, Ht.map(
+    u?.dispose(), Ie(o, () => S(o, Bt.map(
       ([c, p]) => a("button", { type: "button", role: "tab", dataset: { key: c }, class: `ks-chip${r === c ? " is-active" : ""}`, "aria-selected": String(r === c), onClick: () => {
         r = c, d();
       } }, p)
@@ -893,7 +893,7 @@ function Ut(e, n, t) {
       )) : O("Исходящих сообщений не было.")
     });
   }, l = (c) => ve(c);
-  return d(), S(e, a("div", { class: "ks-page" }, G(g.activity), o, j("", s))), H(t, i, ["audit", "commands", "outbox", "items", "locations", "notes", "tasks", "reminders", "calendar"], () => u?.refresh(), 500), i.add(() => u?.dispose()), U(i);
+  return d(), S(e, a("div", { class: "ks-page" }, G(g.activity), o, j("", s))), B(t, i, ["audit", "commands", "outbox", "items", "locations", "notes", "tasks", "reminders", "calendar"], () => u?.refresh(), 500), i.add(() => u?.dispose()), U(i);
 }
 function Ue(e, n, t, i) {
   const s = Z(), o = ne(t ? t.start : new Date(Math.ceil(Date.now() / 36e5) * 36e5).toISOString(), s), r = t ? ne(t.end, s) : "", u = n.sources.filter((d) => d.capabilities.includes("create") && d.available);
@@ -971,7 +971,7 @@ function Ft(e, n, t) {
   });
   return d.onclick = () => {
     o += 14, l.refresh();
-  }, e.replaceChildren(a("div", { class: "ks-page" }, G(g.calendar, u), s, a("div", { class: "ks-row" }, d))), t.readData("domovoy.api", { path: "api/state" }).then((c) => c.ok && se(c.data.timezone)), H(t, i, ["calendar"], () => l.refresh()), i.add(() => l.dispose()), U(i);
+  }, e.replaceChildren(a("div", { class: "ks-page" }, G(g.calendar, u), s, a("div", { class: "ks-row" }, d))), t.readData("domovoy.api", { path: "api/state" }).then((c) => c.ok && se(c.data.timezone)), B(t, i, ["calendar"], () => l.refresh()), i.add(() => l.dispose()), U(i);
 }
 const Vt = {
   home_assistant: "Home Assistant",
@@ -1334,8 +1334,9 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
         a("div", { class: "ks-row" }, h),
         ee(t, [
           { name: "enabled", label: "Включён", type: "checkbox", value: d.telegram.enabled },
-          ke("telegram_token", "Токен бота (от @BotFather)", r.secrets.telegram_token)
-        ], (f) => ({ settings: { telegram: { enabled: f.enabled === !0 } }, secrets: { telegram_token: String(f.telegram_token) } }), u),
+          ke("telegram_token", "Токен бота (от @BotFather)", r.secrets.telegram_token),
+          { name: "proxy", label: "HTTP-прокси для Telegram", type: "url", value: d.telegram.proxy ?? "", placeholder: "http://127.0.0.1:9080", hint: "Только для Telegram. Для Tor add-on включите http_tunnel: true и укажите http://127.0.0.1:9080. Пусто — прямое подключение.", wide: !0 }
+        ], (f) => ({ settings: { telegram: { enabled: f.enabled === !0, proxy: String(f.proxy).trim() } }, secrets: { telegram_token: String(f.telegram_token) } }), u),
         a("h3", null, "Контакты"),
         Wt(t, r, u)
       )), y = W("calendar", "Календарь", l("caldav"), a("div", null, c("caldav"), ee(t, [
@@ -1461,7 +1462,7 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
       return a("div", { class: "dv-stack" }, p, m, b, P, y, E, x, k, z, F);
     }
   });
-  return S(e, a("div", { class: "ks-page" }, G(g.integrations), s)), H(t, i, ["integrations", "contacts", "settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), U(i);
+  return S(e, a("div", { class: "ks-page" }, G(g.integrations), s)), B(t, i, ["integrations", "contacts", "settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), U(i);
 }
 function pt(e, n = !0) {
   const t = e.slice().sort((i, s) => i.path.join("/").localeCompare(s.path.join("/"), "ru")).map((i) => ({ value: String(i.id), label: i.path.join(" → ") }));
@@ -1483,7 +1484,7 @@ function De(e, n, t, i) {
     async (s) => {
       const o = Rt(String(s.new_path ?? "")), r = {
         name: String(s.name).trim(),
-        quantity: Bt(s.quantity),
+        quantity: Ht(s.quantity),
         unit: String(s.unit ?? "").trim(),
         category: String(s.category ?? "").trim(),
         properties: zt(String(s.properties ?? "")),
@@ -1601,7 +1602,7 @@ function Qt(e, n, t) {
       a("div", { class: "ks-card ks-filters" }, u.el, d.el),
       r
     )
-  ), H(t, i, ["items", "locations"], p), i.add(() => c.dispose()), U(i);
+  ), B(t, i, ["items", "locations"], p), i.add(() => c.dispose()), U(i);
 }
 const kt = { home: "дом", room: "комната", cabinet: "шкаф", shelf: "полка", box: "коробка", cell: "ячейка", place: "место" }, en = Object.entries(kt).map(([e, n]) => ({ value: e, label: n }));
 function gt(e, n = []) {
@@ -1650,7 +1651,7 @@ function tn(e, n, t) {
     load: (l) => t.readData("domovoy.api", { path: "api/locations/tree" }, { signal: l }),
     render: ({ tree: l }, c) => (o.onclick = () => r(null, null, l, c), l.length ? a("ul", { class: "dv-loc-tree dv-loc-root" }, l.map((p) => u(p, l, c))) : a("div", { class: "ks-empty" }, a("strong", null, "Мест ещё нет"), a("p", null, "Они появятся сами, когда вы скажете «положил в третью коробку нижнего шкафа», или добавьте вручную.")))
   });
-  return e.replaceChildren(a("div", { class: "ks-page" }, G(g.locations, o), a("div", { class: "ks-card" }, s))), H(t, i, ["locations", "items"], () => d.refresh()), i.add(() => d.dispose()), U(i);
+  return e.replaceChildren(a("div", { class: "ks-page" }, G(g.locations, o), a("div", { class: "ks-card" }, s))), B(t, i, ["locations", "items"], () => d.refresh()), i.add(() => d.dispose()), U(i);
 }
 const Ye = "domovoy.session";
 function nn() {
@@ -1763,7 +1764,7 @@ function sn(e, n, t) {
       );
     }
   });
-  return H(t, i, ["calendar", "reminders", "tasks", "review", "commands", "outbox", "notification"], () => d.refresh()), i.add(() => d.dispose()), U(i);
+  return B(t, i, ["calendar", "reminders", "tasks", "review", "commands", "outbox", "notification"], () => d.refresh()), i.add(() => d.dispose()), U(i);
 }
 function We(e, n, t) {
   K(
@@ -1816,7 +1817,7 @@ function on(e, n, t) {
   });
   return r.input.addEventListener("input", () => {
     o = r.input.value.trim(), d.refresh();
-  }), S(e, a("div", { class: "ks-page" }, G(g.memory, u), ze(t, () => d.refresh()), a("div", { class: "ks-card ks-filters" }, r.el), s)), H(t, i, ["notes", "items", "locations"], () => d.refresh()), i.add(() => d.dispose()), U(i);
+  }), S(e, a("div", { class: "ks-page" }, G(g.memory, u), ze(t, () => d.refresh()), a("div", { class: "ks-card ks-filters" }, r.el), s)), B(t, i, ["notes", "items", "locations"], () => d.refresh()), i.add(() => d.dispose()), U(i);
 }
 async function bt(e, n, t, i) {
   const s = await A(e, "review.approve", t ? { id: n, proposal: t } : { id: n });
@@ -1891,7 +1892,7 @@ function ln(e, n, t) {
       )
     )) : a("div", { class: "ks-empty" }, a("strong", null, r === "pending" ? "Всё проверено" : "Пусто"), a("p", null, r === "pending" ? "Неуверенные команды попадают сюда — я ничего не записываю без вашего подтверждения." : ""))
   });
-  return d(), S(e, a("div", { class: "ks-page" }, G(g.review), a("p", { class: "ks-muted" }, "Здесь команды, в которых я не уверен, и всё, что предложила языковая модель. Пока вы не подтвердите, ничего не изменилось."), u, s)), H(t, i, ["review", "commands"], () => l.refresh()), i.add(() => l.dispose()), U(i);
+  return d(), S(e, a("div", { class: "ks-page" }, G(g.review), a("p", { class: "ks-muted" }, "Здесь команды, в которых я не уверен, и всё, что предложила языковая модель. Пока вы не подтвердите, ничего не изменилось."), u, s)), B(t, i, ["review", "commands"], () => l.refresh()), i.add(() => l.dispose()), U(i);
 }
 const Ke = { location: "domovoy.locations", note: "domovoy.memory", task: "domovoy.tasks", event: "domovoy.calendar" };
 function dn(e, n, t) {
@@ -1944,7 +1945,7 @@ function dn(e, n, t) {
       })) : O(`Ничего не нашлось по «${b}». Возможно, я этого ещё не запоминал.`)
     );
   }, h = Qe(() => void v(), 250);
-  return o.addEventListener("input", () => h()), i.add(() => h.cancel()), i.add(() => c?.abort()), p(), S(e, a("div", { class: "ks-page" }, a("div", { class: "ks-card" }, o, r, d), u)), v(), H(t, i, ["items", "locations", "notes", "tasks", "calendar"], () => void v(), 500), U(i);
+  return o.addEventListener("input", () => h()), i.add(() => h.cancel()), i.add(() => c?.abort()), p(), S(e, a("div", { class: "ks-page" }, a("div", { class: "ks-card" }, o, r, d), u)), v(), B(t, i, ["items", "locations", "notes", "tasks", "calendar"], () => void v(), 500), U(i);
 }
 const cn = (e) => e.split(/[\n,]/).map((n) => n.trim()).filter(Boolean);
 function un(e) {
@@ -2050,7 +2051,7 @@ function pn(e, n, t) {
       return a("div", { class: "dv-stack" }, p, m, v, h, y);
     }
   });
-  return S(e, a("div", { class: "ks-page" }, G(g.settings), s)), H(t, i, ["settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), U(i);
+  return S(e, a("div", { class: "ks-page" }, G(g.settings), s)), B(t, i, ["settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), U(i);
 }
 const fn = Object.entries(g.channels).map(([e, n]) => ({ value: e, label: n }));
 function Ze(e, n, t, i) {
@@ -2168,7 +2169,7 @@ function kn(e, n, t) {
   });
   return l.input.addEventListener("change", () => {
     o = l.input.checked, c.refresh();
-  }), S(e, a("div", { class: "ks-page" }, G(g.tasks, u, d), a("div", { class: "ks-card ks-filters" }, l.el), s)), H(t, i, ["reminders", "tasks", "contacts"], () => c.refresh()), i.add(() => c.dispose()), U(i);
+  }), S(e, a("div", { class: "ks-page" }, G(g.tasks, u, d), a("div", { class: "ks-card ks-filters" }, l.el), s)), B(t, i, ["reminders", "tasks", "contacts"], () => c.refresh()), i.add(() => c.dispose()), U(i);
 }
 function Je(e) {
   let n = 0;
@@ -2474,7 +2475,7 @@ function Te(e, n, t) {
         load: (p) => $(o, "api/today", void 0, p),
         render: (p, m) => (se(p.timezone), t(p, m, d, o))
       });
-      H(o, r, ["calendar", "reminders", "tasks"], () => l.refresh(), 400);
+      B(o, r, ["calendar", "reminders", "tasks"], () => l.refresh(), 400);
       const c = window.setInterval(() => l.refresh(), 6e4);
       return r.add(() => window.clearInterval(c)), r.add(() => l.dispose()), {
         update(p) {

@@ -9,6 +9,7 @@ import stat
 import threading
 import time
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
 
@@ -263,6 +264,58 @@ class Storage(AppCase):
 
 
 class ProviderResilience(AppCase):
+    def test_http_request_uses_an_explicit_proxy(self) -> None:
+        from domovoy.providers.base import http_request
+
+        seen: list[str] = []
+
+        class Proxy(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                seen.append(self.path)
+                body = b"ok"
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Proxy)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        status, _, body = http_request(
+            "GET", "http://example.invalid/test",
+            proxy=f"http://127.0.0.1:{server.server_address[1]}",
+        )
+        self.assertEqual((status, body), (200, b"ok"))
+        self.assertEqual(seen, ["http://example.invalid/test"])
+
+    def test_telegram_provider_passes_proxy_to_the_http_layer(self) -> None:
+        from domovoy.providers import telegram as telegram_module
+        from domovoy.providers.base import HealthTracker
+        from domovoy.providers.telegram import TelegramProvider
+
+        captured: dict = {}
+        original = telegram_module.json_request
+
+        def fake_json(method, url, **kwargs):
+            captured.update({"method": method, "url": url, **kwargs})
+            return {"ok": True, "result": {}}
+
+        telegram_module.json_request = fake_json  # type: ignore[assignment]
+        try:
+            provider = TelegramProvider(
+                token=lambda: "token", health=HealthTracker("telegram", self.clock),
+                base_url="http://telegram.test", proxy=lambda: "http://127.0.0.1:9080",
+            )
+            provider.test()
+        finally:
+            telegram_module.json_request = original  # type: ignore[assignment]
+        self.assertEqual(captured.get("proxy"), "http://127.0.0.1:9080")
+
     def test_model_client_breaks_the_circuit_after_repeated_failures_and_recovers(self) -> None:
         with FakeLLM() as llm:
             now = [0.0]

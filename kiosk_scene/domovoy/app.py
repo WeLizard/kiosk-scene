@@ -61,6 +61,7 @@ class Domovoy:
         self.telegram = TelegramProvider(
             token=lambda: self.secrets.get("telegram_token"), health=self.health["telegram"],
             base_url=lambda: telegram_base_url or self.settings.get("telegram")["base_url"],
+            proxy=lambda: self.settings.get("telegram").get("proxy") or "",
         )
         self.caldav = CalDavProvider(
             config=lambda: self.settings.get("caldav"), secret=lambda: self.secrets.get("caldav_password"),

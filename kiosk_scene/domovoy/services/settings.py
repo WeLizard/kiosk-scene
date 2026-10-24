@@ -20,7 +20,7 @@ DEFAULTS: dict[str, Any] = {
     "calendar": {"default": "local", "ha_calendars": []},
     "caldav": {"url": "", "username": "", "auth": "basic"},
     "ha": {"url": "", "allowed_services": [], "person_entity": ""},
-    "telegram": {"enabled": True, "base_url": "https://api.telegram.org"},
+    "telegram": {"enabled": True, "base_url": "https://api.telegram.org", "proxy": ""},
     "messaging": {"sandbox": False},
     "speakers": [],
     "speak": {"enabled": True, "fallback": "telegram", "quiet_from": "23:00", "quiet_to": "07:00"},
