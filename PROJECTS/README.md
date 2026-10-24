@@ -18,10 +18,15 @@ proprietary models, private media and history, which the asset policy in
 
 ## Init
 
+The submodules are marked `update = none`: a normal clone and the Home
+Assistant add-on repository clone skip them. This keeps the private Neiri
+repository from breaking a public/CI/add-on clone. Opt in explicitly when
+you need the instance sources:
+
 ```bash
-git clone --recurse-submodules https://github.com/WeLizard/kiosk-scene.git
-# or, in an existing checkout:
-git submodule update --init PROJECTS/neiri PROJECTS/haos
+git clone https://github.com/WeLizard/kiosk-scene.git
+git -c submodule.neiri.update=checkout submodule update --init PROJECTS/neiri
+git -c submodule.PROJECTS/haos.update=checkout submodule update --init PROJECTS/haos
 ```
 
 The Neiri instance resolves the engine root by walking from its own

@@ -2,6 +2,8 @@
 	path = PROJECTS/neiri
 	url = https://github.com/WeLizard/neiri.git
 	branch = main
+	update = none
 [submodule "PROJECTS/haos"]
 	path = PROJECTS/haos
 	url = https://github.com/WeLizard/HAOS-kiosk.git
+	update = none
