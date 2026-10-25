@@ -21,7 +21,7 @@ from ..nlu.presence_words import DAY_WINDOWS
 from ..services.context import Ctx
 from ..services.items import format_quantity
 from ..services.triggers import looks_active
-from ..text import norm_key
+from ..text import norm_key, tokens
 
 
 @dataclass
@@ -285,7 +285,17 @@ class Executor:
 
     def do_query_memory(self, intent: dict[str, Any], ctx: Ctx, session: dict[str, Any], **_: Any) -> Outcome:
         result = self.app.search.search(intent["query"], limit=5)
-        hits = [h for h in result["hits"] if h["score"] >= 0.5]
+        query_terms = set(tokens(intent["query"], drop_stopwords=True))
+        hits = []
+        for hit in result["hits"]:
+            if hit["score"] < 0.5:
+                continue
+            # Cosine similarity has a high baseline for short Russian phrases. A hit that matched only by vector
+            # must share a content word, otherwise the only note in memory would answer every personal question.
+            lexical = any(name in ("fts", "fuzzy") for name in hit.get("matched_by", []))
+            text_terms = set(tokens(f"{hit['title']} {hit.get('snippet', '')}", drop_stopwords=True))
+            if lexical or query_terms & text_terms:
+                hits.append(hit)
         if not hits:
             return Outcome(True, "Ничего похожего не нашёл в памяти.", data=result)
         lines = [f"{h['title']}" + (f" — {h['snippet']}" if h["kind"] in ("note",) else "") for h in hits[:3]]

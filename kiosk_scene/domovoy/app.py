@@ -134,10 +134,11 @@ class Domovoy:
 
     def integrations(self) -> list[dict[str, Any]]:
         ai, voice = self.settings.get("ai"), self.settings.get("voice")
+        semantic_ready = bool(ai.get("enabled") and ai.get("base_url") and ai.get("embedding_model"))
         tracked = {
             "home_assistant": self.ha.configured(), "telegram": self.telegram.configured(),
-            "caldav": self.caldav.configured(), "llm": self.llm.configured(), "speak": bool(self.settings.get("speakers")),
-            "stt": bool(voice.get("stt", {}).get("base_url")),
+            "caldav": self.caldav.configured(), "llm": self.llm.configured() or semantic_ready,
+            "speak": bool(self.settings.get("speakers")), "stt": bool(voice.get("stt", {}).get("base_url")),
         }
         result = []
         for name, configured in tracked.items():
@@ -146,7 +147,10 @@ class Domovoy:
                 health.status = "unconfigured"
             elif health.status == "unconfigured":
                 health.status = "ok" if health.last_ok else "degraded" if health.last_error else "unknown"
-            result.append({**health.public(), "configured": configured})
+            entry = {**health.public(), "configured": configured}
+            if name == "llm" and semantic_ready and not self.llm.configured():
+                entry["detail"] = "Семантический поиск и роутер работают; чат-модель не задана"
+            result.append(entry)
         alice_allowed = [str(item).strip() for item in (self.settings.get("alice").get("allowed_user_ids") or []) if str(item).strip()]
         result.append({
             "name": "alice", "status": "configured" if alice_allowed else "unconfigured",

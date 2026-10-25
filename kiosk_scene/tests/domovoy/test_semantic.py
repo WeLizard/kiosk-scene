@@ -42,6 +42,19 @@ class Semantic(AppCase):
         self.app.settings.update({"ai": {"enabled": False}})
         self.assertIsNone(self.router.route("у меня день рождения 3 августа"))
 
+    def test_memory_query_ignores_unrelated_vector_only_hits(self) -> None:
+        original = self.app.search.search
+        self.app.search.search = lambda query, limit=5: {"hits": [{
+            "kind": "note", "id": 1, "title": "У меня день рождения 3 августа", "snippet": "",
+            "score": 1.1, "matched_by": ["vector"],
+        }]}
+        try:
+            answer = self.say("какой у меня размер обуви?")
+            self.assertEqual(answer["status"], "answered")
+            self.assertIn("Ничего", answer["reply"])
+        finally:
+            self.app.search.search = original
+
     def test_pipeline_uses_semantic_fallback_before_the_model(self) -> None:
         answer = self.say("у меня аллергия на пыль")
         self.assertEqual((answer["status"], answer["reply"]), ("applied", "Запомнила."))
