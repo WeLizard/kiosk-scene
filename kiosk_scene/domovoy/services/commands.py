@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import sqlite3
-from typing import Any
+from typing import Any, Callable
 
 from ..clock import Clock, from_iso
 from ..db import Database, dumps, loads
@@ -16,8 +16,8 @@ STATUSES = ("applied", "clarify", "review", "rejected", "failed", "answered", "p
 class CommandLog:
     """Every natural-language command with what was understood, what was done, and what was said back."""
 
-    def __init__(self, db: Database, clock: Clock) -> None:
-        self.db, self.clock = db, clock
+    def __init__(self, db: Database, clock: Clock, style: Callable[[str], str] | None = None) -> None:
+        self.db, self.clock, self._style = db, clock, style
 
     def start(self, *, text: str, frontend: str, session_id: str | None) -> int:
         with self.db.write() as conn:
@@ -29,6 +29,8 @@ class CommandLog:
 
     def finish(self, command_id: int, *, status: str, interpreter: str | None, intents: Any, confidence: float | None,
                reply: str, result: Any = None, error: str | None = None) -> None:
+        if self._style:
+            reply = self._style(reply)
         with self.db.write() as conn:
             conn.execute(
                 "UPDATE commands SET status = ?, interpreter = ?, intents = ?, confidence = ?, reply = ?, result = ?, error = ? WHERE id = ?",

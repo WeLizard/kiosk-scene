@@ -40,7 +40,9 @@ class CommandPipeline:
         started = time.monotonic()
         text = " ".join(str(text or "").split())[:MAX_TEXT]
         if not text:
-            return {"status": "rejected", "reply": "Не расслышал. Повторите, пожалуйста.", "command_id": None, "results": []}
+            return self.app.speech.render_payload(
+                {"status": "rejected", "reply": "Не расслышал. Повторите, пожалуйста.", "command_id": None, "results": []}
+            )
         command_id = self.app.commands.start(text=text, frontend=frontend, session_id=session_id)
         try:
             payload = self._handle(text, command_id, frontend, session_id, deadline_s, started, room)
@@ -51,7 +53,7 @@ class CommandPipeline:
             self.app.commands.finish(command_id, status="failed", interpreter=None, intents=None, confidence=None,
                                      reply=payload["reply"], error="internal error")
         payload["command_id"] = command_id
-        return payload
+        return self.app.speech.render_payload(payload)
 
     def approve_review(self, review_id: int, *, edited: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         item = self.app.review.get(review_id)
@@ -119,6 +121,12 @@ class CommandPipeline:
             reply = "Слушаю."
             app.commands.finish(command_id, status="answered", interpreter="identity", intents=[], confidence=1.0, reply=reply)
             return {"status": "answered", "reply": reply, "results": [], "interpreter": "identity", "confidence": 1.0, "intents": []}
+
+        if re.fullmatch(r"(?:привет|здравствуй(?:те)?|добрый (?:день|вечер)|доброе утро|на связи|"
+                        r"ты (?:здесь|тут|на связи)|ау|слышишь)[!.?]*", command_text, re.I):
+            reply = "На связи."
+            app.commands.finish(command_id, status="answered", interpreter="rules", intents=[], confidence=1.0, reply=reply)
+            return {"status": "answered", "reply": reply, "results": [], "interpreter": "rules", "confidence": 1.0, "intents": []}
 
         pending = session.get("pending")
         if pending:

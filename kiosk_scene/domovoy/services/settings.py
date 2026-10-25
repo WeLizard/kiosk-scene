@@ -15,7 +15,7 @@ DEFAULTS: dict[str, Any] = {
     "default_event_minutes": 60,
     "auto_apply_confidence": 0.8,
     "review_confidence": 0.5,
-    "identity": {"name": DEFAULT_NAME, "aliases": list(DEFAULT_ALIASES)},
+    "identity": {"name": DEFAULT_NAME, "aliases": list(DEFAULT_ALIASES), "gender": "male"},
     "ai": {"enabled": False, "base_url": "", "model": "", "embedding_model": "", "auto_apply": False, "timeout_s": 20, "max_tokens": 320},
     "voice": {"enabled": False, "trigger_words": [],
               "window_s": 20, "reply": "speak", "room": "", "stt": {"base_url": "", "model": "", "language": "ru", "max_seconds": 15}},
@@ -111,6 +111,8 @@ class SettingsService:
         if key == "default_event_minutes" and not 5 <= value <= 24 * 60:
             raise ValidationError("Must be 5..1440", fields={key: "5..1440"})
         if key == "identity":
+            if "gender" in value and value["gender"] not in ("male", "female"):
+                raise ValidationError("Gender must be male or female", fields={key: "gender: male or female"})
             if "name" in value:
                 name = value["name"].strip()
                 if not name:

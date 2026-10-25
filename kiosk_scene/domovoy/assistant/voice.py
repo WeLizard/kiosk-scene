@@ -107,7 +107,8 @@ class VoiceGateway:
 
     def _deliver(self, result: dict[str, Any], room: str, reply_mode: str | None) -> dict[str, Any]:
         mode = reply_mode or self.config().get("reply") or "speak"
-        reply = result.get("reply") or ""
+        reply = self.app.speech.render(result.get("reply") or "")
+        result["reply"] = reply
         result["spoken"] = False
         self._avatar_react(result, reply)
         if mode == "speak" and reply and self.app.settings.get("speakers"):

@@ -39,9 +39,11 @@ class TelegramFrontend:
             return handled
 
     def _help(self) -> str:
-        return (f"Я {display_name(self.app.settings)}. Напиши, например: «Где резисторы?», "
-                "«Добавь в список покупок молоко», «Напомни через 20 минут выключить духовку».\n"
-                "/today — события, задачи и напоминания сегодня\n/shopping — список покупок\n/help — помощь")
+        return self.app.speech.render(
+            f"Я {display_name(self.app.settings)}. Напиши, например: «Где резисторы?», "
+            "«Добавь в список покупок молоко», «Напомни через 20 минут выключить духовку».\n"
+            "/today — события, задачи и напоминания сегодня\n/shopping — список покупок\n/help — помощь"
+        )
 
     def _owner(self, chat_id: str) -> bool:
         return any(contact["is_self"] and self._address(contact) == chat_id for contact in self.app.contacts.list())
@@ -57,7 +59,7 @@ class TelegramFrontend:
         for row in rows:
             # Never re-run a claimed command: external effects cannot be rolled back with SQLite.
             address = row["chat_id"] if row["chat_id"] and self._owner(row["chat_id"]) else None
-            self._finish(row["update_id"], "uncertain", address, UNCERTAIN)
+            self._finish(row["update_id"], "uncertain", address, self.app.speech.render(UNCERTAIN))
 
     def _handle(self, uid: int, update: dict[str, Any]) -> None:
         message = update.get("message")
@@ -95,8 +97,8 @@ class TelegramFrontend:
                                       "username": str(chat.get("username") or "")[:100], "at": self.app.clock.now_iso()})
                         self.app.db.set_setting("telegram.link_requests", links[-20:])
                         self.app.db.emit(conn, "contacts.changed", {"link_requests": len(links)})
-                    self._finish(uid, "paired", address,
-                                 "Для команд владелец должен связать этот личный чат с контактом «Я» в Интеграциях → Контакты.")
+                    self._finish(uid, "paired", address, self.app.speech.render(
+                        "Для команд владелец должен связать этот личный чат с контактом «Я» в Интеграциях → Контакты."))
             else:
                 self._finish(uid, "ignored")
             return

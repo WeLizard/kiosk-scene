@@ -1993,8 +1993,9 @@ function fn(e, n, t) {
       oe(c.timezone);
       const p = ee("Имя ассистента", "Так к нему обращаются и так он представляется в ответах. Имя распознаётся всегда; в «Других обращениях» можно добавить падежи, старое имя и ники.", ce(t, [
         { name: "identity_name", label: "Имя", required: !0, value: r.identity?.name ?? "Домовой", wide: !0 },
+        { name: "identity_gender", label: "Как говорить о себе", type: "select", options: [{ value: "male", label: "В мужском роде — «понял», «готов»" }, { value: "female", label: "В женском роде — «поняла», «готова»" }], value: r.identity?.gender ?? "male", hint: "Влияет на формы речи; нейтральные «Записано» и «Готово» не меняются.", wide: !0 },
         { name: "identity_aliases", label: "Другие обращения", type: "textarea", rows: 3, value: un(r.identity?.aliases), hint: "Через запятую или с новой строки. Например: нейри, нейрия, нейрию. Для «домового» падежи уже добавлены.", wide: !0 }
-      ], (y) => ({ identity: { name: String(y.identity_name).trim(), aliases: Ze(String(y.identity_aliases)) } }), u)), m = ee("Общие", null, ce(t, [
+      ], (y) => ({ identity: { name: String(y.identity_name).trim(), gender: String(y.identity_gender), aliases: Ze(String(y.identity_aliases)) } }), u)), m = ee("Общие", null, ce(t, [
         { name: "timezone", label: "Часовой пояс", type: "select", options: mn(r.timezone), value: r.timezone, hint: `Сейчас на сервере: ${c.timezone}`, wide: !0 },
         { name: "default_reminder_hour", label: "Во сколько напоминать, если сказали только «завтра» (час)", type: "number", min: 0, max: 23, required: !0, value: r.default_reminder_hour, wide: !0 },
         { name: "default_event_minutes", label: "Длительность события по умолчанию, минут", type: "number", min: 5, max: 1440, required: !0, value: r.default_event_minutes, wide: !0 }

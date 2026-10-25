@@ -14,6 +14,7 @@ class Identity(AppCase):
         identity = self.app.settings.get("identity")
         self.assertEqual(identity["name"], DEFAULT_NAME)
         self.assertEqual(identity["aliases"], DEFAULT_ALIASES)
+        self.assertEqual(identity["gender"], "male")
         self.assertEqual(self.app.settings.get("voice")["trigger_words"], [])
 
     def test_pipeline_strips_the_configured_name_and_alias_forms(self) -> None:
@@ -41,3 +42,21 @@ class Identity(AppCase):
             self.app.settings.update({"identity": {"name": "Нейри", "aliases": ["x"] * 21}})
         with self.assertRaises(ValidationError):
             self.app.settings.update({"identity": {"name": "x" * 41}})
+        with self.assertRaises(ValidationError):
+            self.app.settings.update({"identity": {"gender": "neutral"}})
+
+    def test_female_speech_changes_first_person_forms_but_not_the_owner(self) -> None:
+        self.app.settings.update({"identity": {"gender": "female"}})
+        self.assertEqual(self.app.speech.render("Не уверен, что понял. Владелец должен связать."),
+                         "Не уверена, что поняла. Владелец должен связать.")
+        self.assertEqual(self.app.speech.render("«я понял» и я понял"), "«я понял» и я поняла")
+        answer = self.say("абракадабра без команды")
+        self.assertEqual(answer["status"], "rejected")
+        self.assertTrue(answer["reply"].startswith("Не поняла."), answer["reply"])
+        self.assertTrue(self.app.commands.list()[0]["reply"].startswith("Не поняла."))
+        self.assertEqual(self.app.speech.render("Готов."), "Готова.")
+
+    def test_greeting_is_answered_instead_of_rejected(self) -> None:
+        for text in ("На связи", "привет", "ты здесь?"):
+            answer = self.say(text)
+            self.assertEqual((answer["status"], answer["reply"]), ("answered", "На связи."), text)

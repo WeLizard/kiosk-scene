@@ -80,8 +80,9 @@ export function mountSettings(host: HTMLElement, _params: Record<string, unknown
       setServerTimezone(state.timezone);
       const identity = panel("Имя ассистента", "Так к нему обращаются и так он представляется в ответах. Имя распознаётся всегда; в «Других обращениях» можно добавить падежи, старое имя и ники.", saveForm(runtime, [
         { name: "identity_name", label: "Имя", required: true, value: s.identity?.name ?? "Домовой", wide: true },
+        { name: "identity_gender", label: "Как говорить о себе", type: "select", options: [{ value: "male", label: "В мужском роде — «понял», «готов»" }, { value: "female", label: "В женском роде — «поняла», «готова»" }], value: s.identity?.gender ?? "male", hint: "Влияет на формы речи; нейтральные «Записано» и «Готово» не меняются.", wide: true },
         { name: "identity_aliases", label: "Другие обращения", type: "textarea", rows: 3, value: lines(s.identity?.aliases), hint: "Через запятую или с новой строки. Например: нейри, нейрия, нейрию. Для «домового» падежи уже добавлены.", wide: true },
-      ], (v) => ({ identity: { name: String(v.identity_name).trim(), aliases: splitList(String(v.identity_aliases)) } }), refresh));
+      ], (v) => ({ identity: { name: String(v.identity_name).trim(), gender: String(v.identity_gender), aliases: splitList(String(v.identity_aliases)) } }), refresh));
 
       const general = panel("Общие", null, saveForm(runtime, [
         { name: "timezone", label: "Часовой пояс", type: "select", options: timezoneOptions(s.timezone), value: s.timezone, hint: `Сейчас на сервере: ${state.timezone}`, wide: true },

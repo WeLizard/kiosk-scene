@@ -17,6 +17,7 @@ from .providers.speak import SpeakSender
 from .providers.stt import SttProvider
 from .providers.telegram import TelegramProvider
 from .secret_store import SecretsStore
+from .speech import SpeechStyle
 from .services.audit import AuditLog
 from .services.avatar import AvatarState
 from .services.calendar import CalendarService
@@ -97,7 +98,8 @@ class Domovoy:
         self.reminders = ReminderService(self.db, self.clock, self.audit, self.delivery)
         self.triggers = TriggerEngine(self.reminders, self.presence, self.clock)
         self.calendar = CalendarService(self.db, self.clock, self.audit, self.search, caldav=self.caldav, ha=self.ha, settings=self.settings)
-        self.commands = CommandLog(self.db, self.clock)
+        self.speech = SpeechStyle(self.settings)
+        self.commands = CommandLog(self.db, self.clock, style=self.speech.render)
         self.sessions = SessionStore(self.db, self.clock)
         self.review = ReviewQueue(self.db, self.clock)
         self.retention = RetentionService(self.db, self.clock, lambda: self.settings.get("retention"))

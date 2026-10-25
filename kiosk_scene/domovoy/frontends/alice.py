@@ -24,7 +24,7 @@ class AliceFrontend:
         self.app, self.pipeline, self.voice = app, pipeline, voice
 
     def _response(self, payload: dict[str, Any], text: str, *, end: bool = False) -> dict[str, Any]:
-        spoken = speakable(text)
+        spoken = speakable(self.app.speech.render(text))
         return {"response": {"text": spoken, "tts": spoken, "end_session": end}, "version": payload.get("version", "1.0")}
 
     def handle(self, payload: dict[str, Any]) -> dict[str, Any]:

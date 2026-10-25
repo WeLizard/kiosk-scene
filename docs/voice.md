@@ -74,7 +74,8 @@ How it works:
    never pauses (a TV, an appliance) is not sent; it raises the noise floor instead.
 2. Each utterance is downsampled to 16 kHz mono WAV and posted to `/domovoy-api/api/voice/command` with the room.
 3. The server transcribes it and looks for a **trigger word**: the name and other forms from *Настройки → Имя
-   ассистента* («домовой» by default), plus any extra words in *Настройки → Голос*. Without the trigger
+   ассистента* («домовой» by default), plus any extra words in *Настройки → Голос*. Там же выбирается род речи:
+   мужской («понял», «готов») или женский («поняла», «готова»). Without the trigger
    — and outside the follow-up window opened by the last command in that room (20 s by default) — the transcript is
    dropped: not stored, not logged, nothing shown. Audio itself is never stored.
 4. With the trigger, the sentence is interpreted; the answer is spoken by the speakers and shown on the avatar.
