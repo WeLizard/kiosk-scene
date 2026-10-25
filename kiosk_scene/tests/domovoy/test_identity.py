@@ -55,6 +55,9 @@ class Identity(AppCase):
         self.assertTrue(answer["reply"].startswith("Не поняла."), answer["reply"])
         self.assertTrue(self.app.commands.list()[0]["reply"].startswith("Не поняла."))
         self.assertEqual(self.app.speech.render("Готов."), "Готова.")
+        note = self.say("Запомни, у меня день рождения 3 августа")
+        self.assertEqual((note["status"], note["reply"]), ("applied", "Запомнила."))
+        self.assertEqual(self.app.speech.render("Отметил использование."), "Отметила использование.")
 
     def test_greeting_is_answered_instead_of_rejected(self) -> None:
         for text in ("На связи", "привет", "ты здесь?"):
