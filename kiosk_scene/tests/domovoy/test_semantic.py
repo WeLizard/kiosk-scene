@@ -52,6 +52,12 @@ class Semantic(AppCase):
             answer = self.say("какой у меня размер обуви?")
             self.assertEqual(answer["status"], "answered")
             self.assertIn("Ничего", answer["reply"])
+            self.app.search.search = lambda query, limit=5: {"hits": [{
+                "kind": "note", "id": 1, "title": "У меня день рождения 3 августа",
+                "snippet": "У меня день рождения 3 августа", "score": 1.1, "matched_by": ["vector"],
+            }]}
+            answer = self.say("когда у меня день рождения?")
+            self.assertEqual(answer["reply"], "Нашла: У меня день рождения 3 августа.")
         finally:
             self.app.search.search = original
 

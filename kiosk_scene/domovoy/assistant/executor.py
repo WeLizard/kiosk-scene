@@ -298,7 +298,13 @@ class Executor:
                 hits.append(hit)
         if not hits:
             return Outcome(True, "Ничего похожего не нашёл в памяти.", data=result)
-        lines = [f"{h['title']}" + (f" — {h['snippet']}" if h["kind"] in ("note",) else "") for h in hits[:3]]
+        lines = []
+        for hit in hits[:3]:
+            title, snippet = hit["title"].strip(), (hit.get("snippet") or "").strip()
+            if hit["kind"] == "note" and snippet and snippet != title:
+                lines.append(f"{title} — {snippet}")
+            else:
+                lines.append(title)
         return Outcome(True, "Нашёл: " + "; ".join(lines) + ".", refs=[{"kind": h["kind"], "id": h["id"]} for h in hits], data=result)
 
     # ---- reminders, calendar, messages ---------------------------------------------------------
