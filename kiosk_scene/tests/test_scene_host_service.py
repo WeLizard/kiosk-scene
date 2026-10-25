@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import unittest
 import zipfile
 from pathlib import Path
@@ -161,6 +162,17 @@ class ExtensionDiscoveryTests(unittest.TestCase):
             self.assertTrue(found[0]["moduleUrl"].startswith("/scene-extensions/demo/ext.js?v="))
             self.assertEqual(found[0]["config"], {"apiBase": "/demo-api/"})
             self.assertEqual(host.build_bootstrap()["extensions"][0]["id"], "demo")
+
+    def test_module_url_changes_when_content_changes_with_the_same_mtime(self) -> None:
+        with scene_env() as root:
+            host = load_module("scene_host_service")
+            self._make(root, "demo", {"id": "demo", "module": "ext.js"})
+            module = root / "extensions" / "demo" / "ext.js"
+            stat = module.stat()
+            first = host.discover_extensions()[0]["moduleUrl"]
+            module.write_text("export default { changed: true }", encoding="utf-8")
+            os.utime(module, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+            self.assertNotEqual(first, host.discover_extensions()[0]["moduleUrl"])
 
     def test_disabled_and_invalid_extensions_are_skipped(self) -> None:
         with scene_env() as root:

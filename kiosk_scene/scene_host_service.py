@@ -239,11 +239,13 @@ def discover_extensions() -> list[dict[str, Any]]:
                 logging.warning("Extension %s: module %s not found inside its directory", ext_id, module)
                 continue
             config = manifest.get("config")
+            module_stat = module_path.stat()
             found.append(
                 {
                     "id": ext_id,
                     "title": str(manifest.get("title") or ext_id),
-                    "moduleUrl": f"{EXTENSION_URL_PREFIX}/{quote(ext_id)}/{quote(module)}?v={int(module_path.stat().st_mtime)}",
+                    # mtime alone can survive a rebuild (image layers, copied seeds); size breaks the cache too.
+                    "moduleUrl": f"{EXTENSION_URL_PREFIX}/{quote(ext_id)}/{quote(module)}?v={module_stat.st_mtime_ns}-{module_stat.st_size}",
                     "config": config if isinstance(config, dict) else {},
                 }
             )
