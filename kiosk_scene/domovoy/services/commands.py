@@ -31,6 +31,10 @@ class CommandLog:
                reply: str, result: Any = None, error: str | None = None) -> None:
         if self._style:
             reply = self._style(reply)
+            if isinstance(result, list):
+                for row in result:
+                    if isinstance(row, dict) and isinstance(row.get("message"), str):
+                        row["message"] = self._style(row["message"])
         with self.db.write() as conn:
             conn.execute(
                 "UPDATE commands SET status = ?, interpreter = ?, intents = ?, confidence = ?, reply = ?, result = ?, error = ? WHERE id = ?",
