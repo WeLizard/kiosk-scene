@@ -351,6 +351,47 @@ class ProviderResilience(AppCase):
             self.assertNotIn("response_format", second)
             self.assertNotIn("reasoning_effort", second)
 
+    def test_low_token_chat_uses_json_object_and_records_usage(self) -> None:
+        with FakeLLM() as llm:
+            llm.reply = {"intents": []}
+            llm.usage_total = 42
+            provider = OpenAICompatibleProvider(
+                lambda: {"base_url": llm.url + "/v1", "enabled": True, "model": "tiny", "low_tokens": True, "max_tokens": 80},
+                lambda: "SECRET", HealthTracker("llm", self.clock), timeout=2, usage=self.app.usage,
+            )
+            self.assertEqual(provider.chat_json("s", "u", {}), {"intents": []})
+            payload = json.loads(llm.requests[0][3])
+            self.assertEqual(payload["response_format"], {"type": "json_object"})
+            self.assertEqual(payload["max_tokens"], 80)
+            self.assertNotIn("json_schema", payload["response_format"])
+            self.assertEqual(self.app.usage.snapshot()["used"], 42)
+
+    def test_monthly_budget_stops_chat_before_the_request(self) -> None:
+        self.app.settings.update({"ai": {"monthly_token_budget": 10}})
+        self.app.usage.record(10)
+        with FakeLLM() as llm:
+            provider = OpenAICompatibleProvider(
+                lambda: {"base_url": llm.url + "/v1", "enabled": True, "model": "tiny"},
+                lambda: "", HealthTracker("llm", self.clock), timeout=2, usage=self.app.usage,
+            )
+            with self.assertRaises(ProviderError) as stopped:
+                provider.chat_json("s", "u", {})
+            self.assertEqual(stopped.exception.code, "budget")
+            self.assertEqual(llm.requests, [])
+
+    def test_embeddings_can_use_a_separate_local_endpoint_without_the_cloud_key(self) -> None:
+        with FakeLLM() as chat, FakeLLM() as embed:
+            provider = OpenAICompatibleProvider(
+                lambda: {"base_url": chat.url + "/v1", "embedding_base_url": embed.url + "/v1", "enabled": True,
+                         "model": "tiny", "embedding_model": "embed"},
+                lambda: "SECRET", HealthTracker("llm", self.clock), timeout=2,
+            )
+            self.assertEqual(len(provider.embed(["hello"])[0]), embed.embed_dim)
+            self.assertEqual(chat.requests, [])
+            self.assertEqual(len(embed.requests), 1)
+            headers = {k.lower(): v for k, v in embed.requests[0][2].items()}
+            self.assertNotIn("authorization", headers)
+
     def test_heavy_jobs_share_one_slot_and_fail_fast(self) -> None:
         gate = ResourceGate(1)
         with FakeLLM() as llm:

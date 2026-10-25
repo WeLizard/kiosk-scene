@@ -103,6 +103,12 @@ needs 10–20 s per JSON answer, so it must not sit on the path of every command
 `lfm2.5:8b-a1b` is the speed/quality compromise on that hardware. The integration accepts any OpenAI-compatible
 `/v1` endpoint (Ollama, llama.cpp, LM Studio); the router falls back to the model only when it is not confident.
 
+For a metered cloud API, keep `embedding_base_url` pointed at the local Ollama (`http://127.0.0.1:11434/v1`): the
+semantic router and search then never spend cloud tokens. `ai.low_tokens` sends a compact JSON-object request
+instead of the full schema, `ai.max_tokens` caps each answer, and `ai.monthly_token_budget` refuses further chat calls
+once the month's reported usage reaches the limit. Usage is shown on the Integrations page; the API key is write-only
+and belongs to the chat address it was saved for.
+
 Secrets (Telegram token, CalDAV password, HA token, LLM key) are **write-only**: the API and UI can set them and see
 that they are set, never read them back; they are excluded from exports and live in `secrets.json` (mode 0600). A secret
 belongs to the address it was saved for: changing an integration's address to a different host forgets its secret, so

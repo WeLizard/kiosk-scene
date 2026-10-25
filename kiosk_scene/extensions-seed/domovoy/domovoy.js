@@ -26,7 +26,7 @@ function wt(e) {
 function $(e, ...n) {
   wt(e), je(e, n);
 }
-class I {
+class N {
   callbacks = [];
   disposed = !1;
   add(n) {
@@ -68,7 +68,7 @@ function xt(e) {
   return e.endsWith("/") ? e : `${e}/`;
 }
 function _t(e, n) {
-  const t = n && typeof n == "object" ? n : {}, s = (t.error && typeof t.error == "object" ? t.error : null) ?? t, o = typeof s.message == "string" ? s.message : typeof t.error == "string" ? t.error : `Request failed (HTTP ${e})`, r = s.fields && typeof s.fields == "object" ? Object.fromEntries(Object.entries(s.fields).map(([l, c]) => [l, String(c)])) : void 0;
+  const t = n && typeof n == "object" ? n : {}, s = (t.error && typeof t.error == "object" ? t.error : null) ?? t, o = typeof s.message == "string" ? s.message : typeof t.error == "string" ? t.error : `Request failed (HTTP ${e})`, r = s.fields && typeof s.fields == "object" ? Object.fromEntries(Object.entries(s.fields).map(([l, d]) => [l, String(d)])) : void 0;
   return {
     code: typeof s.code == "string" ? s.code : `http_${e}`,
     message: o,
@@ -80,12 +80,12 @@ function St(e) {
   const n = e.fetchImpl ?? ((...o) => globalThis.fetch(...o)), t = xt(e.baseUrl);
   function i(o, r) {
     const l = new URL(o.replace(/^\/+/, ""), new URL(t, globalThis.location?.href ?? "http://localhost/"));
-    for (const [c, d] of Object.entries(r ?? {}))
-      d != null && d !== "" && l.searchParams.set(c, String(d));
+    for (const [d, c] of Object.entries(r ?? {}))
+      c != null && c !== "" && l.searchParams.set(d, String(c));
     return l.toString();
   }
   async function s(o, r = {}) {
-    const l = new AbortController(), c = r.timeoutMs ?? e.timeoutMs ?? 15e3, d = setTimeout(() => l.abort(new DOMException("Request timed out", "TimeoutError")), c), u = () => l.abort(r.signal?.reason);
+    const l = new AbortController(), d = r.timeoutMs ?? e.timeoutMs ?? 15e3, c = setTimeout(() => l.abort(new DOMException("Request timed out", "TimeoutError")), d), u = () => l.abort(r.signal?.reason);
     r.signal?.addEventListener("abort", u, { once: !0 }), r.signal?.aborted && u();
     try {
       const p = { Accept: "application/json", ...e.headers ?? {}, ...r.headers ?? {} }, m = e.getToken?.();
@@ -123,7 +123,7 @@ function St(e) {
         }
       };
     } finally {
-      clearTimeout(d), r.signal?.removeEventListener("abort", u);
+      clearTimeout(c), r.signal?.removeEventListener("abort", u);
     }
   }
   return { request: s, url: i };
@@ -136,87 +136,87 @@ function Tt(e, n) {
   return e === Ce || n === e || n.startsWith(`${e}.`);
 }
 function At(e) {
-  const n = e.path ?? "events", t = e.waitSeconds ?? 25, i = (e.graceSeconds ?? 10) * 1e3, s = e.minBackoffMs ?? 1e3, o = e.maxBackoffMs ?? 3e4, r = e.random ?? Math.random, l = /* @__PURE__ */ new Map(), c = /* @__PURE__ */ new Set();
-  let d = "connecting", u = null, p = !1, m = !1, v = 0, b = null, h = null, w = !1;
-  function g(f) {
-    if (d !== f) {
-      d = f;
-      for (const S of Array.from(c))
-        S(f);
+  const n = e.path ?? "events", t = e.waitSeconds ?? 25, i = (e.graceSeconds ?? 10) * 1e3, s = e.minBackoffMs ?? 1e3, o = e.maxBackoffMs ?? 3e4, r = e.random ?? Math.random, l = /* @__PURE__ */ new Map(), d = /* @__PURE__ */ new Set();
+  let c = "connecting", u = null, p = !1, m = !1, v = 0, b = null, h = null, w = !1;
+  function g(C) {
+    if (c !== C) {
+      c = C;
+      for (const f of Array.from(d))
+        f(C);
     }
   }
-  function y(f) {
-    for (const [S, q] of Array.from(l.entries()))
-      if (!(!Tt(S, f.topic) && f.topic !== Ce))
-        for (const V of Array.from(q))
+  function y(C) {
+    for (const [f, _] of Array.from(l.entries()))
+      if (!(!Tt(f, C.topic) && C.topic !== Ce))
+        for (const M of Array.from(_))
           try {
-            V(f);
+            M(C);
           } catch {
           }
   }
-  function _(f) {
-    return new Promise((S) => {
-      const q = () => {
-        clearTimeout(V), h = null, S();
-      }, V = setTimeout(q, f);
-      h = q;
+  function S(C) {
+    return new Promise((f) => {
+      const _ = () => {
+        clearTimeout(M), h = null, f();
+      }, M = setTimeout(_, C);
+      h = _;
     });
   }
   const z = () => {
-    typeof document > "u" || document.hidden || (w = !0, !p && !m && e.pauseWhenHidden !== !1 && F(), h?.(), b?.abort(new DOMException("resume", "AbortError")));
+    typeof document > "u" || document.hidden || (w = !0, !p && !m && e.pauseWhenHidden !== !1 && V(), h?.(), b?.abort(new DOMException("resume", "AbortError")));
   };
   async function j() {
     p = !0;
     try {
       for (; !m && !(e.pauseWhenHidden !== !1 && typeof document < "u" && document.hidden); ) {
         b = new AbortController();
-        let f = !1;
-        const S = setTimeout(() => {
-          f = !0, b?.abort(new DOMException("poll timeout", "TimeoutError"));
-        }, t * 1e3 + i), q = await e.http.request(n, {
+        let C = !1;
+        const f = setTimeout(() => {
+          C = !0, b?.abort(new DOMException("poll timeout", "TimeoutError"));
+        }, t * 1e3 + i), _ = await e.http.request(n, {
           query: { since: u ?? void 0, timeout: u === null ? 0 : t },
           signal: b.signal,
           timeoutMs: t * 1e3 + i
         });
-        if (clearTimeout(S), b = null, m)
+        if (clearTimeout(f), b = null, m)
           break;
-        if (!q.ok && q.error.code === "aborted" && !f)
+        if (!_.ok && _.error.code === "aborted" && !C)
           continue;
-        if (!q.ok || !$t(q.data)) {
+        if (!_.ok || !$t(_.data)) {
           v += 1, g(v >= 3 ? "offline" : "reconnecting");
           const X = Math.min(o, s * 2 ** Math.min(v - 1, 10));
-          await _(X / 2 + r() * (X / 2)), w = !0;
+          await S(X / 2 + r() * (X / 2)), w = !0;
           continue;
         }
-        const V = q.data, vt = u;
-        u = typeof V.cursor == "number" ? V.cursor : u;
+        const M = _.data, vt = u;
+        u = typeof M.cursor == "number" ? M.cursor : u;
         const yt = v > 0;
-        v = 0, g("live"), (V.reset || w || yt) && ((vt !== null || V.reset) && y({ topic: Ce, payload: { resync: !0, reset: V.reset === !0 }, cursor: u ?? void 0 }), w = !1);
-        for (const X of V.events ?? [])
+        v = 0, g("live"), (M.reset || w || yt) && ((vt !== null || M.reset) && y({ topic: Ce, payload: { resync: !0, reset: M.reset === !0 }, cursor: u ?? void 0 }), w = !1);
+        for (const X of M.events ?? [])
           y({ topic: X.topic, payload: X.payload, cursor: X.seq });
       }
     } finally {
       p = !1;
     }
   }
-  function F() {
+  function V() {
     p || m || (typeof document < "u" && e.pauseWhenHidden !== !1 && (document.removeEventListener("visibilitychange", z), document.addEventListener("visibilitychange", z)), j());
   }
   return {
     id: e.id,
-    status: () => d,
-    start: F,
-    subscribe(f, S) {
-      let q = l.get(f);
-      return q || (q = /* @__PURE__ */ new Set(), l.set(f, q)), q.add(S), !p && !m && F(), () => {
-        q?.delete(S), q && q.size === 0 && l.delete(f);
+    status: () => c,
+    start: V,
+    subscribe(C, f) {
+      let _ = l.get(C);
+      return _ || (_ = /* @__PURE__ */ new Set(), l.set(C, _)), _.add(f), !p && !m && V(), () => {
+        _?.delete(f), _ && _.size === 0 && l.delete(C);
       };
     },
-    onStatus(f) {
-      return c.add(f), () => c.delete(f);
+    onStatus(C) {
+      return d.add(C), () => d.delete(C);
     },
     close() {
-      m = !0, b?.abort(new DOMException("closed", "AbortError")), h?.(), typeof document < "u" && document.removeEventListener("visibilitychange", z), l.clear(), c.clear();
+      m = !0, b?.abort(new DOMException("closed", "AbortError")), h?.(), typeof document < "u" && document.removeEventListener("visibilitychange", z), l.clear(), d.clear();
     }
   };
 }
@@ -232,9 +232,9 @@ const Et = {
   olderData: "Showing older data",
   renderFailed: "This view could not be displayed."
 };
-let N = { ...Et };
+let R = { ...Et };
 function Ct(e) {
-  N = { ...N, ...e };
+  R = { ...R, ...e };
 }
 function A(e, n = {}) {
   return a(
@@ -255,16 +255,16 @@ function D(e, n = "neutral") {
 function tt(e, n, t) {
   return a("div", { class: "ks-empty" }, a("strong", null, e), n ? a("p", null, n) : null, t);
 }
-function nt(e = N.loading) {
+function nt(e = R.loading) {
   return a("div", { class: "ks-loading", role: "status", aria: { live: "polite" } }, a("span", { class: "ks-spinner", aria: { hidden: !0 } }), e);
 }
-function Ne(e, n) {
+function ze(e, n) {
   return a(
     "div",
     { class: "ks-error", role: "alert" },
     a("strong", null, e.message),
     e.code ? a("small", null, e.code) : null,
-    n && e.retryable !== !1 ? A(N.retry, { onClick: n }) : null
+    n && e.retryable !== !1 ? A(R.retry, { onClick: n }) : null
   );
 }
 let at = 0;
@@ -277,7 +277,7 @@ function ue(e) {
     const l = a(
       "select",
       { id: n, name: e.name, required: e.required },
-      (e.options ?? []).map((c) => a("option", { value: c.value, selected: String(e.value ?? "") === c.value }, c.label))
+      (e.options ?? []).map((d) => a("option", { value: d.value, selected: String(e.value ?? "") === d.value }, d.label))
     );
     l.value = String(e.value ?? e.options?.[0]?.value ?? ""), i = l;
   } else t === "checkbox" ? i = a("input", { id: n, name: e.name, type: "checkbox", checked: e.value === !0 }) : i = a("input", {
@@ -310,15 +310,15 @@ function ue(e) {
   };
 }
 function pe(e, n) {
-  const t = Object.fromEntries(e.map((l) => [l.name, ue(l)])), i = a("div", { class: "ks-form-error", role: "alert", hidden: !0 }), s = A(n.submitLabel ?? N.save, { variant: "primary", type: "submit" }), o = a("form", { class: "ks-form", novalidate: !0 }, i, a("div", { class: "ks-form-grid" }, Object.values(t).map((l) => l.el)), a("div", { class: "ks-form-actions" }, s, n.extraActions)), r = {
+  const t = Object.fromEntries(e.map((l) => [l.name, ue(l)])), i = a("div", { class: "ks-form-error", role: "alert", hidden: !0 }), s = A(n.submitLabel ?? R.save, { variant: "primary", type: "submit" }), o = a("form", { class: "ks-form", novalidate: !0 }, i, a("div", { class: "ks-form-grid" }, Object.values(t).map((l) => l.el)), a("div", { class: "ks-form-actions" }, s, n.extraActions)), r = {
     el: o,
     fields: t,
     values: () => Object.fromEntries(Object.values(t).map((l) => [l.name, l.value()])),
     showErrors(l) {
-      for (const d of Object.values(t))
-        d.setError(l?.fields?.[d.name] ?? null);
-      const c = l && (!l.fields || Object.keys(l.fields).length === 0) ? l.message : "";
-      i.textContent = c, i.hidden = !c;
+      for (const c of Object.values(t))
+        c.setError(l?.fields?.[c.name] ?? null);
+      const d = l && (!l.fields || Object.keys(l.fields).length === 0) ? l.message : "";
+      i.textContent = d, i.hidden = !d;
     },
     setBusy(l) {
       s.disabled = l, o.toggleAttribute("aria-busy", l);
@@ -326,12 +326,12 @@ function pe(e, n) {
   };
   return o.addEventListener("submit", (l) => {
     l.preventDefault();
-    let c = !0;
-    for (const d of e) {
-      const u = t[d.name].value();
-      d.required && (u === "" || u === !1) ? (t[d.name].setError(N.required), c = !1) : t[d.name].setError(null);
+    let d = !0;
+    for (const c of e) {
+      const u = t[c.name].value();
+      c.required && (u === "" || u === !1) ? (t[c.name].setError(R.required), d = !1) : t[c.name].setError(null);
     }
-    c && (r.showErrors(null), r.setBusy(!0), Promise.resolve(n.onSubmit(r.values(), r)).finally(() => r.setBusy(!1)));
+    d && (r.showErrors(null), r.setBusy(!0), Promise.resolve(n.onSubmit(r.values(), r)).finally(() => r.setBusy(!1)));
   }), r;
 }
 function Me(e, n, t) {
@@ -344,7 +344,7 @@ function Me(e, n, t) {
       a("thead", null, a("tr", null, e.map((i) => a("th", { scope: "col", class: i.className }, i.header)))),
       a("tbody", null, n.map((i) => a("tr", null, e.map((s) => a("td", { class: s.className, dataset: { label: s.header } }, s.render(i))))))
     )
-  ) : t ?? tt(N.nothingHere);
+  ) : t ?? tt(R.nothingHere);
 }
 const re = [];
 function fe(e, n) {
@@ -353,18 +353,18 @@ function fe(e, n) {
   };
   const s = new Promise((m) => {
     i = m;
-  }), o = new I(), r = (m) => {
+  }), o = new N(), r = (m) => {
     if (o.isDisposed)
       return;
     o.dispose();
     const v = re.indexOf(u);
     v >= 0 && re.splice(v, 1), u.remove(), t?.focus?.(), i(m);
-  }, l = typeof n == "function" ? n(r) : n, c = `ks-dialog-title-${at += 1}`, d = a(
+  }, l = typeof n == "function" ? n(r) : n, d = `ks-dialog-title-${at += 1}`, c = a(
     "div",
-    { class: "ks-dialog", role: "dialog", aria: { modal: !0, labelledby: c }, tabindex: -1 },
-    a("div", { class: "ks-dialog-head" }, a("h2", { id: c }, e), A("×", { variant: "ghost", title: N.close, onClick: () => r(void 0) })),
+    { class: "ks-dialog", role: "dialog", aria: { modal: !0, labelledby: d }, tabindex: -1 },
+    a("div", { class: "ks-dialog-head" }, a("h2", { id: d }, e), A("×", { variant: "ghost", title: R.close, onClick: () => r(void 0) })),
     a("div", { class: "ks-dialog-body" }, l)
-  ), u = a("div", { class: "ks-overlay" }, d);
+  ), u = a("div", { class: "ks-overlay" }, c);
   u.addEventListener("mousedown", (m) => {
     m.target === u && r(void 0);
   });
@@ -375,7 +375,7 @@ function fe(e, n) {
         return;
       }
       if (m.key === "Tab") {
-        const v = Array.from(d.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])")).filter((w) => !w.hasAttribute("disabled"));
+        const v = Array.from(c.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])")).filter((w) => !w.hasAttribute("disabled"));
         if (!v.length) {
           m.preventDefault();
           return;
@@ -385,7 +385,7 @@ function fe(e, n) {
       }
     }
   };
-  return document.addEventListener("keydown", p, !0), o.add(() => document.removeEventListener("keydown", p, !0)), document.body.appendChild(u), re.push(u), (d.querySelector("input, select, textarea, button.ks-btn-primary") ?? d).focus(), { el: u, close: r, closed: s };
+  return document.addEventListener("keydown", p, !0), o.add(() => document.removeEventListener("keydown", p, !0)), document.body.appendChild(u), re.push(u), (c.querySelector("input, select, textarea, button.ks-btn-primary") ?? c).focus(), { el: u, close: r, closed: s };
 }
 function it(e) {
   return fe(
@@ -397,19 +397,19 @@ function it(e) {
       a(
         "div",
         { class: "ks-form-actions" },
-        A(N.cancel, { onClick: () => t(!1) }),
-        A(e.confirmLabel ?? N.confirm, { variant: e.destructive ? "danger" : "primary", onClick: () => t(!0) })
+        A(R.cancel, { onClick: () => t(!1) }),
+        A(e.confirmLabel ?? R.confirm, { variant: e.destructive ? "danger" : "primary", onClick: () => t(!0) })
       )
     )
   ).closed.then((t) => t === !0);
 }
 let le = null;
-function C(e, n = "neutral", t = 4500) {
+function O(e, n = "neutral", t = 4500) {
   (!le || !le.isConnected) && (le = a("div", { class: "ks-toasts", role: "status", aria: { live: "polite" } }), document.body.appendChild(le));
   const i = a("div", { class: `ks-toast ks-toast-${n}` }, e);
   le.appendChild(i), setTimeout(() => i.remove(), t);
 }
-function R(e) {
+function U(e) {
   let n = 0, t = null, i = !1, s = !1;
   const o = a("div", { class: "ks-stale-banner", role: "alert", hidden: !0 }), r = a("div", { class: "ks-async-content" });
   $(e.host, o, r);
@@ -417,19 +417,19 @@ function R(e) {
     if (s)
       return;
     t?.abort(), t = new AbortController();
-    const c = n += 1;
-    (!i || e.keepStale === !1) && $(r, nt()), e.load(t.signal).then((d) => {
-      if (!(s || c !== n)) {
-        if (d.ok) {
+    const d = n += 1;
+    (!i || e.keepStale === !1) && $(r, nt()), e.load(t.signal).then((c) => {
+      if (!(s || d !== n)) {
+        if (c.ok) {
           try {
-            const u = e.render(d.data, l);
+            const u = e.render(c.data, l);
             i = !0, o.hidden = !0, $(r, u);
           } catch (u) {
-            console.error("View render failed", u), $(r, Ne({ code: "render_failed", message: N.renderFailed, retryable: !0 }, l));
+            console.error("View render failed", u), $(r, ze({ code: "render_failed", message: R.renderFailed, retryable: !0 }, l));
           }
           return;
         }
-        d.error.code !== "aborted" && (i ? (o.hidden = !1, $(o, `${N.olderData} — ${d.error.message} `, A(N.retry, { variant: "ghost", onClick: l }))) : $(r, Ne(d.error, l)));
+        c.error.code !== "aborted" && (i ? (o.hidden = !1, $(o, `${R.olderData} — ${c.error.message} `, A(R.retry, { variant: "ghost", onClick: l }))) : $(r, ze(c.error, l)));
       }
     });
   };
@@ -446,7 +446,7 @@ function Re(e, n) {
   const t = document.createElement("style");
   t.id = e, t.textContent = n, document.head.appendChild(t);
 }
-const qt = 1, Ot = '.ks-admin,.ks-dialog,.ks-toasts,.ks-scope{--ks-bg: #f5f7f9;--ks-surface: #ffffff;--ks-surface-2: #eef2f5;--ks-border: #d5dde4;--ks-text: #1c2833;--ks-muted: #5c6b78;--ks-accent: #2464a8;--ks-accent-text: #ffffff;--ks-good: #1f7a4d;--ks-warn: #9a6100;--ks-bad: #b3261e;--ks-info: #2464a8;--ks-radius: 10px;--ks-shadow: 0 1px 2px rgba(20, 30, 40, .06), 0 4px 14px rgba(20, 30, 40, .06);--ks-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;font-family:var(--ks-font);color:var(--ks-text)}@media(prefers-color-scheme:dark){.ks-admin,.ks-dialog,.ks-toasts,.ks-scope:not([data-theme=kiosk]){--ks-bg: #12181e;--ks-surface: #1a222a;--ks-surface-2: #222c36;--ks-border: #33404c;--ks-text: #e6ecf1;--ks-muted: #96a5b2;--ks-accent: #5b9be0;--ks-accent-text: #0b1620;--ks-good: #5cc493;--ks-warn: #e0a84a;--ks-bad: #f08a83;--ks-info: #5b9be0;--ks-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .35)}}.ks-admin *,.ks-dialog *,.ks-toasts *,.ks-scope *{box-sizing:border-box}.ks-scope[data-theme=kiosk]{--ks-bg: transparent;--ks-surface: rgba(255, 255, 255, .72);--ks-surface-2: rgba(32, 48, 65, .06);--ks-border: rgba(32, 48, 65, .12);--ks-text: #203041;--ks-muted: rgba(32, 48, 65, .66)}.ks-admin{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;min-height:100dvh;background:var(--ks-bg);font-size:15px;line-height:1.45}.ks-sidebar{position:sticky;top:0;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:8px;padding:16px 12px;background:var(--ks-surface);border-right:1px solid var(--ks-border);overflow-y:auto}.ks-brand{padding:4px 10px 12px;font-weight:700;font-size:17px;letter-spacing:-.01em}.ks-nav-list{display:flex;flex-direction:column;gap:2px}.ks-nav-group{margin:12px 10px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ks-muted)}.ks-nav-item,.ks-bottom-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--ks-text);text-decoration:none;min-height:40px}.ks-nav-item:hover{background:var(--ks-surface-2)}.ks-nav-item[aria-current=page]{background:color-mix(in srgb,var(--ks-accent) 14%,transparent);color:var(--ks-accent);font-weight:600}.ks-nav-icon{width:22px;text-align:center;flex:none}.ks-nav-footer{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:12px;border-top:1px solid var(--ks-border)}.ks-nav-footer-link{padding:6px 10px;color:var(--ks-muted);text-decoration:none;font-size:13px}.ks-content{min-width:0;display:flex;flex-direction:column}.ks-topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px 20px;background:color-mix(in srgb,var(--ks-bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--ks-border)}.ks-topbar-title{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ks-menu-button,.ks-bottom-nav,.ks-scrim{display:none}.ks-main-view{flex:1;padding:20px;outline:none;max-width:1200px;width:100%}.ks-conn{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-muted);white-space:nowrap}.ks-conn[data-state=live]{color:var(--ks-good)}.ks-conn[data-state=reconnecting],.ks-conn[data-state=connecting]{color:var(--ks-warn)}.ks-conn[data-state=offline]{color:var(--ks-bad);border-color:var(--ks-bad)}@media(max-width:899px){.ks-admin{display:block;padding-bottom:64px}.ks-sidebar{position:fixed;inset:0 auto 0 0;z-index:30;width:min(84vw,300px);transform:translate(-102%);transition:transform .18s ease;box-shadow:var(--ks-shadow)}.ks-admin:not([data-menu=open]) .ks-sidebar{visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s}.ks-admin[data-menu=open] .ks-sidebar{transform:none}.ks-admin[data-menu=open] .ks-scrim{display:block;position:fixed;inset:0;z-index:20;background:#0006}.ks-menu-button{display:inline-flex}.ks-topbar{padding:10px 12px}.ks-topbar-title{font-size:17px}.ks-main-view{padding:14px 12px}.ks-bottom-nav{position:fixed;inset:auto 0 0;z-index:10;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ks-surface);border-top:1px solid var(--ks-border);padding-bottom:env(safe-area-inset-bottom,0)}.ks-bottom-item{flex-direction:column;gap:2px;justify-content:center;padding:8px 4px;font-size:11px;border-radius:0;min-height:56px;color:var(--ks-muted)}.ks-bottom-item[aria-current=page]{color:var(--ks-accent);font-weight:600}.ks-bottom-item .ks-nav-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.ks-page{display:flex;flex-direction:column;gap:16px}.ks-card{background:var(--ks-surface);border:1px solid var(--ks-border);border-radius:var(--ks-radius);padding:16px;box-shadow:var(--ks-shadow);min-width:0}.ks-card>h2,.ks-card>header>h2{margin:0 0 10px;font-size:15px;font-weight:700}.ks-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.ks-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}.ks-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.ks-row-spread{justify-content:space-between}.ks-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ks-toolbar .ks-grow{flex:1;min-width:180px}.ks-muted{color:var(--ks-muted)}.ks-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.ks-list>li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--ks-border);min-width:0}.ks-list>li:last-child{border-bottom:0}.ks-list .ks-grow{flex:1;min-width:0}.ks-list .ks-title{font-weight:600;overflow-wrap:anywhere}.ks-list .ks-sub{color:var(--ks-muted);font-size:13px;overflow-wrap:anywhere}.ks-done{text-decoration:line-through;color:var(--ks-muted)}.ks-tree{list-style:none;margin:0;padding-left:18px;border-left:1px dashed var(--ks-border)}.ks-tree.ks-tree-root{padding-left:0;border-left:0}.ks-tree-node{padding:3px 0}.ks-btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;font:inherit;font-size:14px;min-height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer;touch-action:manipulation}.ks-btn:hover:not(:disabled){background:var(--ks-surface-2)}.ks-btn:focus-visible,.ks-field input:focus-visible,.ks-field select:focus-visible,.ks-field textarea:focus-visible,.ks-nav-item:focus-visible,.ks-bottom-item:focus-visible{outline:2px solid var(--ks-accent);outline-offset:1px}.ks-btn:disabled{opacity:.55;cursor:default}.ks-btn-primary{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text);font-weight:600}.ks-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--ks-accent) 88%,black)}.ks-btn-danger{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 50%,var(--ks-border))}.ks-btn-ghost{border-color:transparent;background:transparent}.ks-btn-sm{min-height:30px;padding:0 10px;font-size:13px}.ks-form{display:flex;flex-direction:column;gap:12px}.ks-form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}.ks-form-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.ks-form-error,.ks-field-error{color:var(--ks-bad);font-size:13px}.ks-field{display:flex;flex-direction:column;gap:4px;min-width:0}.ks-field-wide{grid-column:1 / -1}.ks-field label{font-size:13px;font-weight:600;color:var(--ks-muted)}.ks-field input:not([type=checkbox]),.ks-field select,.ks-field textarea,.ks-input{font:inherit;font-size:16px;width:100%;min-height:40px;padding:8px 10px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text)}.ks-field-check{flex-direction:row;align-items:center;gap:8px}.ks-field.has-error input,.ks-field.has-error select,.ks-field.has-error textarea{border-color:var(--ks-bad)}.ks-field-hint{color:var(--ks-muted);font-size:12px}.ks-required{color:var(--ks-bad)}.ks-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--ks-border);background:var(--ks-surface-2);color:var(--ks-muted);white-space:nowrap}.ks-badge-good{color:var(--ks-good);border-color:color-mix(in srgb,var(--ks-good) 40%,var(--ks-border))}.ks-badge-warn{color:var(--ks-warn);border-color:color-mix(in srgb,var(--ks-warn) 40%,var(--ks-border))}.ks-badge-bad{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 40%,var(--ks-border))}.ks-badge-info{color:var(--ks-info);border-color:color-mix(in srgb,var(--ks-info) 40%,var(--ks-border))}.ks-empty,.ks-loading,.ks-error{padding:28px 16px;text-align:center;color:var(--ks-muted)}.ks-empty strong,.ks-error strong{display:block;color:var(--ks-text);margin-bottom:4px}.ks-error{color:var(--ks-bad);display:flex;flex-direction:column;align-items:center;gap:8px}.ks-spinner{display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-3px;border:2px solid var(--ks-border);border-top-color:var(--ks-accent);border-radius:50%;animation:ks-spin .8s linear infinite}@keyframes ks-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ks-spinner{animation-duration:3s}}.ks-stale-banner{padding:8px 12px;margin-bottom:10px;border-radius:8px;background:color-mix(in srgb,var(--ks-warn) 14%,var(--ks-surface));color:var(--ks-warn);font-size:13px}.ks-table-wrap{overflow-x:auto}.ks-table{width:100%;border-collapse:collapse;font-size:14px}.ks-table th,.ks-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--ks-border);vertical-align:top}.ks-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ks-muted)}@media(max-width:640px){.ks-table thead{display:none}.ks-table,.ks-table tbody,.ks-table tr,.ks-table td{display:block;width:100%}.ks-table tr{padding:8px 0;border-bottom:1px solid var(--ks-border)}.ks-table td{border:0;padding:2px 4px}.ks-table td:before{content:attr(data-label) ": ";color:var(--ks-muted);font-size:12px}.ks-table td[data-label=""]:before{content:none}}.ks-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:#00000073}.ks-dialog{width:min(560px,100%);max-height:92vh;overflow:auto;background:var(--ks-surface);border-radius:14px;box-shadow:var(--ks-shadow);border:1px solid var(--ks-border)}.ks-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ks-border)}.ks-dialog-head h2{margin:0;font-size:16px}.ks-dialog-body{padding:16px}.ks-toasts{position:fixed;z-index:120;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}.ks-toast{padding:10px 14px;border-radius:10px;background:var(--ks-text);color:var(--ks-bg);box-shadow:var(--ks-shadow);font-size:14px}.ks-toast-good{background:var(--ks-good);color:#fff}.ks-toast-bad{background:var(--ks-bad);color:#fff}@media(max-width:899px){.ks-toasts{bottom:72px}}.ks-chip{font:inherit;font-size:14px;min-height:34px;padding:4px 12px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer}.ks-chip.is-active{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text)}.ks-link{font:inherit;padding:0;border:0;background:none;color:var(--ks-accent);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}.ks-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}.ks-filters .ks-field{flex:1 1 200px;min-width:0}.ks-list-click>li{cursor:pointer}.ks-list-click>li:hover,.ks-list-click>li:focus-visible{background:var(--ks-surface-2);outline:none}@media(max-width:640px){.ks-hide-narrow{display:none}}', Dt = Ot, st = "domovoy.api", ot = "domovoy.actions", be = "domovoy.events", Y = (e, n = ["id"]) => Object.fromEntries(Object.entries(e).filter(([t]) => !n.includes(t))), H = (e) => (n) => `${e}/${encodeURIComponent(String(n.id))}`, He = {
+const Ot = 1, qt = '.ks-admin,.ks-dialog,.ks-toasts,.ks-scope{--ks-bg: #f5f7f9;--ks-surface: #ffffff;--ks-surface-2: #eef2f5;--ks-border: #d5dde4;--ks-text: #1c2833;--ks-muted: #5c6b78;--ks-accent: #2464a8;--ks-accent-text: #ffffff;--ks-good: #1f7a4d;--ks-warn: #9a6100;--ks-bad: #b3261e;--ks-info: #2464a8;--ks-radius: 10px;--ks-shadow: 0 1px 2px rgba(20, 30, 40, .06), 0 4px 14px rgba(20, 30, 40, .06);--ks-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;font-family:var(--ks-font);color:var(--ks-text)}@media(prefers-color-scheme:dark){.ks-admin,.ks-dialog,.ks-toasts,.ks-scope:not([data-theme=kiosk]){--ks-bg: #12181e;--ks-surface: #1a222a;--ks-surface-2: #222c36;--ks-border: #33404c;--ks-text: #e6ecf1;--ks-muted: #96a5b2;--ks-accent: #5b9be0;--ks-accent-text: #0b1620;--ks-good: #5cc493;--ks-warn: #e0a84a;--ks-bad: #f08a83;--ks-info: #5b9be0;--ks-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .35)}}.ks-admin *,.ks-dialog *,.ks-toasts *,.ks-scope *{box-sizing:border-box}.ks-scope[data-theme=kiosk]{--ks-bg: transparent;--ks-surface: rgba(255, 255, 255, .72);--ks-surface-2: rgba(32, 48, 65, .06);--ks-border: rgba(32, 48, 65, .12);--ks-text: #203041;--ks-muted: rgba(32, 48, 65, .66)}.ks-admin{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;min-height:100dvh;background:var(--ks-bg);font-size:15px;line-height:1.45}.ks-sidebar{position:sticky;top:0;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:8px;padding:16px 12px;background:var(--ks-surface);border-right:1px solid var(--ks-border);overflow-y:auto}.ks-brand{padding:4px 10px 12px;font-weight:700;font-size:17px;letter-spacing:-.01em}.ks-nav-list{display:flex;flex-direction:column;gap:2px}.ks-nav-group{margin:12px 10px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ks-muted)}.ks-nav-item,.ks-bottom-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--ks-text);text-decoration:none;min-height:40px}.ks-nav-item:hover{background:var(--ks-surface-2)}.ks-nav-item[aria-current=page]{background:color-mix(in srgb,var(--ks-accent) 14%,transparent);color:var(--ks-accent);font-weight:600}.ks-nav-icon{width:22px;text-align:center;flex:none}.ks-nav-footer{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:12px;border-top:1px solid var(--ks-border)}.ks-nav-footer-link{padding:6px 10px;color:var(--ks-muted);text-decoration:none;font-size:13px}.ks-content{min-width:0;display:flex;flex-direction:column}.ks-topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px 20px;background:color-mix(in srgb,var(--ks-bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--ks-border)}.ks-topbar-title{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ks-menu-button,.ks-bottom-nav,.ks-scrim{display:none}.ks-main-view{flex:1;padding:20px;outline:none;max-width:1200px;width:100%}.ks-conn{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-muted);white-space:nowrap}.ks-conn[data-state=live]{color:var(--ks-good)}.ks-conn[data-state=reconnecting],.ks-conn[data-state=connecting]{color:var(--ks-warn)}.ks-conn[data-state=offline]{color:var(--ks-bad);border-color:var(--ks-bad)}@media(max-width:899px){.ks-admin{display:block;padding-bottom:64px}.ks-sidebar{position:fixed;inset:0 auto 0 0;z-index:30;width:min(84vw,300px);transform:translate(-102%);transition:transform .18s ease;box-shadow:var(--ks-shadow)}.ks-admin:not([data-menu=open]) .ks-sidebar{visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s}.ks-admin[data-menu=open] .ks-sidebar{transform:none}.ks-admin[data-menu=open] .ks-scrim{display:block;position:fixed;inset:0;z-index:20;background:#0006}.ks-menu-button{display:inline-flex}.ks-topbar{padding:10px 12px}.ks-topbar-title{font-size:17px}.ks-main-view{padding:14px 12px}.ks-bottom-nav{position:fixed;inset:auto 0 0;z-index:10;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--ks-surface);border-top:1px solid var(--ks-border);padding-bottom:env(safe-area-inset-bottom,0)}.ks-bottom-item{flex-direction:column;gap:2px;justify-content:center;padding:8px 4px;font-size:11px;border-radius:0;min-height:56px;color:var(--ks-muted)}.ks-bottom-item[aria-current=page]{color:var(--ks-accent);font-weight:600}.ks-bottom-item .ks-nav-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.ks-page{display:flex;flex-direction:column;gap:16px}.ks-card{background:var(--ks-surface);border:1px solid var(--ks-border);border-radius:var(--ks-radius);padding:16px;box-shadow:var(--ks-shadow);min-width:0}.ks-card>h2,.ks-card>header>h2{margin:0 0 10px;font-size:15px;font-weight:700}.ks-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.ks-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}.ks-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.ks-row-spread{justify-content:space-between}.ks-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ks-toolbar .ks-grow{flex:1;min-width:180px}.ks-muted{color:var(--ks-muted)}.ks-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.ks-list>li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--ks-border);min-width:0}.ks-list>li:last-child{border-bottom:0}.ks-list .ks-grow{flex:1;min-width:0}.ks-list .ks-title{font-weight:600;overflow-wrap:anywhere}.ks-list .ks-sub{color:var(--ks-muted);font-size:13px;overflow-wrap:anywhere}.ks-done{text-decoration:line-through;color:var(--ks-muted)}.ks-tree{list-style:none;margin:0;padding-left:18px;border-left:1px dashed var(--ks-border)}.ks-tree.ks-tree-root{padding-left:0;border-left:0}.ks-tree-node{padding:3px 0}.ks-btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;font:inherit;font-size:14px;min-height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer;touch-action:manipulation}.ks-btn:hover:not(:disabled){background:var(--ks-surface-2)}.ks-btn:focus-visible,.ks-field input:focus-visible,.ks-field select:focus-visible,.ks-field textarea:focus-visible,.ks-nav-item:focus-visible,.ks-bottom-item:focus-visible{outline:2px solid var(--ks-accent);outline-offset:1px}.ks-btn:disabled{opacity:.55;cursor:default}.ks-btn-primary{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text);font-weight:600}.ks-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--ks-accent) 88%,black)}.ks-btn-danger{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 50%,var(--ks-border))}.ks-btn-ghost{border-color:transparent;background:transparent}.ks-btn-sm{min-height:30px;padding:0 10px;font-size:13px}.ks-form{display:flex;flex-direction:column;gap:12px}.ks-form-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}.ks-form-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.ks-form-error,.ks-field-error{color:var(--ks-bad);font-size:13px}.ks-field{display:flex;flex-direction:column;gap:4px;min-width:0}.ks-field-wide{grid-column:1 / -1}.ks-field label{font-size:13px;font-weight:600;color:var(--ks-muted)}.ks-field input:not([type=checkbox]),.ks-field select,.ks-field textarea,.ks-input{font:inherit;font-size:16px;width:100%;min-height:40px;padding:8px 10px;border-radius:8px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text)}.ks-field-check{flex-direction:row;align-items:center;gap:8px}.ks-field.has-error input,.ks-field.has-error select,.ks-field.has-error textarea{border-color:var(--ks-bad)}.ks-field-hint{color:var(--ks-muted);font-size:12px}.ks-required{color:var(--ks-bad)}.ks-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--ks-border);background:var(--ks-surface-2);color:var(--ks-muted);white-space:nowrap}.ks-badge-good{color:var(--ks-good);border-color:color-mix(in srgb,var(--ks-good) 40%,var(--ks-border))}.ks-badge-warn{color:var(--ks-warn);border-color:color-mix(in srgb,var(--ks-warn) 40%,var(--ks-border))}.ks-badge-bad{color:var(--ks-bad);border-color:color-mix(in srgb,var(--ks-bad) 40%,var(--ks-border))}.ks-badge-info{color:var(--ks-info);border-color:color-mix(in srgb,var(--ks-info) 40%,var(--ks-border))}.ks-empty,.ks-loading,.ks-error{padding:28px 16px;text-align:center;color:var(--ks-muted)}.ks-empty strong,.ks-error strong{display:block;color:var(--ks-text);margin-bottom:4px}.ks-error{color:var(--ks-bad);display:flex;flex-direction:column;align-items:center;gap:8px}.ks-spinner{display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-3px;border:2px solid var(--ks-border);border-top-color:var(--ks-accent);border-radius:50%;animation:ks-spin .8s linear infinite}@keyframes ks-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ks-spinner{animation-duration:3s}}.ks-stale-banner{padding:8px 12px;margin-bottom:10px;border-radius:8px;background:color-mix(in srgb,var(--ks-warn) 14%,var(--ks-surface));color:var(--ks-warn);font-size:13px}.ks-table-wrap{overflow-x:auto}.ks-table{width:100%;border-collapse:collapse;font-size:14px}.ks-table th,.ks-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--ks-border);vertical-align:top}.ks-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ks-muted)}@media(max-width:640px){.ks-table thead{display:none}.ks-table,.ks-table tbody,.ks-table tr,.ks-table td{display:block;width:100%}.ks-table tr{padding:8px 0;border-bottom:1px solid var(--ks-border)}.ks-table td{border:0;padding:2px 4px}.ks-table td:before{content:attr(data-label) ": ";color:var(--ks-muted);font-size:12px}.ks-table td[data-label=""]:before{content:none}}.ks-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:#00000073}.ks-dialog{width:min(560px,100%);max-height:92vh;overflow:auto;background:var(--ks-surface);border-radius:14px;box-shadow:var(--ks-shadow);border:1px solid var(--ks-border)}.ks-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ks-border)}.ks-dialog-head h2{margin:0;font-size:16px}.ks-dialog-body{padding:16px}.ks-toasts{position:fixed;z-index:120;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}.ks-toast{padding:10px 14px;border-radius:10px;background:var(--ks-text);color:var(--ks-bg);box-shadow:var(--ks-shadow);font-size:14px}.ks-toast-good{background:var(--ks-good);color:#fff}.ks-toast-bad{background:var(--ks-bad);color:#fff}@media(max-width:899px){.ks-toasts{bottom:72px}}.ks-chip{font:inherit;font-size:14px;min-height:34px;padding:4px 12px;border-radius:999px;border:1px solid var(--ks-border);background:var(--ks-surface);color:var(--ks-text);cursor:pointer}.ks-chip.is-active{background:var(--ks-accent);border-color:var(--ks-accent);color:var(--ks-accent-text)}.ks-link{font:inherit;padding:0;border:0;background:none;color:var(--ks-accent);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}.ks-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}.ks-filters .ks-field{flex:1 1 200px;min-width:0}.ks-list-click>li{cursor:pointer}.ks-list-click>li:hover,.ks-list-click>li:focus-visible{background:var(--ks-surface-2);outline:none}@media(max-width:640px){.ks-hide-narrow{display:none}}', Dt = qt, st = "domovoy.api", ot = "domovoy.actions", be = "domovoy.events", Y = (e, n = ["id"]) => Object.fromEntries(Object.entries(e).filter(([t]) => !n.includes(t))), H = (e) => (n) => `${e}/${encodeURIComponent(String(n.id))}`, Ue = {
   "command.send": { title: "Отправить команду", method: "POST", path: () => "api/command", body: (e) => e },
   "command.undo": { title: "Отменить команду", method: "POST", path: (e) => `api/commands/${e.id}/undo`, body: () => ({}) },
   "items.create": { title: "Добавить предмет", method: "POST", path: () => "api/items", body: (e) => e },
@@ -490,17 +490,17 @@ const qt = 1, Ot = '.ks-admin,.ks-dialog,.ks-toasts,.ks-scope{--ks-bg: #f5f7f9;-
   "backup.create": { title: "Сделать резервную копию", method: "POST", path: () => "api/backup", body: () => ({}) },
   "data.import": { title: "Импортировать данные", method: "POST", path: () => "api/import", body: (e) => e.data, destructive: !0 },
   "voice.text": { title: "Голосовая команда (текст)", method: "POST", path: () => "api/voice/command", body: (e) => e }
-}, qe = "domovoy.token";
+}, Oe = "domovoy.token";
 function jt() {
   try {
-    return window.localStorage.getItem(qe);
+    return window.localStorage.getItem(Oe);
   } catch {
     return null;
   }
 }
 function Mt(e) {
   try {
-    e ? window.localStorage.setItem(qe, e) : window.localStorage.removeItem(qe);
+    e ? window.localStorage.setItem(Oe, e) : window.localStorage.removeItem(Oe);
   } catch {
   }
 }
@@ -523,17 +523,17 @@ function Pt(e) {
   }, actions: {
     id: ot,
     describe() {
-      return Object.entries(He).map(([s, o]) => ({ id: s, title: o.title, destructive: o.destructive }));
+      return Object.entries(Ue).map(([s, o]) => ({ id: s, title: o.title, destructive: o.destructive }));
     },
     async invoke(s, o, r) {
-      const l = He[s];
+      const l = Ue[s];
       if (!l)
         return { ok: !1, error: { code: "unknown_action", message: `Unknown action ${s}` } };
-      const c = o ?? {};
-      return n.request(l.path(c), {
+      const d = o ?? {};
+      return n.request(l.path(d), {
         method: l.method,
-        body: l.body ? l.body(c) : void 0,
-        query: l.query?.(c),
+        body: l.body ? l.body(d) : void 0,
+        query: l.query?.(d),
         signal: r?.signal
       });
     }
@@ -610,7 +610,7 @@ let rt = "";
 function oe(e) {
   rt = e;
 }
-function Z() {
+function K() {
   return rt || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 function lt(e, n) {
@@ -626,32 +626,32 @@ function lt(e, n) {
   });
   return Object.fromEntries(t.formatToParts(e).map((i) => [i.type, i.value]));
 }
-function ie(e, n = Z()) {
+function ie(e, n = K()) {
   const t = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(e);
   if (!t)
     throw new Error(`Invalid local time: ${e}`);
-  const [i, s, o, r, l] = t.slice(1).map(Number), c = Date.UTC(i, s - 1, o, r, l);
-  let d = c;
+  const [i, s, o, r, l] = t.slice(1).map(Number), d = Date.UTC(i, s - 1, o, r, l);
+  let c = d;
   for (let u = 0; u < 2; u += 1) {
-    const p = lt(new Date(d), n), m = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute));
-    d += c - m;
+    const p = lt(new Date(c), n), m = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute));
+    c += d - m;
   }
-  return new Date(d).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return new Date(c).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
-function ae(e, n = Z()) {
+function ae(e, n = K()) {
   const t = lt(new Date(e), n);
   return `${t.year}-${t.month}-${t.day}T${t.hour}:${t.minute}`;
 }
-function L(e, n = Z()) {
+function I(e, n = K()) {
   return e ? new Intl.DateTimeFormat("ru-RU", { timeZone: n, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(e)) : "—";
 }
-function se(e, n = Z()) {
+function se(e, n = K()) {
   return new Intl.DateTimeFormat("ru-RU", { timeZone: n, hour: "2-digit", minute: "2-digit" }).format(new Date(e));
 }
-function Lt(e, n = Z()) {
+function Lt(e, n = K()) {
   return new Intl.DateTimeFormat("ru-RU", { timeZone: n, weekday: "long", day: "numeric", month: "long" }).format(new Date(e));
 }
-function J(e, n = Z()) {
+function G(e, n = K()) {
   return ae(e, n).slice(0, 10);
 }
 function Pe(e, n = Date.now()) {
@@ -673,7 +673,7 @@ function he(e) {
 function Le(e, n = "") {
   return e == null ? "" : `${Number.isInteger(e) ? String(e) : String(Math.round(e * 1e3) / 1e3)} ${n}`.trim();
 }
-const Be = ["ui", "telegram", "speak", "ha_notify"], xe = ["tasks", "shopping", "chores"], we = {
+const He = ["ui", "telegram", "speak", "ha_notify"], xe = ["tasks", "shopping", "chores"], we = {
   add_item: { title: "Запомнить вещь", fields: [{ name: "name", label: "Название", kind: "str" }, { name: "quantity", label: "Количество", kind: "num" }, { name: "unit", label: "Ед.", kind: "str" }, { name: "location_path", label: "Место (через →)", kind: "path" }, { name: "notes", label: "Заметки", kind: "str" }, { name: "mode", label: "Как менять количество", kind: "enum", options: ["set", "add"] }] },
   place_item: { title: "Положить вещь", fields: [{ name: "name", label: "Название", kind: "str" }, { name: "quantity", label: "Количество", kind: "num" }, { name: "unit", label: "Ед.", kind: "str" }, { name: "location_path", label: "Место (через →)", kind: "path" }] },
   move_item: { title: "Переместить вещь", fields: [{ name: "name", label: "Название", kind: "str" }, { name: "location_path", label: "Новое место (через →)", kind: "path" }, { name: "use_last", label: "Последнюю упомянутую", kind: "bool" }] },
@@ -685,7 +685,7 @@ const Be = ["ui", "telegram", "speak", "ha_notify"], xe = ["tasks", "shopping", 
   list_location: { title: "Что лежит в месте", fields: [{ name: "location_path", label: "Место (через →)", kind: "path" }] },
   add_note: { title: "Заметка", fields: [{ name: "title", label: "Заголовок", kind: "str" }, { name: "text", label: "Текст", kind: "str" }] },
   query_memory: { title: "Вспомнить", fields: [{ name: "query", label: "Запрос", kind: "str" }] },
-  create_reminder: { title: "Напоминание", fields: [{ name: "text", label: "О чём", kind: "str" }, { name: "when", label: "Когда", kind: "iso" }, { name: "channel", label: "Как", kind: "enum", options: Be }, { name: "recipient", label: "Кому", kind: "str" }, { name: "trigger", label: "Условие", kind: "json" }, { name: "recurrence", label: "Повтор", kind: "json" }] },
+  create_reminder: { title: "Напоминание", fields: [{ name: "text", label: "О чём", kind: "str" }, { name: "when", label: "Когда", kind: "iso" }, { name: "channel", label: "Как", kind: "enum", options: He }, { name: "recipient", label: "Кому", kind: "str" }, { name: "trigger", label: "Условие", kind: "json" }, { name: "recurrence", label: "Повтор", kind: "json" }] },
   query_reminders: { title: "Активные напоминания", fields: [] },
   complete_reminder: { title: "Выполнить напоминание", fields: [{ name: "reminder_id", label: "Номер", kind: "num" }] },
   snooze_reminder: { title: "Отложить напоминание", fields: [{ name: "reminder_id", label: "Номер", kind: "num" }, { name: "minutes", label: "Минут", kind: "num" }] },
@@ -694,7 +694,7 @@ const Be = ["ui", "telegram", "speak", "ha_notify"], xe = ["tasks", "shopping", 
   update_event: { title: "Перенести/изменить событие", fields: [{ name: "title", label: "Какое событие", kind: "str" }, { name: "new_title", label: "Новое название", kind: "str" }, { name: "new_start", label: "Новое начало", kind: "iso" }, { name: "new_end", label: "Новый конец", kind: "iso" }] },
   delete_event: { title: "Удалить событие", fields: [{ name: "title", label: "Какое событие", kind: "str" }] },
   query_calendar: { title: "Что в календаре", fields: [{ name: "start", label: "С", kind: "iso" }, { name: "end", label: "По", kind: "iso" }] },
-  send_message: { title: "Сообщение", fields: [{ name: "recipient", label: "Кому", kind: "str" }, { name: "text", label: "Текст", kind: "str" }, { name: "channel", label: "Как", kind: "enum", options: Be }, { name: "when", label: "Когда", kind: "iso" }] },
+  send_message: { title: "Сообщение", fields: [{ name: "recipient", label: "Кому", kind: "str" }, { name: "text", label: "Текст", kind: "str" }, { name: "channel", label: "Как", kind: "enum", options: He }, { name: "when", label: "Когда", kind: "iso" }] },
   add_task: { title: "Задача", fields: [{ name: "title", label: "Название", kind: "str" }, { name: "list", label: "Список", kind: "enum", options: xe }, { name: "due_date", label: "Срок (ГГГГ-ММ-ДД)", kind: "str" }] },
   add_shopping: { title: "В список покупок", fields: [{ name: "items", label: "Что купить (через запятую)", kind: "list" }] },
   complete_task: { title: "Отметить задачу", fields: [{ name: "title", label: "Какая", kind: "str" }, { name: "list", label: "Список", kind: "enum", options: xe }] },
@@ -718,7 +718,7 @@ function ut(e, n = (t) => t) {
   const i = t.fields.filter((s) => e[s.name] !== void 0 && e[s.name] !== null && e[s.name] !== "" && e[s.name] !== !1).map((s) => `${s.label.replace(/ \(.*\)$/, "")}: ${s.kind === "iso" ? n(String(e[s.name])) : ct(s, e[s.name])}`);
   return i.length ? `${t.title} — ${i.join("; ")}` : t.title;
 }
-function zt(e, n, t) {
+function Nt(e, n, t) {
   const i = we[String(e.type)], s = { ...e };
   for (const o of i?.fields ?? []) {
     if (!(o.name in n) || o.kind === "json")
@@ -732,9 +732,9 @@ function zt(e, n, t) {
     if (!l)
       delete s[o.name];
     else if (o.kind === "num") {
-      const c = Number(l.replace(",", "."));
-      s[o.name] = Number.isFinite(c) ? c : l;
-    } else o.kind === "path" ? s[o.name] = l.split(/→|->|>/).map((c) => c.trim()).filter(Boolean) : o.kind === "list" ? s[o.name] = l.split(",").map((c) => c.trim()).filter(Boolean) : o.kind === "iso" ? s[o.name] = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(l) ? t(l) : l : s[o.name] = l;
+      const d = Number(l.replace(",", "."));
+      s[o.name] = Number.isFinite(d) ? d : l;
+    } else o.kind === "path" ? s[o.name] = l.split(/→|->|>/).map((d) => d.trim()).filter(Boolean) : o.kind === "list" ? s[o.name] = l.split(",").map((d) => d.trim()).filter(Boolean) : o.kind === "iso" ? s[o.name] = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(l) ? t(l) : l : s[o.name] = l;
   }
   return s;
 }
@@ -748,75 +748,75 @@ async function E(e, n, t, i = {}) {
   if (i.confirm && !await it({ title: i.confirm.title, message: i.confirm.message, confirmLabel: i.confirm.label ?? k.delete, destructive: !0 }))
     return { ok: !1, error: { code: "cancelled", message: "cancelled" } };
   const s = await mt(e, n, t);
-  return s.ok ? i.success && C(i.success, "good") : C(s.error.message, "bad", 7e3), s;
+  return s.ok ? i.success && O(i.success, "good") : O(s.error.message, "bad", 7e3), s;
 }
 function B(e, n, t, i, s = 250, o) {
   let r = !1;
   const l = () => {
     const u = document.activeElement;
     return !o || !u || !o.contains(u) ? !1 : /^(INPUT|TEXTAREA|SELECT)$/.test(u.tagName) || u.tagName === "BUTTON" && u.closest("form") !== null;
-  }, c = () => {
+  }, d = () => {
     if (l()) {
       r = !0;
       return;
     }
     r = !1, i();
-  }, d = et(c, s);
-  if (n.add(() => d.cancel()), o) {
+  }, c = et(d, s);
+  if (n.add(() => c.cancel()), o) {
     const u = (p) => {
       !r || p.relatedTarget instanceof Node && o.contains(p.relatedTarget) || window.setTimeout(() => {
-        r && !l() && c();
+        r && !l() && d();
       }, 150);
     };
     o.addEventListener("focusout", u), n.add(() => o.removeEventListener("focusout", u));
   }
   for (const u of t)
-    n.add(e.subscribe(be, u, () => d()));
+    n.add(e.subscribe(be, u, () => c()));
 }
 function Ie(e, n) {
   const t = document.activeElement instanceof HTMLElement && e.contains(document.activeElement) ? document.activeElement.dataset.key : void 0;
   n(), t && e.querySelector(`[data-key="${CSS.escape(t)}"]`)?.focus();
 }
-function U(e, n) {
+function F(e, n) {
   return {
     dispose() {
       e.dispose();
     }
   };
 }
-function M(e, n, t) {
+function P(e, n, t) {
   return a("section", { class: "ks-card" }, a("header", null, a("h2", null, e), null), n);
 }
 function ve(e) {
   return D(ne(e), me(e));
 }
-function P(e, n, t, i = "") {
+function L(e, n, t, i = "") {
   return a("li", { class: i }, a("div", { class: "ks-grow" }, a("div", { class: "ks-title" }, e), n ? a("div", { class: "ks-sub" }, n) : null), t ?? null);
 }
 function x(e, n, t = "secondary", i) {
   const s = A(e, { variant: t, onClick: n, title: i });
   return s.classList.add("ks-btn-sm"), s;
 }
-function G(e, ...n) {
+function Z(e, ...n) {
   return a("div", { class: "ks-row ks-row-spread dv-head" }, a("h2", { class: "dv-page-title" }, e), a("div", { class: "ks-row" }, n));
 }
-function O(e = k.empty) {
+function q(e = k.empty) {
   return a("p", { class: "ks-muted" }, e);
 }
-function K(e, n, t, i = {}) {
+function J(e, n, t, i = {}) {
   return fe(e, (o) => {
     const r = pe(n, {
       submitLabel: i.submitLabel ?? k.save,
       extraActions: [A(k.cancel, { onClick: () => o(!1) })],
-      onSubmit: async (l, c) => {
-        const d = await t(l);
-        d.ok ? o(!0) : c.showErrors(d.error);
+      onSubmit: async (l, d) => {
+        const c = await t(l);
+        c.ok ? o(!0) : d.showErrors(c.error);
       }
     });
     return a("div", null, i.note ?? null, r.el);
   }).closed.then((o) => o === !0);
 }
-function Nt(e) {
+function zt(e) {
   const n = {};
   for (const t of e.split(/\r?\n/)) {
     const i = t.indexOf(":"), s = (i >= 0 ? t.slice(0, i) : t).trim(), o = i >= 0 ? t.slice(i + 1).trim() : "";
@@ -828,10 +828,10 @@ function Rt(e) {
   return Object.entries(e ?? {}).map(([n, t]) => `${n}: ${t}`).join(`
 `);
 }
-function Ht(e) {
+function Ut(e) {
   return e.split(/→|->|>|\//).map((n) => n.trim()).filter(Boolean);
 }
-function Bt(e) {
+function Ht(e) {
   if (typeof e != "string" || e.trim() === "")
     return null;
   const n = Number(e.replace(",", "."));
@@ -841,44 +841,44 @@ async function ke(e, n) {
   const [t, i] = await Promise.all([e, n]);
   return t.ok ? i.ok ? { ok: !0, data: [t.data, i.data] } : i : t;
 }
-const Ut = [["audit", "Изменения"], ["commands", "Команды"], ["outbox", "Отправка сообщений"]];
+const Bt = [["audit", "Изменения"], ["commands", "Команды"], ["outbox", "Отправка сообщений"]];
 function Ft(e, n, t) {
-  const i = new I(), s = a("div"), o = a("div", { class: "ks-row dv-chips", role: "tablist" });
+  const i = new N(), s = a("div"), o = a("div", { class: "ks-row dv-chips", role: "tablist" });
   let r = "audit", l = null;
-  const c = () => {
-    l?.dispose(), Ie(o, () => $(o, Ut.map(
+  const d = () => {
+    l?.dispose(), Ie(o, () => $(o, Bt.map(
       ([u, p]) => a("button", { type: "button", role: "tab", dataset: { key: u }, class: `ks-chip${r === u ? " is-active" : ""}`, "aria-selected": String(r === u), onClick: () => {
-        r = u, c();
+        r = u, d();
       } }, p)
-    ))), r === "audit" ? l = R({
+    ))), r === "audit" ? l = U({
       host: s,
       load: (u) => T(t, "api/audit", { limit: 100 }, u),
       render: ({ audit: u }, p) => u.length ? a("ul", { class: "ks-list" }, u.map(
-        (m) => P(
+        (m) => L(
           a("span", null, m.summary, " ", D(m.source, "neutral")),
-          `${L(m.ts)} · ${m.actor}`,
+          `${I(m.ts)} · ${m.actor}`,
           m.undoable ? x(k.undo, async () => {
             (await E(t, "audit.undo", { id: m.id }, { success: "Отменено" })).ok && p();
           }, "ghost") : null
         )
-      )) : O("Изменений пока не было.")
-    }) : r === "commands" ? l = R({
+      )) : q("Изменений пока не было.")
+    }) : r === "commands" ? l = U({
       host: s,
       load: (u) => T(t, "api/commands", { limit: 100 }, u),
       render: ({ commands: u }) => u.length ? a("ul", { class: "ks-list" }, u.map(
-        (p) => P(
-          a("span", null, `«${p.text}»`, " ", d(p.status)),
-          [L(p.ts), p.frontend, p.interpreter ?? "", p.confidence !== null ? `${Math.round(p.confidence * 100)}%` : "", p.reply ?? p.error ?? ""].filter(Boolean).join(" · "),
-          p.intents?.length ? a("details", null, a("summary", null, "Как я понял"), a("ul", null, p.intents.map((m) => a("li", null, ut(m, (v) => L(v)))))) : null
+        (p) => L(
+          a("span", null, `«${p.text}»`, " ", c(p.status)),
+          [I(p.ts), p.frontend, p.interpreter ?? "", p.confidence !== null ? `${Math.round(p.confidence * 100)}%` : "", p.reply ?? p.error ?? ""].filter(Boolean).join(" · "),
+          p.intents?.length ? a("details", null, a("summary", null, "Как я понял"), a("ul", null, p.intents.map((m) => a("li", null, ut(m, (v) => I(v)))))) : null
         )
-      )) : O("Команд пока не было.")
-    }) : l = R({
+      )) : q("Команд пока не было.")
+    }) : l = U({
       host: s,
       load: (u) => T(t, "api/outbox", { limit: 100 }, u),
       render: ({ messages: u }, p) => u.length ? a("ul", { class: "ks-list" }, u.map(
-        (m) => P(
+        (m) => L(
           a("span", null, m.text, " ", ve(m.status)),
-          `${k.channels[m.channel] ?? m.channel} → ${m.recipient || "—"} · ${L(m.created_at)}${m.attempts ? ` · попыток: ${m.attempts}` : ""}${m.last_error ? ` · ${m.last_error}` : ""}`,
+          `${k.channels[m.channel] ?? m.channel} → ${m.recipient || "—"} · ${I(m.created_at)}${m.attempts ? ` · попыток: ${m.attempts}` : ""}${m.last_error ? ` · ${m.last_error}` : ""}`,
           a(
             "div",
             { class: "ks-row" },
@@ -890,14 +890,14 @@ function Ft(e, n, t) {
             }, "danger") : null
           )
         )
-      )) : O("Исходящих сообщений не было.")
+      )) : q("Исходящих сообщений не было.")
     });
-  }, d = (u) => ve(u);
-  return c(), $(e, a("div", { class: "ks-page" }, G(k.activity), o, M("", s))), B(t, i, ["audit", "commands", "outbox", "items", "locations", "notes", "tasks", "reminders", "calendar"], () => l?.refresh(), 500), i.add(() => l?.dispose()), U(i);
+  }, c = (u) => ve(u);
+  return d(), $(e, a("div", { class: "ks-page" }, Z(k.activity), o, P("", s))), B(t, i, ["audit", "commands", "outbox", "items", "locations", "notes", "tasks", "reminders", "calendar"], () => l?.refresh(), 500), i.add(() => l?.dispose()), F(i);
 }
-function Ue(e, n, t, i) {
-  const s = Z(), o = ae(t ? t.start : new Date(Math.ceil(Date.now() / 36e5) * 36e5).toISOString(), s), r = t ? ae(t.end, s) : "", l = n.sources.filter((c) => c.capabilities.includes("create") && c.available);
-  K(
+function Be(e, n, t, i) {
+  const s = K(), o = ae(t ? t.start : new Date(Math.ceil(Date.now() / 36e5) * 36e5).toISOString(), s), r = t ? ae(t.end, s) : "", l = n.sources.filter((d) => d.capabilities.includes("create") && d.available);
+  J(
     t ? `Изменить: ${t.title}` : "Новое событие",
     [
       { name: "title", label: k.title, required: !0, value: t?.title ?? "", wide: !0 },
@@ -906,39 +906,39 @@ function Ue(e, n, t, i) {
       { name: "all_day", label: "Весь день", type: "checkbox", value: t?.all_day ?? !1 },
       { name: "location", label: "Где", value: t?.location ?? "", wide: !0 },
       { name: "notes", label: k.notes, type: "textarea", rows: 2, value: t?.notes ?? "", wide: !0 },
-      ...t ? [] : [{ name: "calendar", label: "Календарь", type: "select", options: l.map((c) => ({ value: c.id, label: c.title })), value: n.default }]
+      ...t ? [] : [{ name: "calendar", label: "Календарь", type: "select", options: l.map((d) => ({ value: d.id, label: d.title })), value: n.default }]
     ],
-    async (c) => {
-      const d = {
-        title: String(c.title).trim(),
-        start: ie(String(c.start), s),
-        all_day: c.all_day === !0,
-        location: String(c.location ?? ""),
-        notes: String(c.notes ?? "")
+    async (d) => {
+      const c = {
+        title: String(d.title).trim(),
+        start: ie(String(d.start), s),
+        all_day: d.all_day === !0,
+        location: String(d.location ?? ""),
+        notes: String(d.notes ?? "")
       };
-      c.end && (d.end = ie(String(c.end), s));
-      const u = t ? await e.invokeAction("domovoy.actions", "calendar.update", { ref: t.ref, ...d }) : await e.invokeAction("domovoy.actions", "calendar.create", { ...d, calendar: c.calendar });
+      d.end && (c.end = ie(String(d.end), s));
+      const u = t ? await e.invokeAction("domovoy.actions", "calendar.update", { ref: t.ref, ...c }) : await e.invokeAction("domovoy.actions", "calendar.create", { ...c, calendar: d.calendar });
       return u.ok && i(), u;
     }
   );
 }
 function Vt(e, n, t) {
-  const i = new I(), s = a("div");
+  const i = new N(), s = a("div");
   let o = 14, r = { sources: [], default: "local" };
-  const l = A(k.add, { variant: "primary" }), c = A("Показать ещё 2 недели", { variant: "ghost" }), d = R({
+  const l = A(k.add, { variant: "primary" }), d = A("Показать ещё 2 недели", { variant: "ghost" }), c = U({
     host: s,
     load: (u) => {
-      const p = Z(), m = J((/* @__PURE__ */ new Date()).toISOString(), p), v = ie(`${m}T00:00`, p), b = ie(`${J(new Date(Date.parse(`${m}T12:00:00Z`) + o * 864e5).toISOString(), "UTC")}T00:00`, p);
+      const p = K(), m = G((/* @__PURE__ */ new Date()).toISOString(), p), v = ie(`${m}T00:00`, p), b = ie(`${G(new Date(Date.parse(`${m}T12:00:00Z`) + o * 864e5).toISOString(), "UTC")}T00:00`, p);
       return ke(
         T(t, "api/calendar/events", { start: v, end: b }, u),
         T(t, "api/calendar/sources", void 0, u)
       );
     },
     render: ([{ events: u, warnings: p }, m], v) => {
-      r = m, l.onclick = () => Ue(t, r, null, v);
+      r = m, l.onclick = () => Be(t, r, null, v);
       const b = /* @__PURE__ */ new Map();
       for (const h of u) {
-        const w = J(h.start);
+        const w = G(h.start);
         b.set(w, [...b.get(w) ?? [], h]);
       }
       return a(
@@ -951,13 +951,13 @@ function Vt(e, n, t) {
             { class: "ks-card" },
             a("header", null, a("h2", null, Lt(w[0].start))),
             a("ul", { class: "ks-list" }, w.sort((g, y) => g.start.localeCompare(y.start)).map(
-              (g) => P(
+              (g) => L(
                 a("span", null, g.title, g.recurring ? a("span", { class: "ks-muted" }, " ↻") : null, g.read_only ? [" ", D("только чтение", "neutral")] : null),
                 `${g.all_day ? "весь день" : `${se(g.start)}–${se(g.end)}`}${g.location ? ` · ${g.location}` : ""} · ${g.calendar}`,
                 g.read_only ? null : a(
                   "div",
                   { class: "ks-row" },
-                  x(k.edit, () => Ue(t, r, g, v)),
+                  x(k.edit, () => Be(t, r, g, v)),
                   x(k.delete, async () => {
                     (await E(t, "calendar.delete", { ref: g.ref }, { confirm: { title: "Удалить событие", message: `«${g.title}» будет удалено из календаря.` } })).ok && v();
                   }, "danger")
@@ -965,13 +965,13 @@ function Vt(e, n, t) {
               )
             ))
           )
-        ) : O(`На ближайшие ${o} дней событий нет.`)
+        ) : q(`На ближайшие ${o} дней событий нет.`)
       );
     }
   });
-  return c.onclick = () => {
-    o += 14, d.refresh();
-  }, e.replaceChildren(a("div", { class: "ks-page" }, G(k.calendar, l), s, a("div", { class: "ks-row" }, c))), t.readData("domovoy.api", { path: "api/state" }).then((u) => u.ok && oe(u.data.timezone)), B(t, i, ["calendar"], () => d.refresh()), i.add(() => d.dispose()), U(i);
+  return d.onclick = () => {
+    o += 14, c.refresh();
+  }, e.replaceChildren(a("div", { class: "ks-page" }, Z(k.calendar, l), s, a("div", { class: "ks-row" }, d))), t.readData("domovoy.api", { path: "api/state" }).then((u) => u.ok && oe(u.data.timezone)), B(t, i, ["calendar"], () => c.refresh()), i.add(() => c.dispose()), F(i);
 }
 const Yt = {
   home_assistant: "Home Assistant",
@@ -983,11 +983,11 @@ const Yt = {
   stt: "Распознавание речи"
 };
 function de(e, n, t, i, s, o = !1) {
-  const r = i.filter((c) => !s || s.includes(c.domain)), l = [
+  const r = i.filter((d) => !s || s.includes(d.domain)), l = [
     { value: "", label: "Выбрать из Home Assistant" },
-    ...r.map((c) => ({ value: c.id, label: `${c.name} (${c.id})` }))
+    ...r.map((d) => ({ value: d.id, label: `${d.name} (${d.id})` }))
   ];
-  return t && !r.some((c) => c.id === t) && l.push({ value: t, label: `${t} (сейчас не найдено)` }), [
+  return t && !r.some((d) => d.id === t) && l.push({ value: t, label: `${t} (сейчас не найдено)` }), [
     { name: `${e}_pick`, label: n, type: "select", options: l, value: t, wide: !0 },
     {
       name: e,
@@ -1003,28 +1003,28 @@ function Q(e, n, t) {
   const i = String(e[n] ?? "").trim();
   return i !== t ? i : String(e[`${n}_pick`] ?? "").trim() || i;
 }
-const Oe = (e) => Array.isArray(e) ? e.join(`
+const qe = (e) => Array.isArray(e) ? e.join(`
 `) : "", ye = (e) => e.split(/[\n,]/).map((n) => n.trim()).filter(Boolean);
 function te(e, n, t, i) {
   return pe(n, {
     onSubmit: async (o, r) => {
-      const { settings: l, secrets: c } = t(o), d = Object.fromEntries(Object.entries(c ?? {}).filter(([, u]) => u !== ""));
+      const { settings: l, secrets: d } = t(o), c = Object.fromEntries(Object.entries(d ?? {}).filter(([, u]) => u !== ""));
       if (l && Object.keys(l).length) {
         const u = await e.invokeAction("domovoy.actions", "settings.update", l);
         if (!u.ok) {
           r.showErrors(u.error);
           return;
         }
-        (u.data.secrets_cleared ?? []).filter((m) => !(m in d)).length && C("Адрес изменён, поэтому сохранённый ключ сброшен — введите его заново.", "warn", 9e3);
+        (u.data.secrets_cleared ?? []).filter((m) => !(m in c)).length && O("Адрес изменён, поэтому сохранённый ключ сброшен — введите его заново.", "warn", 9e3);
       }
-      if (Object.keys(d).length) {
-        const u = await e.invokeAction("domovoy.actions", "secrets.set", d);
+      if (Object.keys(c).length) {
+        const u = await e.invokeAction("domovoy.actions", "secrets.set", c);
         if (!u.ok) {
           r.showErrors(u.error);
           return;
         }
       }
-      C("Сохранено", "good"), i();
+      O("Сохранено", "good"), i();
     }
   }).el;
 }
@@ -1041,12 +1041,12 @@ function Wt(e, n, t) {
   return x("Проверить", async () => {
     const i = await e.invokeAction("domovoy.actions", "integration.test", { name: n });
     if (!i.ok)
-      C(i.error.message, "bad", 7e3);
+      O(i.error.message, "bad", 7e3);
     else if (i.data.ok) {
       const s = i.data.detail;
-      C(s?.username ? `Связь есть: @${s.username}` : "Связь есть", "good");
+      O(s?.username ? `Связь есть: @${s.username}` : "Связь есть", "good");
     } else
-      C(i.data.error?.message ?? "Не получилось", "bad", 7e3);
+      O(i.data.error?.message ?? "Не получилось", "bad", 7e3);
     t();
   });
 }
@@ -1058,14 +1058,14 @@ function W(e, n, t, i) {
   }), s;
 }
 function Se(e, n, t, i, s, o, r, l) {
-  const c = async (u) => {
+  const d = async (u) => {
     const p = await e.invokeAction("domovoy.actions", "settings.update", { [n]: u });
-    return p.ok ? l() : C(p.error.message, "bad", 7e3), p;
-  }, d = (u) => {
+    return p.ok ? l() : O(p.error.message, "bad", 7e3), p;
+  }, c = (u) => {
     const p = u >= 0 ? t[u] : null;
-    K(p ? `Изменить: ${r}` : `Добавить: ${r}`, s(p), async (m) => {
+    J(p ? `Изменить: ${r}` : `Добавить: ${r}`, s(p), async (m) => {
       const v = t.slice(), b = o(m, p);
-      return u >= 0 ? v[u] = b : v.push(b), c(v);
+      return u >= 0 ? v[u] = b : v.push(b), d(v);
     });
   };
   return a(
@@ -1074,19 +1074,19 @@ function Se(e, n, t, i, s, o, r, l) {
     Me(
       [
         ...i.map((u, p) => ({ key: `c${p}`, header: u.header, render: (m) => u.render(m) })),
-        { key: "a", header: "", render: (u) => a("div", { class: "ks-row" }, x(k.edit, () => d(t.indexOf(u))), x(k.delete, async () => {
-          await c(t.filter((p) => p !== u));
+        { key: "a", header: "", render: (u) => a("div", { class: "ks-row" }, x(k.edit, () => c(t.indexOf(u))), x(k.delete, async () => {
+          await d(t.filter((p) => p !== u));
         }, "danger")) }
       ],
       t,
-      O("Пока не задано.")
+      q("Пока не задано.")
     ),
-    a("div", { class: "ks-row" }, A(k.add, { onClick: () => d(-1) }))
+    a("div", { class: "ks-row" }, A(k.add, { onClick: () => c(-1) }))
   );
 }
-function Kt(e, n, t) {
+function Jt(e, n, t) {
   const i = (o) => {
-    K(
+    J(
       o ? `Изменить: ${o.name}` : "Новый контакт",
       [
         { name: "name", label: "Имя", required: !0, value: o?.name ?? "", wide: !0 },
@@ -1097,40 +1097,40 @@ function Kt(e, n, t) {
       async (r) => {
         const l = { ...o?.channels ?? {} };
         String(r.chat_id).trim() ? l.telegram = { chat_id: String(r.chat_id).trim() } : delete l.telegram;
-        const c = { name: String(r.name).trim(), aliases: ye(String(r.aliases)), channels: l, is_self: r.is_self === !0 }, d = o ? await e.invokeAction("domovoy.actions", "contacts.update", { id: o.id, ...c }) : await e.invokeAction("domovoy.actions", "contacts.create", c);
-        return d.ok && t(), d;
+        const d = { name: String(r.name).trim(), aliases: ye(String(r.aliases)), channels: l, is_self: r.is_self === !0 }, c = o ? await e.invokeAction("domovoy.actions", "contacts.update", { id: o.id, ...d }) : await e.invokeAction("domovoy.actions", "contacts.create", d);
+        return c.ok && t(), c;
       }
     );
   }, s = (o, r) => {
-    const l = n.contacts.map((c) => ({ value: String(c.id), label: c.name }));
-    l.push({ value: "__new__", label: "Создать новый контакт…" }), K(
+    const l = n.contacts.map((d) => ({ value: String(d.id), label: d.name }));
+    l.push({ value: "__new__", label: "Создать новый контакт…" }), J(
       `Привязать ${r}`,
       [
         { name: "contact_id", label: "К контакту", type: "select", options: l, required: !0, value: n.contacts[0]?.id ? String(n.contacts[0].id) : "__new__", wide: !0 },
         { name: "is_self", label: "Это я (владелец) — разрешить команды", type: "checkbox", value: !1, hint: "Команды принимает только контакт с этой галочкой." }
       ],
-      async (c) => {
-        const d = c.is_self === !0;
-        if (c.contact_id === "__new__") {
+      async (d) => {
+        const c = d.is_self === !0;
+        if (d.contact_id === "__new__") {
           const p = await e.invokeAction("domovoy.actions", "contacts.create", {
             name: r,
             aliases: [],
             channels: { telegram: { chat_id: o } },
-            is_self: d
+            is_self: c
           });
           if (!p.ok)
             return p;
           const m = await e.invokeAction("domovoy.actions", "contacts.link", {
             contact_id: p.data.contact.id,
             chat_id: o,
-            is_self: d
+            is_self: c
           });
           return m.ok && t(), m;
         }
         const u = await e.invokeAction("domovoy.actions", "contacts.link", {
-          contact_id: Number(c.contact_id),
+          contact_id: Number(d.contact_id),
           chat_id: o,
-          is_self: d
+          is_self: c
         });
         return u.ok && t(), u;
       }
@@ -1149,7 +1149,7 @@ function Kt(e, n, t) {
         }, "danger")) }
       ],
       n.contacts,
-      O("Контактов нет. Добавьте себя и тех, кому Домовой будет писать.")
+      q("Контактов нет. Добавьте себя и тех, кому Домовой будет писать.")
     ),
     n.linkRequests.length ? a(
       "div",
@@ -1160,14 +1160,14 @@ function Kt(e, n, t) {
     a("div", { class: "ks-row" }, A("Добавить контакт", { onClick: () => i(null) }))
   );
 }
-const Zt = "http://127.0.0.1:48123/domovoy-api/", Gt = "<секрет Assist — нажмите «Показать»>";
+const Kt = "http://127.0.0.1:48123/domovoy-api/", Zt = "<секрет Assist — нажмите «Показать»>";
 function Fe(e, n = "Домовой") {
   const t = n.trim() || "Домовой", i = t.toLowerCase();
   return [
     "# configuration.yaml — один раз",
     "rest_command:",
     "  domovoy_say:",
-    `    url: "${Zt}frontends/assist"`,
+    `    url: "${Kt}frontends/assist"`,
     "    method: POST",
     "    headers:",
     `      X-Domovoy-Secret: "${e}"`,
@@ -1192,32 +1192,32 @@ function Fe(e, n = "Домовой") {
 function pt(e, n) {
   const t = async () => {
     const o = await T(e, "api/security");
-    return o.ok ? o.data : (C(o.error.message, "bad", 7e3), null);
+    return o.ok ? o.data : (O(o.error.message, "bad", 7e3), null);
   }, i = async (o) => {
     try {
-      await navigator.clipboard.writeText(o), C("Скопировано", "good");
+      await navigator.clipboard.writeText(o), O("Скопировано", "good");
     } catch {
-      C("Не удалось скопировать — нажмите «Показать» и выделите вручную", "warn", 7e3);
+      O("Не удалось скопировать — нажмите «Показать» и выделите вручную", "warn", 7e3);
     }
   };
   return { secretRow: (o, r, l) => {
-    const c = a("code", { class: "dv-secret" }, "•".repeat(12));
-    let d = !1;
+    const d = a("code", { class: "dv-secret" }, "•".repeat(12));
+    let c = !1;
     return a(
       "div",
       { class: "dv-secret-row" },
       a("strong", null, o),
-      c,
+      d,
       a(
         "div",
         { class: "ks-row" },
         x("Показать", async () => {
-          if (d) {
-            d = !1, c.textContent = "•".repeat(12);
+          if (c) {
+            c = !1, d.textContent = "•".repeat(12);
             return;
           }
           const u = await t();
-          u && (d = !0, c.textContent = r(u));
+          u && (c = !0, d.textContent = r(u));
         }, "ghost"),
         x("Скопировать", async () => {
           const u = await t();
@@ -1230,7 +1230,7 @@ function pt(e, n) {
     );
   }, fetchSecurity: t, copy: i };
 }
-function Jt(e, n, t) {
+function Gt(e, n, t) {
   const { secretRow: i, fetchSecurity: s, copy: o } = pt(e, n), r = t.identity?.name || "Домовой";
   return a(
     "div",
@@ -1240,7 +1240,7 @@ function Jt(e, n, t) {
     i("Секрет для Home Assistant (Assist)", (l) => l.assist_secret, "assist_secret"),
     a("h3", null, `Голос через Home Assistant (фраза «${r.toLowerCase()} …»)`),
     a("p", { class: "ks-muted" }, "Если Home Assistant работает не на этом же устройстве, замените 127.0.0.1 на адрес, по которому он видит аддон."),
-    a("pre", { class: "dv-code" }, Fe(Gt, r)),
+    a("pre", { class: "dv-code" }, Fe(Zt, r)),
     x("Скопировать YAML с секретом", async () => {
       const l = await s();
       l && await o(Fe(l.assist_secret, r));
@@ -1250,7 +1250,7 @@ function Jt(e, n, t) {
 function Xt(e, n, t) {
   const { secretRow: i } = pt(e, n), s = x("Проверить настройку", async () => {
     const o = await e.invokeAction("domovoy.actions", "alice.test");
-    o.ok ? o.data.ok ? C("Настройка Алисы готова: навык отвечает локально. Публичный адрес и сам навык проверяются в Yandex Dialogs.", "good", 9e3) : C(o.data.error?.message ?? "Настройка не готова", "bad", 8e3) : C(o.error.message, "bad", 8e3), n();
+    o.ok ? o.data.ok ? O("Настройка Алисы готова: навык отвечает локально. Публичный адрес и сам навык проверяются в Yandex Dialogs.", "good", 9e3) : O(o.data.error?.message ?? "Настройка не готова", "bad", 8e3) : O(o.error.message, "bad", 8e3), n();
   }, "secondary");
   return a(
     "div",
@@ -1269,64 +1269,64 @@ function Xt(e, n, t) {
     a("h3", null, "Кому можно говорить"),
     a("p", { class: "ks-muted" }, "Укажите Yandex user id (не логин и не email), по одному на строку или через запятую. Пустой список отключает команды: это защита от чужих людей, получивших ссылку на навык."),
     te(e, [
-      { name: "allowed_user_ids", label: "Yandex user id", type: "textarea", rows: 3, value: Oe(t.alice?.allowed_user_ids), placeholder: "1234567890", hint: "Посмотреть id можно в профиле пользователя в консоли Yandex Dialogs.", wide: !0 }
+      { name: "allowed_user_ids", label: "Yandex user id", type: "textarea", rows: 3, value: qe(t.alice?.allowed_user_ids), placeholder: "1234567890", hint: "Посмотреть id можно в профиле пользователя в консоли Yandex Dialogs.", wide: !0 }
     ], (o) => ({ settings: { alice: { allowed_user_ids: ye(String(o.allowed_user_ids)) } } }), n),
     a("div", { class: "ks-row" }, s)
   );
 }
 function Qt(e, n, t) {
-  const i = new I(), s = a("div"), o = R({
+  const i = new N(), s = a("div"), o = U({
     host: s,
     load: async (r) => {
-      const [l, c, d, u] = await Promise.all([
+      const [l, d, c, u] = await Promise.all([
         T(t, "api/integrations", void 0, r),
         T(t, "api/settings", void 0, r),
         T(t, "api/contacts", void 0, r),
         T(t, "api/ha/entities", { limit: 1e3 }, r)
-      ]), p = await ke(Promise.resolve(l), Promise.resolve(c));
-      return p.ok ? d.ok ? { ok: !0, data: {
+      ]), p = await ke(Promise.resolve(l), Promise.resolve(d));
+      return p.ok ? c.ok ? { ok: !0, data: {
         integrations: p.data[0].integrations,
         secrets: p.data[0].secrets,
         settings: p.data[1].settings,
-        contacts: d.data.contacts,
-        linkRequests: d.data.link_requests ?? [],
+        contacts: c.data.contacts,
+        linkRequests: c.data.link_requests ?? [],
         haEntities: u.ok ? u.data.entities : [],
         haEntitiesAvailable: u.ok
-      } } : d : p;
+      } } : c : p;
     },
     render: (r, l) => {
-      const c = r.settings, d = (f) => {
-        const S = r.integrations.find((q) => q.name === f);
-        return S ? D(ne(S.status), me(S.status)) : null;
+      const d = r.settings, c = (f) => {
+        const _ = r.integrations.find((M) => M.name === f);
+        return _ ? D(ne(_.status), me(_.status)) : null;
       }, u = (f) => {
-        const S = r.integrations.find((q) => q.name === f);
-        return S ? a("p", { class: "ks-muted" }, [S.detail, S.last_ok ? `Последний успех: ${L(S.last_ok)}.` : "", S.last_error ? `Последняя ошибка: ${S.last_error}` : ""].filter(Boolean).join(" "), " ", Wt(t, f, l)) : null;
+        const _ = r.integrations.find((M) => M.name === f);
+        return _ ? a("p", { class: "ks-muted" }, [_.detail, _.last_ok ? `Последний успех: ${I(_.last_ok)}.` : "", _.last_error ? `Последняя ошибка: ${_.last_error}` : ""].filter(Boolean).join(" "), " ", Wt(t, f, l)) : null;
       }, p = a("div", { class: "ks-grid dv-status-grid" }, r.integrations.map(
         (f) => a("div", { class: "ks-card dv-status" }, a("strong", null, Yt[f.name] ?? f.name), D(ne(f.status), me(f.status)), a("small", { class: "ks-muted" }, f.detail && f.detail.toLowerCase() !== ne(f.status).toLowerCase() ? f.detail : ""))
-      )), m = W("ha", "Home Assistant", d("home_assistant"), a(
+      )), m = W("ha", "Home Assistant", c("home_assistant"), a(
         "div",
         null,
         u("home_assistant"),
         r.haEntitiesAvailable ? null : a("p", { class: "ks-muted" }, "Список сущностей недоступен. Можно указать ID вручную."),
         te(t, [
-          { name: "url", label: "Адрес Home Assistant", type: "url", value: c.ha.url, placeholder: "http://homeassistant.local:8123", hint: "В аддоне обычно http://supervisor/core — оставьте пустым, если работаете внутри HA.", wide: !0 },
+          { name: "url", label: "Адрес Home Assistant", type: "url", value: d.ha.url, placeholder: "http://homeassistant.local:8123", hint: "В аддоне обычно http://supervisor/core — оставьте пустым, если работаете внутри HA.", wide: !0 },
           ge("ha_token", "Долгоживущий токен доступа", r.secrets.ha_token),
-          ...de("person_entity", "Ваш person", c.ha.person_entity, r.haEntities, ["person"]),
-          { name: "allowed_services", label: "Разрешённые сервисы управления", type: "textarea", rows: 4, value: Oe(c.ha.allowed_services), placeholder: `light.turn_on
+          ...de("person_entity", "Ваш person", d.ha.person_entity, r.haEntities, ["person"]),
+          { name: "allowed_services", label: "Разрешённые сервисы управления", type: "textarea", rows: 4, value: qe(d.ha.allowed_services), placeholder: `light.turn_on
 light.turn_off
 script.turn_on`, hint: "Дополнительно к базовым (свет, розетки, вентиляторы, шторы, сцены). Замки, сигнализация, скрипты и Supervisor запрещены всегда.", wide: !0 }
-        ], (f) => ({ settings: { ha: { url: String(f.url).trim(), person_entity: Q(f, "person_entity", c.ha.person_entity), allowed_services: ye(String(f.allowed_services)) } }, secrets: { ha_token: String(f.ha_token) } }), l)
+        ], (f) => ({ settings: { ha: { url: String(f.url).trim(), person_entity: Q(f, "person_entity", d.ha.person_entity), allowed_services: ye(String(f.allowed_services)) } }, secrets: { ha_token: String(f.ha_token) } }), l)
       )), v = a(
         "span",
         { class: "ks-row" },
-        d("telegram"),
+        c("telegram"),
         r.linkRequests.length ? D(`${r.linkRequests.length} запрос(а)`, "warn") : null
       ), b = x("Отправить тестовое сообщение", async () => {
         const f = await t.invokeAction(
           "domovoy.actions",
           "telegram.test_message"
         );
-        f.ok ? f.data.ok ? C("Тестовое сообщение отправлено в Telegram", "good") : C(f.data.detail?.last_error ?? "Не удалось отправить: сообщение осталось в очереди", "bad", 9e3) : C(f.error.message, "bad", 8e3), l();
+        f.ok ? f.data.ok ? O("Тестовое сообщение отправлено в Telegram", "good") : O(f.data.detail?.last_error ?? "Не удалось отправить: сообщение осталось в очереди", "bad", 9e3) : O(f.error.message, "bad", 8e3), l();
       }, "secondary"), h = W("telegram", "Telegram", v, a(
         "div",
         null,
@@ -1334,47 +1334,62 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
         u("telegram"),
         a("div", { class: "ks-row" }, b),
         te(t, [
-          { name: "enabled", label: "Включён", type: "checkbox", value: c.telegram.enabled },
+          { name: "enabled", label: "Включён", type: "checkbox", value: d.telegram.enabled },
           ge("telegram_token", "Токен бота (от @BotFather)", r.secrets.telegram_token),
-          { name: "proxy", label: "HTTP-прокси для Telegram", type: "url", value: c.telegram.proxy ?? "", placeholder: "http://127.0.0.1:9080", hint: "Только для Telegram. Для Tor add-on включите http_tunnel: true и укажите http://127.0.0.1:9080. Пусто — прямое подключение.", wide: !0 }
+          { name: "proxy", label: "HTTP-прокси для Telegram", type: "url", value: d.telegram.proxy ?? "", placeholder: "http://127.0.0.1:9080", hint: "Только для Telegram. Для Tor add-on включите http_tunnel: true и укажите http://127.0.0.1:9080. Пусто — прямое подключение.", wide: !0 }
         ], (f) => ({ settings: { telegram: { enabled: f.enabled === !0, proxy: String(f.proxy).trim() } }, secrets: { telegram_token: String(f.telegram_token) } }), l),
         a("h3", null, "Контакты"),
-        Kt(t, r, l)
-      )), w = W("calendar", "Календарь", d("caldav"), a("div", null, u("caldav"), te(t, [
-        { name: "url", label: "CalDAV URL", type: "url", value: c.caldav.url, placeholder: "https://caldav.example.com/dav/user/calendar/", wide: !0 },
-        { name: "username", label: "Логин", value: c.caldav.username },
+        Jt(t, r, l)
+      )), w = W("calendar", "Календарь", c("caldav"), a("div", null, u("caldav"), te(t, [
+        { name: "url", label: "CalDAV URL", type: "url", value: d.caldav.url, placeholder: "https://caldav.example.com/dav/user/calendar/", wide: !0 },
+        { name: "username", label: "Логин", value: d.caldav.username },
         ge("caldav_password", "Пароль / пароль приложения", r.secrets.caldav_password),
-        { name: "default", label: "Куда добавлять по умолчанию", type: "select", options: [{ value: "local", label: "Локальный календарь" }, { value: "caldav", label: "CalDAV" }], value: c.calendar.default },
+        { name: "default", label: "Куда добавлять по умолчанию", type: "select", options: [{ value: "local", label: "Локальный календарь" }, { value: "caldav", label: "CalDAV" }], value: d.calendar.default },
         { name: "ha_calendar_pick", label: "Добавить календарь HA", type: "select", value: "", options: [
           { value: "", label: "Выбрать из Home Assistant" },
           ...r.haEntities.filter((f) => f.domain === "calendar").map((f) => ({ value: f.id, label: `${f.name} (${f.id})` }))
         ], wide: !0 },
-        { name: "ha_calendars", label: "Календари из Home Assistant", type: "textarea", rows: 2, value: Oe(c.calendar.ha_calendars), placeholder: "calendar.family", hint: "По одному на строку. События из них видны; добавлять можно, менять и удалять — нет.", wide: !0 }
+        { name: "ha_calendars", label: "Календари из Home Assistant", type: "textarea", rows: 2, value: qe(d.calendar.ha_calendars), placeholder: "calendar.family", hint: "По одному на строку. События из них видны; добавлять можно, менять и удалять — нет.", wide: !0 }
       ], (f) => ({
         settings: { caldav: { url: String(f.url).trim(), username: String(f.username).trim() }, calendar: {
           default: f.default,
           ha_calendars: [...new Set([...ye(String(f.ha_calendars)), String(f.ha_calendar_pick || "").trim()].filter(Boolean))]
         } },
         secrets: { caldav_password: String(f.caldav_password) }
-      }), l))), g = W("llm", "Языковая модель (необязательно)", d("llm"), a(
+      }), l))), g = r.integrations.find((f) => f.name === "llm")?.usage, y = W("llm", "Языковая модель (необязательно)", c("llm"), a(
         "div",
         null,
         u("llm"),
         a("p", { class: "ks-muted" }, "Подойдёт любой OpenAI-совместимый сервер: локальный (Ollama, llama.cpp, LM Studio) или облачный. Без неё Домовой работает по правилам — быстро и без нагрузки на процессор. Модель ничего не решает сама: её предложения проходят проверку и попадают в «Проверку»."),
         a("p", { class: "ks-muted" }, "Модель эмбеддингов делает поиск смысловым и включает быстрый роутер личных фактов: «у меня день рождения…», «что я люблю» разбираются за ~0,3 с, без генерации. Языковая модель нужна только для длинного хвоста."),
+        a("p", { class: "ks-muted" }, "Для облачного API оставьте адрес эмбеддингов локальным (Ollama): тогда семантика не тратит облачные токены. Компактный режим не отправляет полную JSON-схему, а лимит останавливает запросы при исчерпании бюджета."),
+        g ? a("p", { class: "ks-muted" }, `Токенов в этом месяце: ${g.used.toLocaleString("ru-RU")}${g.budget ? ` из ${g.budget.toLocaleString("ru-RU")}` : " (без лимита)"}.`) : null,
         te(t, [
-          { name: "enabled", label: "Включена", type: "checkbox", value: c.ai.enabled },
-          { name: "base_url", label: "Адрес API", type: "url", value: c.ai.base_url, placeholder: "http://127.0.0.1:11434/v1", wide: !0 },
-          { name: "model", label: "Модель для команд", value: c.ai.model, placeholder: "lfm2.5:8b-a1b", hint: "Можно оставить пустым: тогда работают правила и семантический роутер, без генерации." },
-          { name: "embedding_model", label: "Модель для смыслового поиска и роутера", value: c.ai.embedding_model, placeholder: "qwen3-embedding:0.6b", hint: "Пусто — поиск по словам и опечаткам, без семантики. Для Ollama подойдёт qwen3-embedding:0.6b." },
+          { name: "enabled", label: "Включена", type: "checkbox", value: d.ai.enabled },
+          { name: "base_url", label: "Адрес API (чат)", type: "url", value: d.ai.base_url, placeholder: "https://api.openai.com/v1", wide: !0 },
+          { name: "embedding_base_url", label: "Адрес эмбеддингов (локальный)", type: "url", value: d.ai.embedding_base_url, placeholder: "http://127.0.0.1:11434/v1", hint: "Пусто — использовать основной адрес. Для облачного чата укажите локальный Ollama, чтобы не платить за эмбеддинги.", wide: !0 },
+          { name: "model", label: "Модель для команд", value: d.ai.model, placeholder: "gpt-4o-mini", hint: "Можно оставить пустым: тогда работают правила и семантический роутер, без генерации." },
+          { name: "embedding_model", label: "Модель для смыслового поиска и роутера", value: d.ai.embedding_model, placeholder: "qwen3-embedding:0.6b", hint: "Пусто — поиск по словам и опечаткам, без семантики. Для Ollama подойдёт qwen3-embedding:0.6b." },
+          { name: "max_tokens", label: "Максимум токенов на ответ", type: "number", min: 32, max: 4096, value: d.ai.max_tokens ?? 160, hint: "160 хватает на 1–2 команды; больше — только если модель обрезает JSON." },
+          { name: "monthly_token_budget", label: "Лимит токенов в месяц (0 — без лимита)", type: "number", min: 0, max: 1e7, value: d.ai.monthly_token_budget ?? 0, wide: !0 },
+          { name: "low_tokens", label: "Экономить токены: без полной JSON-схемы", type: "checkbox", value: d.ai.low_tokens !== !1, hint: "Компактный JSON-режим; проверка полей всё равно остаётся на сервере.", wide: !0 },
           ge("llm_api_key", "API-ключ (если нужен)", r.secrets.llm_api_key)
-        ], (f) => ({ settings: { ai: { enabled: f.enabled === !0, base_url: String(f.base_url).trim(), model: String(f.model).trim(), embedding_model: String(f.embedding_model).trim() } }, secrets: { llm_api_key: String(f.llm_api_key) } }), l)
-      )), y = W("speak", "Голос через колонки (Яндекс Станции)", d("speak"), a(
+        ], (f) => ({ settings: { ai: {
+          enabled: f.enabled === !0,
+          base_url: String(f.base_url).trim(),
+          embedding_base_url: String(f.embedding_base_url).trim(),
+          model: String(f.model).trim(),
+          embedding_model: String(f.embedding_model).trim(),
+          max_tokens: Number(f.max_tokens) || 160,
+          monthly_token_budget: Number(f.monthly_token_budget) || 0,
+          low_tokens: f.low_tokens === !0
+        } }, secrets: { llm_api_key: String(f.llm_api_key) } }), l)
+      )), S = W("speak", "Голос через колонки (Яндекс Станции)", c("speak"), a(
         "div",
         null,
         u("speak"),
         a("p", { class: "ks-muted" }, "Домовой говорит через колонки, подключённые к Home Assistant. Способ озвучки задаётся здесь, а не в коде."),
-        Se(t, "speakers", c.speakers, [
+        Se(t, "speakers", d.speakers, [
           { header: "Колонка", render: (f) => String(f.name || f.entity_id) },
           { header: "Комната", render: (f) => String(f.room ?? "") || k.none },
           { header: "Способ", render: (f) => ({ yandex_station_text: "Яндекс Станция (текст)", tts_speak: "TTS (tts.speak)", custom: "свой сервис" })[String(f.mode)] ?? String(f.mode ?? "Яндекс Станция (текст)") },
@@ -1387,18 +1402,18 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
           ...de("tts_entity", "TTS-сущность (для tts.speak)", String(f?.tts_entity ?? ""), r.haEntities, ["tts"]),
           { name: "service", label: "Свой сервис", value: f?.service ?? "", placeholder: "script.say", hint: "domain.service; в данных используйте {text} и {entity_id}." },
           { name: "default", label: "По умолчанию, если неизвестно, где человек", type: "checkbox", value: f?.default === !0, wide: !0 }
-        ], (f, S) => ({
-          ...S ?? {},
-          id: S?.id ?? Q(f, "entity_id", String(S?.entity_id ?? "")),
+        ], (f, _) => ({
+          ..._ ?? {},
+          id: _?.id ?? Q(f, "entity_id", String(_?.entity_id ?? "")),
           name: String(f.name).trim(),
-          entity_id: Q(f, "entity_id", String(S?.entity_id ?? "")),
+          entity_id: Q(f, "entity_id", String(_?.entity_id ?? "")),
           room: String(f.room).trim(),
           mode: f.mode,
-          tts_entity: Q(f, "tts_entity", String(S?.tts_entity ?? "")),
+          tts_entity: Q(f, "tts_entity", String(_?.tts_entity ?? "")),
           service: String(f.service).trim(),
           default: f.default === !0
         }), "колонка", l)
-      )), _ = W("rooms", "Где вы находитесь: комнаты и места", null, a(
+      )), z = W("rooms", "Где вы находитесь: комнаты и места", null, a(
         "div",
         null,
         a("p", { class: "ks-muted" }, "Датчик присутствия или устройство, по которому Домовой понимает, что вы в комнате, — для напоминаний «когда зайду на кухню» и чтобы отвечать в нужную колонку."),
@@ -1406,7 +1421,7 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
         Se(
           t,
           "rooms",
-          c.rooms,
+          d.rooms,
           [{ header: "Комната", render: (f) => String(f.name || f.room) }, { header: "Датчик", render: (f) => `${f.entity_id ?? ""} = ${f.state ?? "on"}` }],
           (f) => [
             { name: "name", label: "Название", required: !0, value: f?.name ?? f?.room ?? "", placeholder: "кухня" },
@@ -1420,10 +1435,10 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
             ),
             { name: "state", label: "Активна, когда состояние", value: f?.state ?? "on" }
           ],
-          (f, S) => ({
-            ...S ?? {},
+          (f, _) => ({
+            ..._ ?? {},
             name: String(f.name).trim(),
-            entity_id: Q(f, "entity_id", String(S?.entity_id ?? "")),
+            entity_id: Q(f, "entity_id", String(_?.entity_id ?? "")),
             state: String(f.state).trim() || "on"
           }),
           "комната",
@@ -1433,45 +1448,45 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
         Se(
           t,
           "places",
-          c.places,
+          d.places,
           [{ header: "Место", render: (f) => String(f.name) }, { header: "Сущность", render: (f) => `${f.entity_id ?? ""} = ${f.state ?? "on"}` }],
           (f) => [
             { name: "name", label: "Название", required: !0, value: f?.name ?? "", placeholder: "мастерская" },
             ...de("entity_id", "Сущность", String(f?.entity_id ?? ""), r.haEntities, void 0, !0),
             { name: "state", label: "Активно, когда состояние", value: f?.state ?? "on" }
           ],
-          (f, S) => ({
-            ...S ?? {},
+          (f, _) => ({
+            ..._ ?? {},
             name: String(f.name).trim(),
-            entity_id: Q(f, "entity_id", String(S?.entity_id ?? "")),
+            entity_id: Q(f, "entity_id", String(_?.entity_id ?? "")),
             state: String(f.state).trim() || "on"
           }),
           "место",
           l
         )
-      )), z = W("stt", "Распознавание речи (микрофон киоска)", d("stt"), a(
+      )), j = W("stt", "Распознавание речи (микрофон киоска)", c("stt"), a(
         "div",
         null,
         u("stt"),
         a("p", { class: "ks-muted" }, "Нужно только если вы говорите в микрофон киоска. Голос через Алису/Home Assistant приходит уже текстом. Подойдёт любой сервер с OpenAI-совместимым /audio/transcriptions (например, локальный faster-whisper)."),
         te(t, [
-          { name: "base_url", label: "Адрес STT-сервера", type: "url", value: c.voice.stt.base_url, placeholder: "http://127.0.0.1:8000/v1", wide: !0 },
-          { name: "model", label: "Модель", value: c.voice.stt.model, placeholder: "small" },
-          { name: "language", label: "Язык", value: c.voice.stt.language },
-          { name: "max_seconds", label: "Максимум секунд записи", type: "number", min: 3, max: 60, value: c.voice.stt.max_seconds }
+          { name: "base_url", label: "Адрес STT-сервера", type: "url", value: d.voice.stt.base_url, placeholder: "http://127.0.0.1:8000/v1", wide: !0 },
+          { name: "model", label: "Модель", value: d.voice.stt.model, placeholder: "small" },
+          { name: "language", label: "Язык", value: d.voice.stt.language },
+          { name: "max_seconds", label: "Максимум секунд записи", type: "number", min: 3, max: 60, value: d.voice.stt.max_seconds }
         ], (f) => ({ settings: { voice: { stt: { base_url: String(f.base_url).trim(), model: String(f.model).trim(), language: String(f.language).trim() || "ru", max_seconds: Number(f.max_seconds) || 15 } } } }), l)
-      )), j = W("alice", "Алиса", d("alice"), Xt(t, l, c)), F = W("security", "Доступ и Home Assistant", null, Jt(t, l, c));
-      return a("div", { class: "dv-stack" }, p, m, h, j, w, y, _, g, z, F);
+      )), V = W("alice", "Алиса", c("alice"), Xt(t, l, d)), C = W("security", "Доступ и Home Assistant", null, Gt(t, l, d));
+      return a("div", { class: "dv-stack" }, p, m, h, V, w, S, z, y, j, C);
     }
   });
-  return $(e, a("div", { class: "ks-page" }, G(k.integrations), s)), B(t, i, ["integrations", "contacts", "settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), U(i);
+  return $(e, a("div", { class: "ks-page" }, Z(k.integrations), s)), B(t, i, ["integrations", "contacts", "settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), F(i);
 }
 function ft(e, n = !0) {
   const t = e.slice().sort((i, s) => i.path.join("/").localeCompare(s.path.join("/"), "ru")).map((i) => ({ value: String(i.id), label: i.path.join(" → ") }));
   return n ? [{ value: "", label: "— без места —" }, ...t] : t;
 }
 function De(e, n, t, i) {
-  return K(
+  return J(
     t ? `Изменить: ${t.name}` : "Добавить вещь",
     [
       { name: "name", label: k.name, required: !0, value: t?.name ?? "", wide: !0 },
@@ -1484,12 +1499,12 @@ function De(e, n, t, i) {
       { name: "notes", label: k.notes, type: "textarea", rows: 2, value: t?.notes ?? "", wide: !0 }
     ],
     async (s) => {
-      const o = Ht(String(s.new_path ?? "")), r = {
+      const o = Ut(String(s.new_path ?? "")), r = {
         name: String(s.name).trim(),
-        quantity: Bt(s.quantity),
+        quantity: Ht(s.quantity),
         unit: String(s.unit ?? "").trim(),
         category: String(s.category ?? "").trim(),
-        properties: Nt(String(s.properties ?? "")),
+        properties: zt(String(s.properties ?? "")),
         notes: String(s.notes ?? "")
       };
       o.length ? r.location_path = o : r.location_id = s.location_id ? Number(s.location_id) : null;
@@ -1513,55 +1528,55 @@ function kt(e, n, t) {
       $(i, a("p", { class: "ks-error" }, o.error.message));
       return;
     }
-    const c = o.data.item, d = () => {
+    const d = o.data.item, c = () => {
       t(), s.close();
     };
     $(
       i,
-      a("h3", null, c.name),
+      a("h3", null, d.name),
       a(
         "dl",
         { class: "dv-facts" },
         a("dt", null, k.quantity),
-        a("dd", null, Le(c.quantity, c.unit) || k.none),
+        a("dd", null, Le(d.quantity, d.unit) || k.none),
         a("dt", null, k.place),
-        a("dd", null, c.location_text || "не указано"),
-        c.category ? [a("dt", null, "Категория"), a("dd", null, c.category)] : null,
-        ...Object.entries(c.properties ?? {}).flatMap(([u, p]) => [a("dt", null, u), a("dd", null, p)]),
-        c.notes ? [a("dt", null, k.notes), a("dd", null, c.notes)] : null,
+        a("dd", null, d.location_text || "не указано"),
+        d.category ? [a("dt", null, "Категория"), a("dd", null, d.category)] : null,
+        ...Object.entries(d.properties ?? {}).flatMap(([u, p]) => [a("dt", null, u), a("dd", null, p)]),
+        d.notes ? [a("dt", null, k.notes), a("dd", null, d.notes)] : null,
         a("dt", null, "Изменено"),
-        a("dd", null, `${L(c.updated_at)} · ${c.source}`)
+        a("dd", null, `${I(d.updated_at)} · ${d.source}`)
       ),
       a(
         "div",
         { class: "ks-row" },
-        A(k.edit, { variant: "primary", onClick: () => l.ok && void De(e, l.data.locations, c, d) }),
+        A(k.edit, { variant: "primary", onClick: () => l.ok && void De(e, l.data.locations, d, c) }),
         A("Списать 1", { onClick: async () => {
-          (await E(e, "items.consume", { id: c.id, quantity: 1 })).ok && d();
+          (await E(e, "items.consume", { id: d.id, quantity: 1 })).ok && c();
         } }),
         A(k.delete, { variant: "danger", onClick: async () => {
-          (await E(e, "items.delete", { id: c.id }, { confirm: { title: "Удалить вещь", message: `«${c.name}» будет удалена. Это можно отменить в журнале.` } })).ok && d();
+          (await E(e, "items.delete", { id: d.id }, { confirm: { title: "Удалить вещь", message: `«${d.name}» будет удалена. Это можно отменить в журнале.` } })).ok && c();
         } })
       ),
       a("h4", null, "История"),
-      r.ok && r.data.history.length ? a("ul", { class: "ks-list" }, r.data.history.slice(0, 12).map((u) => P(u.summary, `${L(u.ts)} · ${u.actor}/${u.source}`))) : O("Изменений не было.")
+      r.ok && r.data.history.length ? a("ul", { class: "ks-list" }, r.data.history.slice(0, 12).map((u) => L(u.summary, `${I(u.ts)} · ${u.actor}/${u.source}`))) : q("Изменений не было.")
     );
   })();
 }
 function en(e, n, t) {
-  const i = new I();
+  const i = new N();
   let s = "", o = String(n.location_id ?? "");
-  const r = a("div"), l = ue({ name: "q", label: "Фильтр", placeholder: "название или заметка" }), c = ue({ name: "loc", label: k.place, type: "select", options: [{ value: "", label: "Везде" }], value: o });
-  let d = [];
-  const u = R({
+  const r = a("div"), l = ue({ name: "q", label: "Фильтр", placeholder: "название или заметка" }), d = ue({ name: "loc", label: k.place, type: "select", options: [{ value: "", label: "Везде" }], value: o });
+  let c = [];
+  const u = U({
     host: r,
     load: (m) => ke(
       T(t, "api/items", { q: s || void 0, location_id: o || void 0, limit: 500 }, m),
       T(t, "api/locations", void 0, m)
     ),
     render: ([{ items: m }, { locations: v }], b) => {
-      d = v;
-      const h = c.input, w = [{ value: "", label: "Везде" }, ...ft(v, !1)];
+      c = v;
+      const h = d.input, w = [{ value: "", label: "Везде" }, ...ft(v, !1)];
       return $(h, w.map((g) => a("option", { value: g.value, selected: g.value === o }, g.label))), h.value = o, a(
         "div",
         null,
@@ -1570,7 +1585,7 @@ function en(e, n, t) {
             { key: "name", header: k.name, render: (g) => a("button", { class: "ks-link", type: "button", onClick: () => kt(t, g.id, b) }, g.name) },
             { key: "qty", header: k.quantity, render: (g) => g.quantity === 0 ? D("нет", "warn") : Le(g.quantity, g.unit) || k.none },
             { key: "place", header: k.place, render: (g) => g.location_text || k.none },
-            { key: "updated", header: "Изменено", render: (g) => L(g.updated_at), className: "ks-hide-narrow" },
+            { key: "updated", header: "Изменено", render: (g) => I(g.updated_at), className: "ks-hide-narrow" },
             {
               key: "actions",
               header: "",
@@ -1593,18 +1608,18 @@ function en(e, n, t) {
   }), p = () => u.refresh();
   return l.input.addEventListener("input", () => {
     s = l.input.value.trim(), p();
-  }), c.input.addEventListener("change", () => {
-    o = c.input.value, p();
+  }), d.input.addEventListener("change", () => {
+    o = d.input.value, p();
   }), $(
     e,
     a(
       "div",
       { class: "ks-page" },
-      G(k.inventory, A(k.add, { variant: "primary", onClick: () => void De(t, d, null, p) })),
-      a("div", { class: "ks-card ks-filters" }, l.el, c.el),
+      Z(k.inventory, A(k.add, { variant: "primary", onClick: () => void De(t, c, null, p) })),
+      a("div", { class: "ks-card ks-filters" }, l.el, d.el),
       r
     )
-  ), B(t, i, ["items", "locations"], p), i.add(() => u.dispose()), U(i);
+  ), B(t, i, ["items", "locations"], p), i.add(() => u.dispose()), F(i);
 }
 const gt = { home: "дом", room: "комната", cabinet: "шкаф", shelf: "полка", box: "коробка", cell: "ячейка", place: "место" }, tn = Object.entries(gt).map(([e, n]) => ({ value: e, label: n }));
 function bt(e, n = []) {
@@ -1613,47 +1628,47 @@ function bt(e, n = []) {
   return n;
 }
 function nn(e, n, t) {
-  const i = new I(), s = a("div"), o = A(k.add, { variant: "primary" }), r = (d, u, p, m) => {
-    const v = bt(p).filter((b) => !d || b.id !== d.id && !b.path.join("\0").startsWith(d.path.join("\0") + "\0"));
-    K(
-      d ? `Изменить: ${d.name}` : u ? `Новое место внутри «${u.name}»` : "Новое место",
+  const i = new N(), s = a("div"), o = A(k.add, { variant: "primary" }), r = (c, u, p, m) => {
+    const v = bt(p).filter((b) => !c || b.id !== c.id && !b.path.join("\0").startsWith(c.path.join("\0") + "\0"));
+    J(
+      c ? `Изменить: ${c.name}` : u ? `Новое место внутри «${u.name}»` : "Новое место",
       [
-        { name: "name", label: k.name, required: !0, value: d?.name ?? "", wide: !0 },
-        { name: "kind", label: "Тип", type: "select", options: tn, value: d?.kind ?? (u ? "box" : "room") },
-        { name: "parent_id", label: "Внутри", type: "select", options: [{ value: "", label: "— верхний уровень —" }, ...v.map((b) => ({ value: String(b.id), label: b.path.join(" → ") }))], value: String((d ? d.parent_id : u?.id) ?? ""), wide: !0 },
-        { name: "notes", label: k.notes, type: "textarea", rows: 2, value: d?.notes ?? "", wide: !0 }
+        { name: "name", label: k.name, required: !0, value: c?.name ?? "", wide: !0 },
+        { name: "kind", label: "Тип", type: "select", options: tn, value: c?.kind ?? (u ? "box" : "room") },
+        { name: "parent_id", label: "Внутри", type: "select", options: [{ value: "", label: "— верхний уровень —" }, ...v.map((b) => ({ value: String(b.id), label: b.path.join(" → ") }))], value: String((c ? c.parent_id : u?.id) ?? ""), wide: !0 },
+        { name: "notes", label: k.notes, type: "textarea", rows: 2, value: c?.notes ?? "", wide: !0 }
       ],
       async (b) => {
-        const h = { name: String(b.name).trim(), kind: String(b.kind), notes: String(b.notes ?? ""), parent_id: b.parent_id ? Number(b.parent_id) : null }, w = d ? await t.invokeAction("domovoy.actions", "locations.update", { id: d.id, ...h }) : await t.invokeAction("domovoy.actions", "locations.create", h);
+        const h = { name: String(b.name).trim(), kind: String(b.kind), notes: String(b.notes ?? ""), parent_id: b.parent_id ? Number(b.parent_id) : null }, w = c ? await t.invokeAction("domovoy.actions", "locations.update", { id: c.id, ...h }) : await t.invokeAction("domovoy.actions", "locations.create", h);
         return w.ok && m(), w;
       }
     );
-  }, l = (d, u, p) => a(
+  }, l = (c, u, p) => a(
     "li",
     { class: "dv-loc" },
     a(
       "div",
       { class: "dv-loc-row" },
-      a("span", { class: "dv-loc-name" }, d.name, " ", D(gt[d.kind] ?? d.kind, "neutral")),
-      a("span", { class: "ks-muted" }, d.item_count ? `${d.item_count} вещ.` : ""),
+      a("span", { class: "dv-loc-name" }, c.name, " ", D(gt[c.kind] ?? c.kind, "neutral")),
+      a("span", { class: "ks-muted" }, c.item_count ? `${c.item_count} вещ.` : ""),
       a(
         "span",
         { class: "ks-row dv-loc-actions" },
-        d.item_count ? x("Вещи", () => t.navigate("domovoy.inventory", { location_id: String(d.id) }), "ghost") : null,
-        x("+ Внутрь", () => r(null, d, u, p), "ghost"),
-        x(k.edit, () => r(d, null, u, p)),
+        c.item_count ? x("Вещи", () => t.navigate("domovoy.inventory", { location_id: String(c.id) }), "ghost") : null,
+        x("+ Внутрь", () => r(null, c, u, p), "ghost"),
+        x(k.edit, () => r(c, null, u, p)),
         x(k.delete, async () => {
-          (await E(t, "locations.delete", { id: d.id }, { confirm: { title: "Удалить место", message: `«${d.name}» будет удалено (только если оно пустое).` } })).ok && p();
+          (await E(t, "locations.delete", { id: c.id }, { confirm: { title: "Удалить место", message: `«${c.name}» будет удалено (только если оно пустое).` } })).ok && p();
         }, "danger")
       )
     ),
-    d.children.length ? a("ul", { class: "dv-loc-tree" }, d.children.map((m) => l(m, u, p))) : null
-  ), c = R({
+    c.children.length ? a("ul", { class: "dv-loc-tree" }, c.children.map((m) => l(m, u, p))) : null
+  ), d = U({
     host: s,
-    load: (d) => t.readData("domovoy.api", { path: "api/locations/tree" }, { signal: d }),
-    render: ({ tree: d }, u) => (o.onclick = () => r(null, null, d, u), d.length ? a("ul", { class: "dv-loc-tree dv-loc-root" }, d.map((p) => l(p, d, u))) : a("div", { class: "ks-empty" }, a("strong", null, "Мест ещё нет"), a("p", null, "Они появятся сами, когда вы скажете «положил в третью коробку нижнего шкафа», или добавьте вручную.")))
+    load: (c) => t.readData("domovoy.api", { path: "api/locations/tree" }, { signal: c }),
+    render: ({ tree: c }, u) => (o.onclick = () => r(null, null, c, u), c.length ? a("ul", { class: "dv-loc-tree dv-loc-root" }, c.map((p) => l(p, c, u))) : a("div", { class: "ks-empty" }, a("strong", null, "Мест ещё нет"), a("p", null, "Они появятся сами, когда вы скажете «положил в третью коробку нижнего шкафа», или добавьте вручную.")))
   });
-  return e.replaceChildren(a("div", { class: "ks-page" }, G(k.locations, o), a("div", { class: "ks-card" }, s))), B(t, i, ["locations", "items"], () => c.refresh()), i.add(() => c.dispose()), U(i);
+  return e.replaceChildren(a("div", { class: "ks-page" }, Z(k.locations, o), a("div", { class: "ks-card" }, s))), B(t, i, ["locations", "items"], () => d.refresh()), i.add(() => d.dispose()), F(i);
 }
 const Ye = "domovoy.session";
 function an() {
@@ -1664,58 +1679,58 @@ function an() {
     return "web-anon";
   }
 }
-function ze(e, n) {
-  const t = a("input", { class: "ks-input dv-command", type: "text", placeholder: k.commandPlaceholder, "aria-label": "Команда", autocomplete: "off", enterkeyhint: "send" }), i = a("div", { class: "dv-reply", role: "status", "aria-live": "polite" }), s = A(k.send, { variant: "primary", type: "submit" }), o = a("form", { class: "dv-commandbar" }, t, s), r = async (c) => {
-    const d = c.trim();
-    if (!d)
+function Ne(e, n) {
+  const t = a("input", { class: "ks-input dv-command", type: "text", placeholder: k.commandPlaceholder, "aria-label": "Команда", autocomplete: "off", enterkeyhint: "send" }), i = a("div", { class: "dv-reply", role: "status", "aria-live": "polite" }), s = A(k.send, { variant: "primary", type: "submit" }), o = a("form", { class: "dv-commandbar" }, t, s), r = async (d) => {
+    const c = d.trim();
+    if (!c)
       return;
     s.disabled = !0, $(i, a("span", { class: "ks-muted" }, k.loading));
-    const u = await mt(e, "command.send", { text: d, session_id: an() });
+    const u = await mt(e, "command.send", { text: c, session_id: an() });
     if (s.disabled = !1, !u.ok) {
       $(i, a("span", { class: "ks-error" }, u.error.message));
       return;
     }
     t.value = "", l(u.data), n();
-  }, l = (c) => {
-    const d = (c.options ?? []).map((u, p) => x(`${p + 1}. ${u}`, () => void r(String(p + 1))));
+  }, l = (d) => {
+    const c = (d.options ?? []).map((u, p) => x(`${p + 1}. ${u}`, () => void r(String(p + 1))));
     $(
       i,
-      a("div", { class: "dv-reply-line" }, D(ne(c.status), me(c.status)), " ", c.reply),
-      d.length ? a("div", { class: "ks-row dv-chips" }, d) : null,
-      c.undoable && c.command_id ? x(k.undo, async () => {
-        (await E(e, "command.undo", { id: c.command_id }, { success: "Отменено" })).ok && ($(i, a("span", { class: "ks-muted" }, "Отменено.")), n());
+      a("div", { class: "dv-reply-line" }, D(ne(d.status), me(d.status)), " ", d.reply),
+      c.length ? a("div", { class: "ks-row dv-chips" }, c) : null,
+      d.undoable && d.command_id ? x(k.undo, async () => {
+        (await E(e, "command.undo", { id: d.command_id }, { success: "Отменено" })).ok && ($(i, a("span", { class: "ks-muted" }, "Отменено.")), n());
       }, "ghost") : null
     );
   };
-  return o.addEventListener("submit", (c) => {
-    c.preventDefault(), r(t.value);
+  return o.addEventListener("submit", (d) => {
+    d.preventDefault(), r(t.value);
   }), a("div", { class: "ks-card dv-command-card" }, o, i);
 }
 function sn(e) {
   if (!e.events.length)
-    return O("Сегодня и завтра событий нет.");
+    return q("Сегодня и завтра событий нет.");
   const n = e.timezone;
   oe(n);
-  const t = J(e.now, n);
+  const t = G(e.now, n);
   return a(
     "ul",
     { class: "ks-list" },
     e.events.map(
-      (i) => P(
+      (i) => L(
         i.title,
-        `${J(i.start, n) === t ? "сегодня" : "завтра"}, ${i.all_day ? "весь день" : `${se(i.start, n)}–${se(i.end, n)}`}${i.location ? ` · ${i.location}` : ""}`
+        `${G(i.start, n) === t ? "сегодня" : "завтра"}, ${i.all_day ? "весь день" : `${se(i.start, n)}–${se(i.end, n)}`}${i.location ? ` · ${i.location}` : ""}`
       )
     )
   );
 }
 function on(e, n, t) {
-  const i = new I(), s = t.mode === "kiosk", o = a("div", { class: `ks-page dv-today${s ? " ks-scope dv-kiosk" : ""}`, dataset: s ? { theme: "kiosk", noSwipe: "true" } : void 0 }), r = a("div", { class: "ks-page" }), l = ze(t, () => c.refresh());
+  const i = new N(), s = t.mode === "kiosk", o = a("div", { class: `ks-page dv-today${s ? " ks-scope dv-kiosk" : ""}`, dataset: s ? { theme: "kiosk", noSwipe: "true" } : void 0 }), r = a("div", { class: "ks-page" }), l = Ne(t, () => d.refresh());
   $(e, o), $(o, l, r);
-  const c = R({
+  const d = U({
     host: r,
-    load: (d) => T(t, "api/today", void 0, d),
-    render: (d, u) => {
-      oe(d.timezone);
+    load: (c) => T(t, "api/today", void 0, c),
+    render: (c, u) => {
+      oe(c.timezone);
       const p = (m, v) => a(
         "div",
         { class: "ks-row" },
@@ -1729,47 +1744,47 @@ function on(e, n, t) {
       return a(
         "div",
         { class: "ks-grid" },
-        M("Календарь", sn(d)),
-        M(
+        P("Календарь", sn(c)),
+        P(
           "Напоминания",
-          d.reminders.length ? a("ul", { class: "ks-list" }, d.reminders.map((m) => P(
+          c.reminders.length ? a("ul", { class: "ks-list" }, c.reminders.map((m) => L(
             m.text,
-            [m.state === "fired" ? "сработало" : m.due_at ? `${L(m.due_at)} (${Pe(m.due_at)})` : dt(m.trigger), m.recurrence ? ` · ${he(m.recurrence)}` : "", ` · ${k.channels[m.channel] ?? m.channel}`].join(""),
+            [m.state === "fired" ? "сработало" : m.due_at ? `${I(m.due_at)} (${Pe(m.due_at)})` : dt(m.trigger), m.recurrence ? ` · ${he(m.recurrence)}` : "", ` · ${k.channels[m.channel] ?? m.channel}`].join(""),
             p(m.id, m.state),
             m.state === "fired" ? "dv-fired" : ""
-          ))) : O("Напоминаний нет.")
+          ))) : q("Напоминаний нет.")
         ),
-        M(
+        P(
           "Список покупок",
-          d.shopping.length ? a("ul", { class: "ks-list" }, d.shopping.map((m) => P(m.title, void 0, x("Куплено", async () => {
+          c.shopping.length ? a("ul", { class: "ks-list" }, c.shopping.map((m) => L(m.title, void 0, x("Куплено", async () => {
             await E(t, "tasks.complete", { id: m.id }), u();
-          })))) : O("Список покупок пуст.")
+          })))) : q("Список покупок пуст.")
         ),
-        M(
+        P(
           "Задачи",
-          d.tasks.length ? a("ul", { class: "ks-list" }, d.tasks.map((m) => P(m.title, m.due_date ? `до ${m.due_date}${m.recurrence ? ` · ${he(m.recurrence)}` : ""}` : "", x("Готово", async () => {
+          c.tasks.length ? a("ul", { class: "ks-list" }, c.tasks.map((m) => L(m.title, m.due_date ? `до ${m.due_date}${m.recurrence ? ` · ${he(m.recurrence)}` : ""}` : "", x("Готово", async () => {
             await E(t, "tasks.complete", { id: m.id }), u();
-          })))) : O("Задач нет.")
+          })))) : q("Задач нет.")
         ),
-        d.review_count ? M("Ждёт проверки", a(
+        c.review_count ? P("Ждёт проверки", a(
           "div",
           null,
-          a("p", null, `Есть неуверенные команды: ${d.review_count}. Я ничего не записал без вашего подтверждения.`),
+          a("p", null, `Есть неуверенные команды: ${c.review_count}. Я ничего не записал без вашего подтверждения.`),
           // the review page exists in the admin UI only; on the kiosk there is nothing to open
           s ? a("p", { class: "ks-muted" }, "Откройте администрирование на телефоне или компьютере, чтобы решить.") : A("Открыть проверку", { variant: "primary", onClick: () => t.navigate("domovoy.review") })
         )) : null,
-        d.warnings.length ? M("Календари", a("p", { class: "ks-stale-banner" }, `Не удалось прочитать: ${d.warnings.map((m) => m.source).join(", ")}`)) : null,
-        s ? null : M(
+        c.warnings.length ? P("Календари", a("p", { class: "ks-stale-banner" }, `Не удалось прочитать: ${c.warnings.map((m) => m.source).join(", ")}`)) : null,
+        s ? null : P(
           "Последние команды",
-          d.recent.length ? a("ul", { class: "ks-list" }, d.recent.map((m) => P(m.text, m.reply ?? "", D(ne(m.status), me(m.status))))) : tt("Команд ещё не было", "Скажите или напишите что-нибудь выше.")
+          c.recent.length ? a("ul", { class: "ks-list" }, c.recent.map((m) => L(m.text, m.reply ?? "", D(ne(m.status), me(m.status))))) : tt("Команд ещё не было", "Скажите или напишите что-нибудь выше.")
         )
       );
     }
   });
-  return B(t, i, ["calendar", "reminders", "tasks", "review", "commands", "outbox", "notification"], () => c.refresh()), i.add(() => c.dispose()), U(i);
+  return B(t, i, ["calendar", "reminders", "tasks", "review", "commands", "outbox", "notification"], () => d.refresh()), i.add(() => d.dispose()), F(i);
 }
 function We(e, n, t) {
-  K(
+  J(
     n ? "Изменить заметку" : "Новая заметка",
     [
       { name: "title", label: "Заголовок", value: n?.title ?? "", wide: !0 },
@@ -1783,23 +1798,23 @@ function We(e, n, t) {
   );
 }
 function rn(e, n, t) {
-  const i = new I(), s = a("div");
+  const i = new N(), s = a("div");
   let o = "";
-  const r = ue({ name: "q", label: "Поиск по заметкам", placeholder: "слово из заголовка или текста" }), l = A(k.add, { variant: "primary" }), c = R({
+  const r = ue({ name: "q", label: "Поиск по заметкам", placeholder: "слово из заголовка или текста" }), l = A(k.add, { variant: "primary" }), d = U({
     host: s,
-    load: (d) => ke(
-      T(t, "api/notes", { q: o || void 0 }, d),
-      T(t, "api/items", { limit: 8 }, d)
+    load: (c) => ke(
+      T(t, "api/notes", { q: o || void 0 }, c),
+      T(t, "api/items", { limit: 8 }, c)
     ),
-    render: ([{ notes: d }, { items: u }], p) => (l.onclick = () => We(t, null, p), a(
+    render: ([{ notes: c }, { items: u }], p) => (l.onclick = () => We(t, null, p), a(
       "div",
       { class: "ks-grid" },
-      M(
+      P(
         "Заметки",
-        d.length ? a("ul", { class: "ks-list" }, d.map(
-          (m) => P(
+        c.length ? a("ul", { class: "ks-list" }, c.map(
+          (m) => L(
             m.title || m.body.slice(0, 60),
-            a("span", null, m.title ? m.body.slice(0, 200) : "", m.tags.length ? ` · #${m.tags.join(" #")}` : "", ` · ${L(m.updated_at)}`),
+            a("span", null, m.title ? m.body.slice(0, 200) : "", m.tags.length ? ` · #${m.tags.join(" #")}` : "", ` · ${I(m.updated_at)}`),
             a(
               "div",
               { class: "ks-row" },
@@ -1809,76 +1824,76 @@ function rn(e, n, t) {
               }, "danger")
             )
           )
-        )) : O(o ? "Ничего не найдено." : "Заметок пока нет. Скажите «запомни, что код домофона 4711».")
+        )) : q(o ? "Ничего не найдено." : "Заметок пока нет. Скажите «запомни, что код домофона 4711».")
       ),
-      M(
+      P(
         "Недавно запомнено",
-        u.length ? a("ul", { class: "ks-list" }, u.map((m) => P(`${m.name}${m.quantity !== null ? ` — ${Le(m.quantity, m.unit)}` : ""}`, `${m.location_text || "место не указано"} · ${L(m.updated_at)}`))) : O()
+        u.length ? a("ul", { class: "ks-list" }, u.map((m) => L(`${m.name}${m.quantity !== null ? ` — ${Le(m.quantity, m.unit)}` : ""}`, `${m.location_text || "место не указано"} · ${I(m.updated_at)}`))) : q()
       )
     ))
   });
   return r.input.addEventListener("input", () => {
-    o = r.input.value.trim(), c.refresh();
-  }), $(e, a("div", { class: "ks-page" }, G(k.memory, l), ze(t, () => c.refresh()), a("div", { class: "ks-card ks-filters" }, r.el), s)), B(t, i, ["notes", "items", "locations"], () => c.refresh()), i.add(() => c.dispose()), U(i);
+    o = r.input.value.trim(), d.refresh();
+  }), $(e, a("div", { class: "ks-page" }, Z(k.memory, l), Ne(t, () => d.refresh()), a("div", { class: "ks-card ks-filters" }, r.el), s)), B(t, i, ["notes", "items", "locations"], () => d.refresh()), i.add(() => d.dispose()), F(i);
 }
 async function ht(e, n, t, i) {
   const s = await E(e, "review.approve", t ? { id: n, proposal: t } : { id: n });
   if (!s.ok)
     return !1;
   const o = s.data.results.filter((r) => !r.ok).map((r) => r.message);
-  return s.data.still_pending ? (C(`Не выполнено, осталось в очереди: ${o.join(" ")}`, "bad", 9e3), !1) : (C(o.length ? `Выполнено частично. ${o.join(" ")}` : i, o.length ? "warn" : "good", o.length ? 9e3 : 4500), !0);
+  return s.data.still_pending ? (O(`Не выполнено, осталось в очереди: ${o.join(" ")}`, "bad", 9e3), !1) : (O(o.length ? `Выполнено частично. ${o.join(" ")}` : i, o.length ? "warn" : "good", o.length ? 9e3 : 4500), !0);
 }
 function ln(e, n, t) {
   fe("Проверить и поправить", (i) => {
     const s = n.proposal.map((r) => {
-      const c = (we[String(r.type)]?.fields ?? []).filter((d) => d.kind !== "json").map((d) => {
-        const u = r[d.name], p = d.kind === "iso" && typeof u == "string" ? ae(u) : d.kind === "bool" ? u === !0 : ct(d, u);
+      const d = (we[String(r.type)]?.fields ?? []).filter((c) => c.kind !== "json").map((c) => {
+        const u = r[c.name], p = c.kind === "iso" && typeof u == "string" ? ae(u) : c.kind === "bool" ? u === !0 : ct(c, u);
         return {
-          name: d.name,
-          label: d.label,
-          type: d.kind === "bool" ? "checkbox" : d.kind === "enum" ? "select" : d.kind === "iso" ? "datetime-local" : (d.kind === "num", "text"),
+          name: c.name,
+          label: c.label,
+          type: c.kind === "bool" ? "checkbox" : c.kind === "enum" ? "select" : c.kind === "iso" ? "datetime-local" : (c.kind === "num", "text"),
           value: p,
-          options: d.options?.map((m) => ({ value: m, label: k.channels[m] ?? k.lists[m] ?? { set: "заменить на это число", add: "прибавить к имеющемуся" }[m] ?? m })),
+          options: c.options?.map((m) => ({ value: m, label: k.channels[m] ?? k.lists[m] ?? { set: "заменить на это число", add: "прибавить к имеющемуся" }[m] ?? m })),
           wide: !0
         };
       });
-      return { intent: r, fields: c, handle: pe(c, { submitLabel: k.save, onSubmit: () => {
+      return { intent: r, fields: d, handle: pe(d, { submitLabel: k.save, onSubmit: () => {
       } }) };
     }), o = async () => {
-      const r = s.map(({ intent: l, handle: c }) => zt(l, c.values(), (d) => ie(d)));
+      const r = s.map(({ intent: l, handle: d }) => Nt(l, d.values(), (c) => ie(c)));
       await ht(e, n.id, r, "Выполнено с вашими правками") && (i(!0), t());
     };
     return a(
       "div",
       null,
       a("p", { class: "ks-muted" }, `Вы сказали: «${n.command_text ?? ""}». ${n.reason}`),
-      s.map(({ intent: r, handle: l }) => a("fieldset", { class: "dv-intent" }, a("legend", null, It(String(r.type))), a("div", { class: "ks-form-grid" }, Object.values(l.fields).map((c) => c.el)))),
+      s.map(({ intent: r, handle: l }) => a("fieldset", { class: "dv-intent" }, a("legend", null, It(String(r.type))), a("div", { class: "ks-form-grid" }, Object.values(l.fields).map((d) => d.el)))),
       a("div", { class: "ks-form-actions" }, A("Применить с правками", { variant: "primary", onClick: () => void o() }), A(k.cancel, { onClick: () => i(!1) }))
     );
   });
 }
 function dn(e, n, t) {
-  const i = new I(), s = a("div"), o = async (u, p, m) => {
+  const i = new N(), s = a("div"), o = async (u, p, m) => {
     await ht(t, u, p, "Выполнено") && m();
   };
   let r = "pending";
-  const l = a("div", { class: "ks-row dv-chips" }), c = () => Ie(l, () => {
+  const l = a("div", { class: "ks-row dv-chips" }), d = () => Ie(l, () => {
     $(l, ["pending", "approved", "rejected"].map(
       (u) => a("button", { type: "button", dataset: { key: u }, class: `ks-chip${r === u ? " is-active" : ""}`, "aria-pressed": String(r === u), onClick: () => {
-        r = u, c(), d.refresh();
+        r = u, d(), c.refresh();
       } }, u === "pending" ? "Ждут решения" : u === "approved" ? "Принятые" : "Отклонённые")
     ));
-  }), d = R({
+  }), c = U({
     host: s,
     load: (u) => T(t, "api/review", { status: r }, u),
     render: ({ items: u }, p) => u.length ? a("div", { class: "ks-grid" }, u.map(
-      (m) => M(
+      (m) => P(
         a("span", null, `«${m.command_text ?? "—"}»`),
         a(
           "div",
           null,
-          a("p", { class: "ks-muted" }, `${L(m.ts)} · уверенность ${m.confidence === null ? "—" : Math.round(m.confidence * 100) + "%"} · ${m.reason}`),
-          a("ul", { class: "ks-list" }, m.proposal.map((v) => a("li", null, ut(v, (b) => L(b))))),
+          a("p", { class: "ks-muted" }, `${I(m.ts)} · уверенность ${m.confidence === null ? "—" : Math.round(m.confidence * 100) + "%"} · ${m.reason}`),
+          a("ul", { class: "ks-list" }, m.proposal.map((v) => a("li", null, ut(v, (b) => I(b))))),
           r === "pending" ? a(
             "div",
             { class: "ks-row" },
@@ -1894,12 +1909,12 @@ function dn(e, n, t) {
       )
     )) : a("div", { class: "ks-empty" }, a("strong", null, r === "pending" ? "Всё проверено" : "Пусто"), a("p", null, r === "pending" ? "Неуверенные команды попадают сюда — я ничего не записываю без вашего подтверждения." : ""))
   });
-  return c(), $(e, a("div", { class: "ks-page" }, G(k.review), a("p", { class: "ks-muted" }, "Здесь команды, в которых я не уверен, и всё, что предложила языковая модель. Пока вы не подтвердите, ничего не изменилось."), l, s)), B(t, i, ["review", "commands"], () => d.refresh()), i.add(() => d.dispose()), U(i);
+  return d(), $(e, a("div", { class: "ks-page" }, Z(k.review), a("p", { class: "ks-muted" }, "Здесь команды, в которых я не уверен, и всё, что предложила языковая модель. Пока вы не подтвердите, ничего не изменилось."), l, s)), B(t, i, ["review", "commands"], () => c.refresh()), i.add(() => c.dispose()), F(i);
 }
-const Ke = { location: "domovoy.locations", note: "domovoy.memory", task: "domovoy.tasks", event: "domovoy.calendar" };
+const Je = { location: "domovoy.locations", note: "domovoy.memory", task: "domovoy.tasks", event: "domovoy.calendar" };
 function cn(e, n, t) {
-  const i = new I(), s = /* @__PURE__ */ new Set(), o = a("input", { class: "ks-input dv-command", type: "search", placeholder: k.search_placeholder, "aria-label": k.search, autocomplete: "off", value: String(n.q ?? "") }), r = a("div", { class: "ks-row dv-chips" }), l = a("div", { class: "dv-results", "aria-live": "polite" }), c = a("p", { class: "ks-muted dv-search-meta" });
-  let d = 0, u = null;
+  const i = new N(), s = /* @__PURE__ */ new Set(), o = a("input", { class: "ks-input dv-command", type: "search", placeholder: k.search_placeholder, "aria-label": k.search, autocomplete: "off", value: String(n.q ?? "") }), r = a("div", { class: "ks-row dv-chips" }), l = a("div", { class: "dv-results", "aria-live": "polite" }), d = a("p", { class: "ks-muted dv-search-meta" });
+  let c = 0, u = null;
   const p = () => Ie(r, () => {
     $(
       r,
@@ -1916,40 +1931,40 @@ function cn(e, n, t) {
       )
     );
   }), m = (h) => {
-    h.kind === "item" ? kt(t, h.id, () => void v()) : Ke[h.kind] && t.navigate(Ke[h.kind], { id: String(h.id) });
+    h.kind === "item" ? kt(t, h.id, () => void v()) : Je[h.kind] && t.navigate(Je[h.kind], { id: String(h.id) });
   }, v = async () => {
     const h = o.value.trim();
     u?.abort();
-    const w = d += 1;
+    const w = c += 1;
     if (!h) {
-      $(l, a("p", { class: "ks-muted" }, "Ищет по вещам, местам, заметкам, задачам и событиям — даже с опечатками.")), c.textContent = "";
+      $(l, a("p", { class: "ks-muted" }, "Ищет по вещам, местам, заметкам, задачам и событиям — даже с опечатками.")), d.textContent = "";
       return;
     }
     u = new AbortController(), $(l, nt());
     const g = await T(t, "api/search", { q: h, kinds: [...s].join(",") || void 0, limit: 30 }, u.signal);
-    if (w !== d)
+    if (w !== c)
       return;
     if (!g.ok) {
       g.error.code !== "aborted" && $(l, a("p", { class: "ks-error" }, g.error.message));
       return;
     }
-    const { hits: y, embedder: _, mode: z } = g.data;
-    c.textContent = `${z === "hybrid" ? "Смысловой поиск" : "Поиск по словам и опечаткам"} · ${_}`, $(
+    const { hits: y, embedder: S, mode: z } = g.data;
+    d.textContent = `${z === "hybrid" ? "Смысловой поиск" : "Поиск по словам и опечаткам"} · ${S}`, $(
       l,
       y.length ? a("ul", { class: "ks-list ks-list-click" }, y.map((j) => {
-        const F = P(
+        const V = L(
           a("span", null, D(k.kinds[j.kind] ?? j.kind, "info"), " ", j.title),
           j.snippet
         );
-        return F.tabIndex = 0, F.setAttribute("role", "button"), F.addEventListener("click", () => m(j)), F.addEventListener("keydown", (f) => {
-          (f.key === "Enter" || f.key === " ") && (f.preventDefault(), m(j));
-        }), F;
-      })) : O(`Ничего не нашлось по «${h}». Возможно, я этого ещё не запоминал.`)
+        return V.tabIndex = 0, V.setAttribute("role", "button"), V.addEventListener("click", () => m(j)), V.addEventListener("keydown", (C) => {
+          (C.key === "Enter" || C.key === " ") && (C.preventDefault(), m(j));
+        }), V;
+      })) : q(`Ничего не нашлось по «${h}». Возможно, я этого ещё не запоминал.`)
     );
   }, b = et(() => void v(), 250);
-  return o.addEventListener("input", () => b()), i.add(() => b.cancel()), i.add(() => u?.abort()), p(), $(e, a("div", { class: "ks-page" }, a("div", { class: "ks-card" }, o, r, c), l)), v(), B(t, i, ["items", "locations", "notes", "tasks", "calendar"], () => void v(), 500), U(i);
+  return o.addEventListener("input", () => b()), i.add(() => b.cancel()), i.add(() => u?.abort()), p(), $(e, a("div", { class: "ks-page" }, a("div", { class: "ks-card" }, o, r, d), l)), v(), B(t, i, ["items", "locations", "notes", "tasks", "calendar"], () => void v(), 500), F(i);
 }
-const Ze = (e) => e.split(/[\n,]/).map((n) => n.trim()).filter(Boolean), un = (e) => Array.isArray(e) ? e.join(", ") : "";
+const Ke = (e) => e.split(/[\n,]/).map((n) => n.trim()).filter(Boolean), un = (e) => Array.isArray(e) ? e.join(", ") : "";
 function mn(e) {
   let n = [];
   try {
@@ -1970,7 +1985,7 @@ function ce(e, n, t, i) {
         o.showErrors(r.error);
         return;
       }
-      C("Сохранено", "good"), i();
+      O("Сохранено", "good"), i();
     }
   }).el;
 }
@@ -1979,25 +1994,25 @@ function pn(e, n) {
   document.body.appendChild(i), i.click(), i.remove(), window.setTimeout(() => URL.revokeObjectURL(t), 1e4);
 }
 function fn(e, n, t) {
-  const i = new I(), s = a("div"), o = R({
+  const i = new N(), s = a("div"), o = U({
     host: s,
     load: async (r) => {
-      const [l, c, d, u] = await Promise.all([
+      const [l, d, c, u] = await Promise.all([
         T(t, "api/settings", void 0, r),
         T(t, "api/voice/status", void 0, r),
         T(t, "api/state", void 0, r),
         T(t, "api/backups", void 0, r)
       ]);
-      return l.ok ? c.ok ? d.ok ? { ok: !0, data: { settings: l.data.settings, voice: c.data, state: d.data, backups: u.ok ? u.data.backups : [] } } : d : c : l;
+      return l.ok ? d.ok ? c.ok ? { ok: !0, data: { settings: l.data.settings, voice: d.data, state: c.data, backups: u.ok ? u.data.backups : [] } } : c : d : l;
     },
-    render: ({ settings: r, voice: l, state: c, backups: d }, u) => {
-      oe(c.timezone);
+    render: ({ settings: r, voice: l, state: d, backups: c }, u) => {
+      oe(d.timezone);
       const p = ee("Имя ассистента", "Так к нему обращаются и так он представляется в ответах. Имя распознаётся всегда; в «Других обращениях» можно добавить падежи, старое имя и ники.", ce(t, [
         { name: "identity_name", label: "Имя", required: !0, value: r.identity?.name ?? "Домовой", wide: !0 },
         { name: "identity_gender", label: "Как говорить о себе", type: "select", options: [{ value: "male", label: "В мужском роде — «понял», «готов»" }, { value: "female", label: "В женском роде — «поняла», «готова»" }], value: r.identity?.gender ?? "male", hint: "Влияет на формы речи; нейтральные «Записано» и «Готово» не меняются.", wide: !0 },
         { name: "identity_aliases", label: "Другие обращения", type: "textarea", rows: 3, value: un(r.identity?.aliases), hint: "Через запятую или с новой строки. Например: нейри, нейрия, нейрию. Для «домового» падежи уже добавлены.", wide: !0 }
-      ], (y) => ({ identity: { name: String(y.identity_name).trim(), gender: String(y.identity_gender), aliases: Ze(String(y.identity_aliases)) } }), u)), m = ee("Общие", null, ce(t, [
-        { name: "timezone", label: "Часовой пояс", type: "select", options: mn(r.timezone), value: r.timezone, hint: `Сейчас на сервере: ${c.timezone}`, wide: !0 },
+      ], (y) => ({ identity: { name: String(y.identity_name).trim(), gender: String(y.identity_gender), aliases: Ke(String(y.identity_aliases)) } }), u)), m = ee("Общие", null, ce(t, [
+        { name: "timezone", label: "Часовой пояс", type: "select", options: mn(r.timezone), value: r.timezone, hint: `Сейчас на сервере: ${d.timezone}`, wide: !0 },
         { name: "default_reminder_hour", label: "Во сколько напоминать, если сказали только «завтра» (час)", type: "number", min: 0, max: 23, required: !0, value: r.default_reminder_hour, wide: !0 },
         { name: "default_event_minutes", label: "Длительность события по умолчанию, минут", type: "number", min: 5, max: 1440, required: !0, value: r.default_event_minutes, wide: !0 }
       ], (y) => ({ timezone: String(y.timezone), default_reminder_hour: Number(y.default_reminder_hour), default_event_minutes: Number(y.default_event_minutes) }), u)), v = ee("Насколько доверять пониманию команд", "Правила понимают привычные фразы сами. Если уверенность ниже порога — команда не выполняется, а ждёт вашего решения в «Проверке». Записи, предложенные языковой моделью, всегда идут на проверку, пока вы явно не разрешите иначе.", ce(t, [
@@ -2018,7 +2033,7 @@ function fn(e, n, t) {
           { name: "quiet_from", label: "Тихие часы с", type: "time", value: r.speak.quiet_from },
           { name: "quiet_to", label: "до", type: "time", value: r.speak.quiet_to },
           { name: "fallback", label: "Если колонка не ответила", type: "select", options: [{ value: "telegram", label: "Написать в Telegram" }, { value: "ui", label: "Показать на экране" }, { value: "none", label: "Ничего" }], value: r.speak.fallback, wide: !0 }
-        ], (y) => ({ voice: { enabled: y.enabled === !0, trigger_words: Ze(String(y.trigger_words)), window_s: Number(y.window_s), reply: y.reply, room: String(y.room).trim() }, speak: { enabled: y.speak_enabled === !0, quiet_from: String(y.quiet_from), quiet_to: String(y.quiet_to), fallback: y.fallback } }), u)
+        ], (y) => ({ voice: { enabled: y.enabled === !0, trigger_words: Ke(String(y.trigger_words)), window_s: Number(y.window_s), reply: y.reply, room: String(y.room).trim() }, speak: { enabled: y.speak_enabled === !0, quiet_from: String(y.quiet_from), quiet_to: String(y.quiet_to), fallback: y.fallback } }), u)
       ), h = ee("Сообщения", null, ce(t, [
         { name: "sandbox", label: "Тестовый режим: ничего не отправлять наружу (Telegram, HA-уведомления)", type: "checkbox", value: r.messaging.sandbox, hint: "Сообщения останутся в «Журнале → Отправка» — удобно проверять сценарии.", wide: !0 }
       ], (y) => ({ messaging: { sandbox: y.sandbox === !0 } }), u)), w = a("input", { type: "file", accept: "application/json,.json", hidden: !0 });
@@ -2026,18 +2041,18 @@ function fn(e, n, t) {
         const y = w.files?.[0];
         if (w.value = "", !y)
           return;
-        let _;
+        let S;
         try {
-          _ = JSON.parse(await y.text());
+          S = JSON.parse(await y.text());
         } catch {
-          C("Это не JSON-файл", "bad");
+          O("Это не JSON-файл", "bad");
           return;
         }
-        await it({ title: "Заменить все данные?", message: "Все текущие данные (вещи, места, заметки, задачи, напоминания, журнал) будут заменены содержимым файла. Перед этим я сделаю резервную копию.", confirmLabel: "Заменить", destructive: !0 }) && (await E(t, "data.import", { data: _ }, { success: "Данные импортированы" })).ok && u();
+        await it({ title: "Заменить все данные?", message: "Все текущие данные (вещи, места, заметки, задачи, напоминания, журнал) будут заменены содержимым файла. Перед этим я сделаю резервную копию.", confirmLabel: "Заменить", destructive: !0 }) && (await E(t, "data.import", { data: S }, { success: "Данные импортированы" })).ok && u();
       });
       const g = ee(
         "Данные и резервные копии",
-        `Версия ${c.version}. В базе: ${c.counts.items} вещей, ${c.counts.locations} мест, ${c.counts.notes} заметок. Пароли и токены в экспорт не попадают.`,
+        `Версия ${d.version}. В базе: ${d.counts.items} вещей, ${d.counts.locations} мест, ${d.counts.notes} заметок. Пароли и токены в экспорт не попадают.`,
         a(
           "div",
           { class: "ks-row" },
@@ -2046,23 +2061,23 @@ function fn(e, n, t) {
           } }),
           A("Скачать экспорт (JSON)", { onClick: async () => {
             const y = await T(t, "api/export");
-            y.ok ? pn(`domovoy-export-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`, y.data) : C(y.error.message, "bad");
+            y.ok ? pn(`domovoy-export-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`, y.data) : O(y.error.message, "bad");
           } }),
           A("Импортировать…", { variant: "danger", onClick: () => w.click() }),
           w
         ),
-        d.length ? a("ul", { class: "ks-list" }, d.slice(0, 8).map((y) => a("li", null, a("div", { class: "ks-grow" }, y.name, a("div", { class: "ks-sub" }, `${Math.max(1, Math.round(y.bytes / 1024))} КБ`))))) : O("Резервных копий пока нет — они создаются раз в сутки автоматически."),
+        c.length ? a("ul", { class: "ks-list" }, c.slice(0, 8).map((y) => a("li", null, a("div", { class: "ks-grow" }, y.name, a("div", { class: "ks-sub" }, `${Math.max(1, Math.round(y.bytes / 1024))} КБ`))))) : q("Резервных копий пока нет — они создаются раз в сутки автоматически."),
         a("small", { class: "ks-muted" }, "Копии лежат в /config/kiosk-scene/domovoy/backups — они попадают и в общую резервную копию Home Assistant.")
       );
       return a("div", { class: "dv-stack" }, p, m, v, b, h, g);
     }
   });
-  return $(e, a("div", { class: "ks-page" }, G(k.settings), s)), B(t, i, ["settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), U(i);
+  return $(e, a("div", { class: "ks-page" }, Z(k.settings), s)), B(t, i, ["settings"], () => o.refresh(), 800, e), i.add(() => o.dispose()), F(i);
 }
 const kn = Object.entries(k.channels).map(([e, n]) => ({ value: e, label: n }));
-function Ge(e, n, t, i) {
-  const s = Z(), o = t?.kind ?? "time", r = t?.trigger ?? {}, l = o !== "time" && r.type === "state", c = r.window ? { window: r.window } : {};
-  K(
+function Ze(e, n, t, i) {
+  const s = K(), o = t?.kind ?? "time", r = t?.trigger ?? {}, l = o !== "time" && r.type === "state", d = r.window ? { window: r.window } : {};
+  J(
     t ? "Изменить напоминание" : "Новое напоминание",
     [
       { name: "text", label: "О чём напомнить", required: !0, value: t?.text ?? "", wide: !0 },
@@ -2070,31 +2085,31 @@ function Ge(e, n, t, i) {
       { name: "due_at", label: "Дата и время", type: "datetime-local", value: t?.due_at ? ae(t.due_at, s) : "" },
       { name: "place", label: "Комната", value: r.place && r.type === "room" ? String(r.place) : "", hint: "Для «когда зайду в комнату»: как в настройках комнат, например «кухня»." },
       { name: "channel", label: "Как сообщить", type: "select", options: kn, value: t?.channel ?? "speak" },
-      { name: "recipient", label: "Кому", type: "select", options: [{ value: "self", label: "Мне" }, ...n.filter((d) => !d.is_self).map((d) => ({ value: d.name, label: d.name }))], value: t?.recipient ?? "self" }
+      { name: "recipient", label: "Кому", type: "select", options: [{ value: "self", label: "Мне" }, ...n.filter((c) => !c.is_self).map((c) => ({ value: c.name, label: c.name }))], value: t?.recipient ?? "self" }
     ],
-    async (d) => {
-      const u = String(d.mode), p = { text: String(d.text).trim(), channel: d.channel, recipient: d.recipient };
+    async (c) => {
+      const u = String(c.mode), p = { text: String(c.text).trim(), channel: c.channel, recipient: c.recipient };
       if (u !== "keep") if (u === "time") {
-        if (!d.due_at)
+        if (!c.due_at)
           return { ok: !1, error: { code: "validation", message: "Укажите время", fields: { due_at: "Укажите время" } } };
-        p.due_at = ie(String(d.due_at), s), p.trigger = null;
+        p.due_at = ie(String(c.due_at), s), p.trigger = null;
       } else if (u === "room") {
-        if (!String(d.place).trim())
+        if (!String(c.place).trim())
           return { ok: !1, error: { code: "validation", message: "Укажите комнату", fields: { place: "Укажите комнату" } } };
-        p.trigger = { type: "room", place: String(d.place).trim(), require_transition: !0, ...c };
+        p.trigger = { type: "room", place: String(c.place).trim(), require_transition: !0, ...d };
       } else {
         const v = await e.readData("domovoy.api", { path: "api/settings" }), b = v.ok ? v.data.settings.ha.person_entity : "";
         if (!b)
           return { ok: !1, error: { code: "validation", message: "Сначала укажите person-сущность в Интеграциях → Home Assistant." } };
-        p.trigger = { type: "presence", person: b, place: "home", require_transition: !0, ...c };
+        p.trigger = { type: "presence", person: b, place: "home", require_transition: !0, ...d };
       }
       const m = t ? await e.invokeAction("domovoy.actions", "reminders.update", { id: t.id, ...p }) : await e.invokeAction("domovoy.actions", "reminders.create", p);
       return m.ok && i(), m;
     }
   );
 }
-function Je(e, n, t, i) {
-  K(
+function Ge(e, n, t, i) {
+  J(
     n ? "Изменить задачу" : "Новая задача",
     [
       { name: "title", label: k.title, required: !0, value: n?.title ?? "", wide: !0 },
@@ -2109,9 +2124,9 @@ function Je(e, n, t, i) {
   );
 }
 function gn(e, n, t) {
-  const i = new I(), s = a("div");
+  const i = new N(), s = a("div");
   let o = !1, r = [];
-  const l = A("Напоминание", { variant: "primary" }), c = A("Задача", { variant: "secondary" }), d = ue({ name: "done", label: "Показывать выполненное", type: "checkbox", value: !1 }), u = R({
+  const l = A("Напоминание", { variant: "primary" }), d = A("Задача", { variant: "secondary" }), c = ue({ name: "done", label: "Показывать выполненное", type: "checkbox", value: !1 }), u = U({
     host: s,
     load: async (p) => {
       const v = await ke(
@@ -2124,10 +2139,10 @@ function gn(e, n, t) {
       return { ok: !0, data: [v.data[0], v.data[1], b.ok ? b.data : { contacts: [] }] };
     },
     render: ([{ reminders: p }, { tasks: m }, v], b) => {
-      r = v.contacts, l.onclick = () => Ge(t, r, null, b), c.onclick = () => Je(t, null, "tasks", b);
-      const h = (g) => P(
+      r = v.contacts, l.onclick = () => Ze(t, r, null, b), d.onclick = () => Ge(t, null, "tasks", b);
+      const h = (g) => L(
         a("span", null, g.text, " ", ve(g.state)),
-        `${g.kind === "time" && g.due_at ? `${L(g.due_at)}${g.state === "pending" ? ` (${Pe(g.due_at)})` : ""}` : dt(g.trigger)}${g.recurrence ? ` · ${he(g.recurrence)}` : ""} · ${k.channels[g.channel] ?? g.channel}${g.recipient && g.recipient !== "self" ? ` → ${g.recipient}` : ""}`,
+        `${g.kind === "time" && g.due_at ? `${I(g.due_at)}${g.state === "pending" ? ` (${Pe(g.due_at)})` : ""}` : dt(g.trigger)}${g.recurrence ? ` · ${he(g.recurrence)}` : ""} · ${k.channels[g.channel] ?? g.channel}${g.recipient && g.recipient !== "self" ? ` → ${g.recipient}` : ""}`,
         a(
           "div",
           { class: "ks-row" },
@@ -2137,45 +2152,45 @@ function gn(e, n, t) {
           g.state === "pending" || g.state === "fired" ? x("+10 мин", async () => {
             (await E(t, "reminders.snooze", { id: g.id, minutes: 10 })).ok && b();
           }) : null,
-          g.state === "pending" ? x(k.edit, () => Ge(t, r, g, b)) : null,
+          g.state === "pending" ? x(k.edit, () => Ze(t, r, g, b)) : null,
           x(k.delete, async () => {
             (await E(t, "reminders.delete", { id: g.id }, { confirm: { title: "Удалить напоминание", message: `«${g.text}»` } })).ok && b();
           }, "danger")
         ),
         g.state === "fired" ? "dv-fired" : ""
       ), w = (g) => {
-        const y = m.filter((_) => _.list === g);
+        const y = m.filter((S) => S.list === g);
         return y.length ? a("ul", { class: "ks-list" }, y.map(
-          (_) => P(
-            a("span", { class: _.done ? "dv-done" : "" }, _.title),
-            [_.due_date ? `срок ${_.due_date}` : "", _.recurrence ? he(_.recurrence) : "", _.notes].filter(Boolean).join(" · "),
+          (S) => L(
+            a("span", { class: S.done ? "dv-done" : "" }, S.title),
+            [S.due_date ? `срок ${S.due_date}` : "", S.recurrence ? he(S.recurrence) : "", S.notes].filter(Boolean).join(" · "),
             a(
               "div",
               { class: "ks-row" },
-              x(_.done ? "Вернуть" : g === "shopping" ? "Куплено" : "Готово", async () => {
-                (await E(t, "tasks.complete", { id: _.id, done: !_.done })).ok && b();
-              }, _.done ? "secondary" : "primary"),
-              x(k.edit, () => Je(t, _, g, b)),
+              x(S.done ? "Вернуть" : g === "shopping" ? "Куплено" : "Готово", async () => {
+                (await E(t, "tasks.complete", { id: S.id, done: !S.done })).ok && b();
+              }, S.done ? "secondary" : "primary"),
+              x(k.edit, () => Ge(t, S, g, b)),
               x(k.delete, async () => {
-                (await E(t, "tasks.delete", { id: _.id }, { confirm: { title: "Удалить задачу", message: `«${_.title}»` } })).ok && b();
+                (await E(t, "tasks.delete", { id: S.id }, { confirm: { title: "Удалить задачу", message: `«${S.title}»` } })).ok && b();
               }, "danger")
             )
           )
-        )) : O();
+        )) : q();
       };
       return a(
         "div",
         { class: "ks-grid" },
-        M("Напоминания", p.length ? a("ul", { class: "ks-list" }, p.map(h)) : O("Напоминаний нет.")),
-        M(k.lists.tasks, w("tasks")),
-        M(k.lists.shopping, w("shopping")),
-        M(k.lists.chores, w("chores"))
+        P("Напоминания", p.length ? a("ul", { class: "ks-list" }, p.map(h)) : q("Напоминаний нет.")),
+        P(k.lists.tasks, w("tasks")),
+        P(k.lists.shopping, w("shopping")),
+        P(k.lists.chores, w("chores"))
       );
     }
   });
-  return d.input.addEventListener("change", () => {
-    o = d.input.checked, u.refresh();
-  }), $(e, a("div", { class: "ks-page" }, G(k.tasks, l, c), a("div", { class: "ks-card ks-filters" }, d.el), s)), B(t, i, ["reminders", "tasks", "contacts"], () => u.refresh()), i.add(() => u.dispose()), U(i);
+  return c.input.addEventListener("change", () => {
+    o = c.input.checked, u.refresh();
+  }), $(e, a("div", { class: "ks-page" }, Z(k.tasks, l, d), a("div", { class: "ks-card ks-filters" }, c.el), s)), B(t, i, ["reminders", "tasks", "contacts"], () => u.refresh()), i.add(() => u.dispose()), F(i);
 }
 function Xe(e) {
   let n = 0;
@@ -2215,10 +2230,10 @@ class bn {
     if (this.state === "idle")
       return this.calibrated ? (this.noise = s < this.noise ? this.noise * 0.9 + s * 0.1 : this.noise * 0.995 + s * 5e-3, this.keepPreroll(n), this.loudMs = r ? this.loudMs + i : 0, this.loudMs >= this.o.startMs && (this.state = "speech", this.quietMs = 0, this.chunks = [...this.preroll], this.samples = this.prerollSamples, this.preroll = [], this.prerollSamples = 0, t.push({ type: "start" })), t) : (this.calibSum += s, this.calibFrames += 1, this.calibMs += i, this.calibMs >= this.o.calibrateMs && (this.noise = Math.max(2e-3, this.calibSum / this.calibFrames), this.calibrated = !0), this.keepPreroll(n), t);
     this.chunks.push(n), this.samples += n.length, this.quietMs = r ? 0 : this.quietMs + i;
-    const l = this.samples / this.o.sampleRate * 1e3, c = l >= this.o.maxMs && this.quietMs < this.o.hangoverMs;
-    if (this.quietMs >= this.o.hangoverMs || c) {
-      const d = l - this.quietMs, u = this.collect(), p = Xe(u);
-      this.reset(), c ? (this.noise = Math.max(this.noise, p), t.push({ type: "discard", reason: "continuous" })) : t.push(d < this.o.minMs ? { type: "discard", reason: "short" } : { type: "end", samples: u, durationMs: l });
+    const l = this.samples / this.o.sampleRate * 1e3, d = l >= this.o.maxMs && this.quietMs < this.o.hangoverMs;
+    if (this.quietMs >= this.o.hangoverMs || d) {
+      const c = l - this.quietMs, u = this.collect(), p = Xe(u);
+      this.reset(), d ? (this.noise = Math.max(this.noise, p), t.push({ type: "discard", reason: "continuous" })) : t.push(c < this.o.minMs ? { type: "discard", reason: "short" } : { type: "end", samples: u, durationMs: l });
     }
     return t;
   }
@@ -2241,11 +2256,11 @@ function hn(e, n, t) {
     return e;
   const i = n / t, s = Math.floor(e.length / i), o = new Float32Array(s);
   for (let r = 0; r < s; r += 1) {
-    const l = Math.floor(r * i), c = Math.min(e.length, Math.floor((r + 1) * i));
-    let d = 0;
-    for (let u = l; u < c; u += 1)
-      d += e[u];
-    o[r] = c > l ? d / (c - l) : 0;
+    const l = Math.floor(r * i), d = Math.min(e.length, Math.floor((r + 1) * i));
+    let c = 0;
+    for (let u = l; u < d; u += 1)
+      c += e[u];
+    o[r] = d > l ? c / (d - l) : 0;
   }
   return o;
 }
@@ -2265,7 +2280,7 @@ function yn() {
   return typeof navigator > "u" || !navigator.mediaDevices?.getUserMedia ? window.isSecureContext === !1 ? "Браузер разрешает микрофон только на https:// или localhost. Откройте киоск по HTTPS или добавьте адрес в исключения браузера." : "В этом браузере нет доступа к микрофону." : null;
 }
 function wn(e) {
-  let n = null, t = null, i = null, s = null, o = null, r = !1, l = !1, c = !1, d = 0, u = !1, p;
+  let n = null, t = null, i = null, s = null, o = null, r = !1, l = !1, d = !1, c = 0, u = !1, p;
   const m = (h) => e.onState(h), v = (h, w = 0) => {
     window.clearTimeout(p), w > 0 ? (m(h), p = window.setTimeout(() => l && !r && m({ kind: "listening" }), w)) : m(h);
   }, b = async (h, w) => {
@@ -2291,53 +2306,53 @@ function wn(e) {
       return r;
     },
     async start() {
-      if (l || c)
+      if (l || d)
         return;
       const h = yn();
       if (h && !e.mediaDevices) {
         m({ kind: "unavailable", reason: h });
         return;
       }
-      const w = d;
-      c = !0, m({ kind: "starting" });
+      const w = c;
+      d = !0, m({ kind: "starting" });
       let g;
       try {
         g = await (e.mediaDevices ?? navigator.mediaDevices).getUserMedia({ audio: { channelCount: 1, echoCancellation: !0, noiseSuppression: !0, autoGainControl: !0 } });
-      } catch (_) {
-        if (c = !1, w !== d)
+      } catch (S) {
+        if (d = !1, w !== c)
           return;
-        const z = _?.name;
+        const z = S?.name;
         m({ kind: "unavailable", reason: z === "NotAllowedError" ? "Доступ к микрофону запрещён в браузере." : z === "NotFoundError" ? "Микрофон не найден." : "Не удалось открыть микрофон." });
         return;
       }
-      if (w !== d) {
-        g.getTracks().forEach((_) => _.stop()), c = !1;
+      if (w !== c) {
+        g.getTracks().forEach((S) => S.stop()), d = !1;
         return;
       }
       if (n = g, t = e.audioContextFactory ? e.audioContextFactory() : new AudioContext(), t.state === "suspended") {
-        const _ = () => void t?.resume().catch(() => {
+        const S = () => void t?.resume().catch(() => {
         });
-        _(), document.addEventListener("pointerdown", _, { once: !0 });
+        S(), document.addEventListener("pointerdown", S, { once: !0 });
       }
       const y = t.sampleRate;
-      o = new bn({ sampleRate: y }), s = t.createMediaStreamSource(n), i = t.createScriptProcessor(4096, 1, 1), i.onaudioprocess = (_) => {
+      o = new bn({ sampleRate: y }), s = t.createMediaStreamSource(n), i = t.createScriptProcessor(4096, 1, 1), i.onaudioprocess = (S) => {
         if (r || !l || !o)
           return;
-        const z = new Float32Array(_.inputBuffer.getChannelData(0));
+        const z = new Float32Array(S.inputBuffer.getChannelData(0));
         for (const j of o.push(z))
           j.type === "start" ? m({ kind: "hearing" }) : j.type === "discard" ? m({ kind: "listening" }) : b(j.samples, y);
-      }, s.connect(i), i.connect(t.destination), l = !0, c = !1, n.getAudioTracks().forEach((_) => {
-        _.enabled = !r;
+      }, s.connect(i), i.connect(t.destination), l = !0, d = !1, n.getAudioTracks().forEach((S) => {
+        S.enabled = !r;
       }), m(r ? { kind: "muted" } : { kind: "listening" });
     },
     stop() {
-      d += 1, c = !1, l = !1, window.clearTimeout(p), i?.disconnect(), s?.disconnect(), i && (i.onaudioprocess = null), n?.getTracks().forEach((h) => h.stop()), t?.close().catch(() => {
+      c += 1, d = !1, l = !1, window.clearTimeout(p), i?.disconnect(), s?.disconnect(), i && (i.onaudioprocess = null), n?.getTracks().forEach((h) => h.stop()), t?.close().catch(() => {
       }), n = t = i = s = null, o = null, m({ kind: "off" });
     },
     setMuted(h) {
       r = h, o?.reset(), n?.getAudioTracks().forEach((w) => {
         w.enabled = !h;
-      }), m(h ? { kind: "muted" } : l ? { kind: "listening" } : c ? { kind: "starting" } : { kind: "off" });
+      }), m(h ? { kind: "muted" } : l ? { kind: "listening" } : d ? { kind: "starting" } : { kind: "off" });
     }
   };
 }
@@ -2380,7 +2395,7 @@ function Sn(e) {
       start(n) {
         return n.subscribe(be, "notification", (t) => {
           const i = t.payload?.text;
-          typeof i == "string" && i.trim() && C(i, "info", 12e3);
+          typeof i == "string" && i.trim() && O(i, "info", 12e3);
         });
       }
     },
@@ -2480,19 +2495,19 @@ function Te(e, n, t) {
     id: e,
     title: n,
     mount(i, s, o) {
-      const r = new I(), l = a("div", { class: `ks-scope dv-widget ${e.replace(".", "-")}`, dataset: { noSwipe: "true", theme: "kiosk" } });
+      const r = new N(), l = a("div", { class: `ks-scope dv-widget ${e.replace(".", "-")}`, dataset: { noSwipe: "true", theme: "kiosk" } });
       $(i, l);
-      let c = s;
-      const d = R({
+      let d = s;
+      const c = U({
         host: l,
         load: (p) => T(o, "api/today", void 0, p),
-        render: (p, m) => (oe(p.timezone), t(p, m, c, o))
+        render: (p, m) => (oe(p.timezone), t(p, m, d, o))
       });
-      B(o, r, ["calendar", "reminders", "tasks"], () => d.refresh(), 400);
-      const u = window.setInterval(() => d.refresh(), 6e4);
-      return r.add(() => window.clearInterval(u)), r.add(() => d.dispose()), {
+      B(o, r, ["calendar", "reminders", "tasks"], () => c.refresh(), 400);
+      const u = window.setInterval(() => c.refresh(), 6e4);
+      return r.add(() => window.clearInterval(u)), r.add(() => c.dispose()), {
         update(p) {
-          c = p, d.refresh();
+          d = p, c.refresh();
         },
         dispose: () => r.dispose()
       };
@@ -2505,7 +2520,7 @@ function Ae(e) {
 }
 const Tn = [
   Te("domovoy.next-event", "Ближайшее событие", (e) => {
-    const [n] = Ae(e).filter((s) => !s.all_day), [t] = Ae(e).filter((s) => s.all_day && J(s.start, e.timezone) === J(e.now, e.timezone)), i = n ?? t;
+    const [n] = Ae(e).filter((s) => !s.all_day), [t] = Ae(e).filter((s) => s.all_day && G(s.start, e.timezone) === G(e.now, e.timezone)), i = n ?? t;
     return i ? a("div", { class: "dv-next" }, a("div", { class: "dv-next-when" }, i.all_day ? "сегодня" : `${se(i.start, e.timezone)} · ${Pe(i.start, new Date(e.now).getTime())}`), a("div", { class: "dv-next-title" }, i.title), i.location ? a("div", { class: "ks-muted" }, i.location) : null) : a("div", { class: "dv-next" }, a("div", { class: "ks-muted" }, "Ближайших событий нет"));
   }),
   Te("domovoy.today", "Сегодня", (e, n, t) => {
@@ -2513,7 +2528,7 @@ const Tn = [
     return a(
       "div",
       { class: "dv-today-widget" },
-      i.length ? a("ul", { class: "ks-list" }, i.map((o) => a("li", null, a("span", { class: "dv-time" }, o.all_day ? "весь день" : se(o.start, e.timezone)), " ", o.title))) : O("Событий нет"),
+      i.length ? a("ul", { class: "ks-list" }, i.map((o) => a("li", null, a("span", { class: "dv-time" }, o.all_day ? "весь день" : se(o.start, e.timezone)), " ", o.title))) : q("Событий нет"),
       s.length ? a("ul", { class: "ks-list dv-reminders" }, s.map((o) => a("li", { class: o.state === "fired" ? "dv-fired" : "" }, "🔔 ", o.text))) : null,
       e.review_count ? a("div", { class: "ks-muted" }, `Ждёт проверки: ${e.review_count}`) : null
     );
@@ -2522,14 +2537,14 @@ const Tn = [
     const s = e.shopping.slice(0, $e(t.max, 8, 30));
     return s.length ? a("ul", { class: "ks-list dv-shopping" }, s.map((o) => a("li", null, a("span", { class: "ks-grow" }, o.title), x("✓", async () => {
       (await E(i, "tasks.complete", { id: o.id })).ok && n();
-    }, "ghost", "Куплено")))) : O("Список покупок пуст");
+    }, "ghost", "Куплено")))) : q("Список покупок пуст");
   }),
   {
     id: "domovoy.command",
     title: "Командная строка",
     mount(e, n, t) {
-      const i = new I(), s = a("div", { class: "ks-scope dv-widget", dataset: { noSwipe: "true", theme: "kiosk" } }, ze(t, () => t.refresh()));
-      return $(e, s), U(i);
+      const i = new N(), s = a("div", { class: "ks-scope dv-widget", dataset: { noSwipe: "true", theme: "kiosk" } }, Ne(t, () => t.refresh()));
+      return $(e, s), F(i);
     }
   }
 ];
@@ -2563,7 +2578,7 @@ const En = [
   { id: "domovoy.integrations", title: k.integrations, icon: "🔌", modes: ["admin"], order: 100, group: "Домовой", mount: Qt },
   { id: "domovoy.settings", title: k.settings, icon: "⚙️", modes: ["admin"], order: 110, group: "Домовой", mount: fn }
 ], Cn = {
-  manifest: { id: "domovoy", title: "Домовой", version: "0.1.0", apiVersion: qt },
+  manifest: { id: "domovoy", title: "Домовой", version: "0.1.0", apiVersion: Ot },
   activate(e) {
     const n = typeof e.config.apiBase == "string" && e.config.apiBase ? e.config.apiBase : "../domovoy-api/";
     if (new URL(n, window.location.href).origin !== window.location.origin)

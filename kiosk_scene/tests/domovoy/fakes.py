@@ -192,6 +192,7 @@ class FakeLLM(FakeServer):
         self.reply: Any = {"intents": []}
         self.fail_status = 0
         self.reject_response_format = False
+        self.usage_total = 0
         self.embed_dim = 8
 
     def handle(self, method, path, query, headers, body):
@@ -202,7 +203,7 @@ class FakeLLM(FakeServer):
             if self.reject_response_format and data.get("response_format"):
                 return 400, {}, {"error": {"message": "response_format unsupported"}}
             content = self.reply if isinstance(self.reply, str) else json.dumps(self.reply, ensure_ascii=False)
-            return 200, {}, {"choices": [{"message": {"content": content}}]}
+            return 200, {}, {"choices": [{"message": {"content": content}}], "usage": {"total_tokens": self.usage_total}}
         if path == "/v1/embeddings":
             data = json.loads(body)
             return 200, {}, {"data": [{"index": i, "embedding": [float((hash(t) >> k) & 3) for k in range(self.embed_dim)]} for i, t in enumerate(data["input"])]}

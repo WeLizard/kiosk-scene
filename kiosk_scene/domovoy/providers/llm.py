@@ -4,6 +4,7 @@ import json
 import re
 import time
 from typing import Any, Callable, Sequence
+from urllib.parse import urlsplit
 
 from ..errors import ProviderError, ProviderNotConfigured
 from .base import CircuitBreaker, HealthTracker, ResourceGate, json_request
@@ -17,11 +18,13 @@ class OpenAICompatibleProvider:
     """
 
     def __init__(self, config: Callable[[], dict[str, Any]], api_key: Callable[[], str], health: HealthTracker,
-                 breaker: CircuitBreaker | None = None, timeout: float = 20.0, gate: ResourceGate | None = None) -> None:
+                 breaker: CircuitBreaker | None = None, timeout: float = 20.0, gate: ResourceGate | None = None,
+                 usage: Any | None = None) -> None:
         self._config, self._api_key, self.health = config, api_key, health
         self.breaker = breaker or CircuitBreaker()
         self.timeout = timeout
         self.gate = gate or ResourceGate(1)
+        self.usage = usage
 
     def configured(self) -> bool:
         cfg = self._config()
@@ -31,21 +34,29 @@ class OpenAICompatibleProvider:
     def model_name(self) -> str:
         return str(self._config().get("model") or "")
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self, embedding: bool, base: str) -> dict[str, str]:
         key = self._api_key()
-        return {"Authorization": f"Bearer {key}"} if key else {}
+        if not key:
+            return {}
+        if embedding:
+            # Never send a cloud key to a different (usually local) embedding endpoint.
+            chat = urlsplit(str(self._config().get("base_url") or ""))
+            target = urlsplit(base)
+            if (chat.scheme, chat.hostname, chat.port) != (target.scheme, target.hostname, target.port):
+                return {}
+        return {"Authorization": f"Bearer {key}"}
 
-    def _post(self, path: str, payload: dict[str, Any], timeout: float) -> Any:
+    def _post(self, path: str, payload: dict[str, Any], timeout: float, *, embedding: bool = False) -> Any:
         cfg = self._config()
-        base = str(cfg.get("base_url") or "").rstrip("/")
+        base = str((cfg.get("embedding_base_url") if embedding else "") or cfg.get("base_url") or "").rstrip("/")
         if not base or cfg.get("enabled") is False:
             raise ProviderNotConfigured("llm", "Local AI provider is not configured")
         if self.breaker.open:
             raise ProviderError("llm: temporarily disabled after repeated failures", code="circuit_open", retryable=True, provider="llm")
         key = self._api_key()
         try:
-            data = json_request("POST", f"{base}/{path.lstrip('/')}", payload=payload, headers=self._headers(), timeout=timeout,
-                                provider="llm", secrets=[key])
+            data = json_request("POST", f"{base}/{path.lstrip('/')}", payload=payload, headers=self._headers(embedding, base),
+                                timeout=timeout, provider="llm", secrets=[key])
         except ProviderError as exc:
             self.breaker.failure()
             self.health.fail(exc, [key])
@@ -56,19 +67,26 @@ class OpenAICompatibleProvider:
 
     def chat_json(self, system: str, user: str, schema: dict[str, Any], *, deadline: float | None = None) -> dict[str, Any]:
         """Ask for JSON matching `schema`. `deadline` is seconds available in total (voice frontends are strict)."""
-        configured_timeout = float(self._config().get("timeout_s") or self.timeout)
+        cfg = self._config()
+        if self.usage is not None and not self.usage.allow():
+            raise ProviderError("llm: monthly token budget exhausted", code="budget", retryable=False, provider="llm")
+        configured_timeout = float(cfg.get("timeout_s") or self.timeout)
         timeout = min(configured_timeout, deadline) if deadline else configured_timeout
         if timeout <= 0.2:
             raise ProviderError("llm: no time left for a model call", code="deadline", retryable=True, provider="llm")
+        # Low-token mode sends no full JSON schema: the compact catalogue in the system prompt is enough,
+        # and the validator still rejects every unknown or malformed field.
+        response_format = ({"type": "json_object"} if cfg.get("low_tokens", True)
+                           else {"type": "json_schema", "json_schema": {"name": "domovoy_intents", "strict": True, "schema": schema}})
         payload = {
             "model": self.model_name or "default",
             "temperature": 0,
-            # Small local models on a CPU-only box: never let generation run away.
-            "max_tokens": int(self._config().get("max_tokens") or 320),
+            # Never let generation run away, especially on a metered API.
+            "max_tokens": int(cfg.get("max_tokens") or 160),
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             # Local reasoning models otherwise spend the whole budget thinking and return empty content.
             "reasoning_effort": "none",
-            "response_format": {"type": "json_schema", "json_schema": {"name": "domovoy_intents", "strict": True, "schema": schema}},
+            "response_format": response_format,
         }
         if not self.gate.acquire(wait=min(1.0, max(0.0, timeout - 0.2))):
             raise ProviderError("llm: model is busy with another job", code="busy", retryable=True, provider="llm")
@@ -94,6 +112,10 @@ class OpenAICompatibleProvider:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError):
             raise ProviderError("llm: unexpected response shape", code="bad_response", retryable=True, provider="llm") from None
+        if self.usage is not None:
+            reported = (data.get("usage") or {}).get("total_tokens")
+            tokens = reported if type(reported) is int and reported >= 0 else max(1, (len(system) + len(user) + len(str(content))) // 4)
+            self.usage.record(tokens)
         return extract_json_object(content)
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
@@ -101,7 +123,7 @@ class OpenAICompatibleProvider:
         if not self.gate.acquire(wait=0.0):
             raise ProviderError("llm: model is busy with another job", code="busy", retryable=True, provider="llm")
         try:
-            data = self._post("embeddings", {"model": model, "input": list(texts)}, min(self.timeout, 15.0))
+            data = self._post("embeddings", {"model": model, "input": list(texts)}, min(self.timeout, 15.0), embedding=True)
         finally:
             self.gate.release()
         try:

@@ -62,7 +62,7 @@ class SemanticRouter:
 
     def configured(self) -> bool:
         cfg = self.app.settings.get("ai")
-        return bool(cfg.get("enabled") and cfg.get("base_url") and cfg.get("embedding_model"))
+        return bool(cfg.get("enabled") and (cfg.get("embedding_base_url") or cfg.get("base_url")) and cfg.get("embedding_model"))
 
     def warmup(self) -> None:
         try:

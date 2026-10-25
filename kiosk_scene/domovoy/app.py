@@ -33,6 +33,7 @@ from .services.search import SearchService
 from .services.settings import SettingsService
 from .services.simple import ContactService, NoteService, TaskService
 from .services.triggers import TriggerEngine
+from .services.usage import TokenUsage
 
 LOG = logging.getLogger("domovoy")
 
@@ -54,6 +55,7 @@ class Domovoy:
         # -- integrations (each one can be missing or down without affecting the rest) -------------
         self.health = {name: HealthTracker(name, self.clock) for name in ("home_assistant", "telegram", "caldav", "llm", "speak", "stt")}
         self.gate = ResourceGate(1)
+        self.usage = TokenUsage(self.db, self.clock, self.settings)
         self.ha = HomeAssistantProvider(
             url=lambda: self.settings.get("ha")["url"] or self.env.ha_api_url,
             token=self._ha_token,
@@ -72,7 +74,7 @@ class Domovoy:
         self.llm = OpenAICompatibleProvider(
             config=lambda: self.settings.get("ai"), api_key=lambda: self.secrets.get("llm_api_key"),
             health=self.health["llm"], breaker=CircuitBreaker(), gate=self.gate,
-            timeout=float(self.settings.get("ai").get("timeout_s") or 20),
+            timeout=float(self.settings.get("ai").get("timeout_s") or 20), usage=self.usage,
         )
         self.stt = SttProvider(
             config=lambda: self.settings.get("voice")["stt"], api_key=lambda: self.secrets.get("llm_api_key"),
@@ -127,14 +129,14 @@ class Domovoy:
 
     def refresh_embedder(self) -> None:
         ai = self.settings.get("ai")
-        if ai.get("enabled") and ai.get("base_url") and ai.get("embedding_model"):
+        if ai.get("enabled") and (ai.get("embedding_base_url") or ai.get("base_url")) and ai.get("embedding_model"):
             self.search.set_model_embedder(ModelEmbedder(self.llm))
         else:
             self.search.set_model_embedder(None)
 
     def integrations(self) -> list[dict[str, Any]]:
         ai, voice = self.settings.get("ai"), self.settings.get("voice")
-        semantic_ready = bool(ai.get("enabled") and ai.get("base_url") and ai.get("embedding_model"))
+        semantic_ready = bool(ai.get("enabled") and (ai.get("embedding_base_url") or ai.get("base_url")) and ai.get("embedding_model"))
         tracked = {
             "home_assistant": self.ha.configured(), "telegram": self.telegram.configured(),
             "caldav": self.caldav.configured(), "llm": self.llm.configured() or semantic_ready,
@@ -148,8 +150,10 @@ class Domovoy:
             elif health.status == "unconfigured":
                 health.status = "ok" if health.last_ok else "degraded" if health.last_error else "unknown"
             entry = {**health.public(), "configured": configured}
-            if name == "llm" and semantic_ready and not self.llm.configured():
-                entry["detail"] = "Семантический поиск и роутер работают; чат-модель не задана"
+            if name == "llm":
+                entry["usage"] = self.usage.snapshot()
+                if semantic_ready and not self.llm.configured():
+                    entry["detail"] = "Семантический поиск и роутер работают; чат-модель не задана"
             result.append(entry)
         alice_allowed = [str(item).strip() for item in (self.settings.get("alice").get("allowed_user_ids") or []) if str(item).strip()]
         result.append({

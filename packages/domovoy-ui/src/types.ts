@@ -151,6 +151,7 @@ export interface Integration {
   last_ok: string | null;
   last_error: string | null;
   configured: boolean;
+  usage?: { month: string; used: number; budget: number; remaining: number | null };
 }
 
 export interface SearchHit {

@@ -16,7 +16,8 @@ DEFAULTS: dict[str, Any] = {
     "auto_apply_confidence": 0.8,
     "review_confidence": 0.5,
     "identity": {"name": DEFAULT_NAME, "aliases": list(DEFAULT_ALIASES), "gender": "male"},
-    "ai": {"enabled": False, "base_url": "", "model": "", "embedding_model": "", "auto_apply": False, "timeout_s": 20, "max_tokens": 320},
+    "ai": {"enabled": False, "base_url": "", "embedding_base_url": "", "model": "", "embedding_model": "",
+           "auto_apply": False, "timeout_s": 20, "max_tokens": 160, "low_tokens": True, "monthly_token_budget": 0},
     "voice": {"enabled": False, "trigger_words": [],
               "window_s": 20, "reply": "speak", "room": "", "stt": {"base_url": "", "model": "", "language": "ru", "max_seconds": 15}},
     "calendar": {"default": "local", "ha_calendars": []},
@@ -133,7 +134,14 @@ class SettingsService:
             for item in value:
                 if not isinstance(item, dict) or not str(item.get("name") or item.get("room") or "").strip():
                     raise ValidationError("Each entry needs a name", fields={key: "Invalid entry"})
+        if key == "ai":
+            if "max_tokens" in value and not 32 <= value["max_tokens"] <= 4096:
+                raise ValidationError("max_tokens must be 32..4096", fields={key: "max_tokens: 32..4096"})
+            if "monthly_token_budget" in value and not 0 <= value["monthly_token_budget"] <= 10_000_000:
+                raise ValidationError("Token budget must be 0..10000000", fields={key: "monthly_token_budget: invalid"})
         urls = [(key, value, "base_url"), (key, value, "url")] if key in ("ai", "caldav", "ha", "telegram") else []
+        if key == "ai":
+            urls.append((key, value, "embedding_base_url"))
         if key == "voice" and isinstance(value.get("stt"), dict):
             urls.append(("voice.stt", value["stt"], "base_url"))
         for owner, block, field in urls:
