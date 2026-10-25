@@ -1,7 +1,8 @@
 """Yandex Dialogs (Alice) webhook: https://yandex.ru/dev/dialogs/alice/doc/protocol.html
 
-The skill's activation name is «Домовой». Sessions stay open (`end_session=false`) so that after
-«Алиса, домовой …» follow-ups need no repeated invocation; «хватит»/«спасибо» closes it.
+The skill's activation name is set in Yandex Dialogs (the default wording is «Домовой»). Sessions stay open
+(`end_session=false`) so that after «Алиса, домовой …» follow-ups need no repeated invocation; «хватит»/
+«спасибо» closes it.
 Alice waits ~3 s for the answer: the pipeline gets a strict budget, and when it cannot finish in time the
 speaker hears an honest "accepted, working on it" while the command completes and is recorded in Activity.
 """
@@ -11,6 +12,7 @@ import concurrent.futures
 import re
 from typing import Any
 
+from ..identity import display_name
 from ..text import normalize, speakable
 
 EXIT_WORDS = {"хватит", "выйди", "выход", "закрой навык", "стоп", "все", "всё", "спасибо", "пока", "до свидания", "достаточно"}
@@ -36,7 +38,7 @@ class AliceFrontend:
         cfg = self.app.settings.get("alice")
         allowed = [str(x) for x in cfg.get("allowed_user_ids") or []]
         if not allowed:
-            return self._response(payload, "Навык не настроен: добавьте свой Yandex user id в настройках Домового.", end=True)
+            return self._response(payload, f"Навык не настроен: добавьте свой Yandex user id в настройках {display_name(self.app.settings)}.", end=True)
         ids = {str((session.get("user") or {}).get("user_id", "")), str(session.get("user_id", "")),
                str((session.get("application") or {}).get("application_id", ""))}
         if not ids & set(allowed):

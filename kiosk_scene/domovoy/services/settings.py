@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from ..db import Database
 from ..errors import ValidationError
+from ..identity import DEFAULT_ALIASES, DEFAULT_NAME
 
 DEFAULTS: dict[str, Any] = {
     "timezone": "",
@@ -14,8 +15,9 @@ DEFAULTS: dict[str, Any] = {
     "default_event_minutes": 60,
     "auto_apply_confidence": 0.8,
     "review_confidence": 0.5,
+    "identity": {"name": DEFAULT_NAME, "aliases": list(DEFAULT_ALIASES)},
     "ai": {"enabled": False, "base_url": "", "model": "", "embedding_model": "", "auto_apply": False, "timeout_s": 20, "max_tokens": 320},
-    "voice": {"enabled": False, "trigger_words": ["домовой", "домового", "домовому", "домовым", "домовом", "domovoy"],
+    "voice": {"enabled": False, "trigger_words": [],
               "window_s": 20, "reply": "speak", "room": "", "stt": {"base_url": "", "model": "", "language": "ru", "max_seconds": 15}},
     "calendar": {"default": "local", "ha_calendars": []},
     "caldav": {"url": "", "username": "", "auth": "basic"},
@@ -33,7 +35,7 @@ DEFAULTS: dict[str, Any] = {
 # Only these top-level keys may be written through the API; each value is validated for shape.
 SHAPES: dict[str, type | tuple[type, ...]] = {
     "timezone": str, "language": str, "default_reminder_hour": int, "default_event_minutes": int,
-    "auto_apply_confidence": (int, float), "review_confidence": (int, float),
+    "auto_apply_confidence": (int, float), "review_confidence": (int, float), "identity": dict,
     "ai": dict, "voice": dict, "calendar": dict, "caldav": dict, "ha": dict, "telegram": dict, "messaging": dict,
     "speakers": list, "speak": dict, "rooms": list, "places": list, "alice": dict, "retention": dict,
 }
@@ -108,6 +110,19 @@ class SettingsService:
             raise ValidationError("Must be 0..23", fields={key: "0..23"})
         if key == "default_event_minutes" and not 5 <= value <= 24 * 60:
             raise ValidationError("Must be 5..1440", fields={key: "5..1440"})
+        if key == "identity":
+            if "name" in value:
+                name = value["name"].strip()
+                if not name:
+                    raise ValidationError("Name cannot be empty", fields={key: "name: required"})
+                if len(name) > 40:
+                    raise ValidationError("Name is too long", fields={key: "name: at most 40 characters"})
+            if "aliases" in value:
+                aliases = [item.strip() for item in value["aliases"] if item.strip()]
+                if len(aliases) > 20:
+                    raise ValidationError("Too many aliases", fields={key: "aliases: at most 20"})
+                if any(len(item) > 40 for item in aliases):
+                    raise ValidationError("Alias is too long", fields={key: "aliases: at most 40 characters each"})
         if key == "speakers":
             for item in value:
                 if not isinstance(item, dict) or not str(item.get("entity_id", "")).count(".") == 1:
@@ -159,4 +174,4 @@ def _check_nested(path: str, default: dict[str, Any], value: dict[str, Any]) -> 
                 raise ValidationError(f"{path}.{name} must be a list of strings", fields={path: f"{name}: strings only"})
 
 
-_STRING_LISTS = {"allowed_services", "ha_calendars", "allowed_user_ids", "trigger_words"}
+_STRING_LISTS = {"allowed_services", "ha_calendars", "allowed_user_ids", "trigger_words", "aliases"}

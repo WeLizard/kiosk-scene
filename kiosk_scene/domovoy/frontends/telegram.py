@@ -7,13 +7,11 @@ from typing import Any
 
 from ..assistant.pipeline import CommandPipeline
 from ..clock import from_iso
+from ..identity import display_name
 from ..services.context import Ctx
 
-HELP = ("Я Домовой. Напиши, например: «Где резисторы?», «Добавь в список покупок молоко», "
-        "«Напомни через 20 минут выключить духовку».\n"
-        "/today — события, задачи и напоминания сегодня\n/shopping — список покупок\n/help — помощь")
 UNCERTAIN = ("Обработка предыдущей команды была прервана. Часть действий могла выполниться. "
-             "Я не повторяю команду автоматически: проверь результат и журнал в Домовом.")
+             "Я не повторяю команду автоматически: проверь результат и журнал.")
 
 
 class TelegramFrontend:
@@ -39,6 +37,11 @@ class TelegramFrontend:
                 self._handle(uid, update)
                 handled += 1
             return handled
+
+    def _help(self) -> str:
+        return (f"Я {display_name(self.app.settings)}. Напиши, например: «Где резисторы?», "
+                "«Добавь в список покупок молоко», «Напомни через 20 минут выключить духовку».\n"
+                "/today — события, задачи и напоминания сегодня\n/shopping — список покупок\n/help — помощь")
 
     def _owner(self, chat_id: str) -> bool:
         return any(contact["is_self"] and self._address(contact) == chat_id for contact in self.app.contacts.list())
@@ -98,13 +101,13 @@ class TelegramFrontend:
                 self._finish(uid, "ignored")
             return
         if command in ("/start", "/help"):
-            reply = HELP
+            reply = self._help()
         elif command == "/today":
             reply = self._today()
         elif command == "/shopping":
             reply = self.pipeline.handle("что в списке покупок", frontend="telegram", session_id=f"telegram:{address}")["reply"]
         elif command.startswith("/"):
-            reply = "Неизвестная команда. " + HELP
+            reply = "Неизвестная команда. " + self._help()
         else:
             reply = self.pipeline.handle(text, frontend="telegram", session_id=f"telegram:{address}")["reply"]
         self._finish(uid, "done", address, reply)

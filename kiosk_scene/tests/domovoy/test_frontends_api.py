@@ -148,6 +148,13 @@ class KioskMicrophone(AppCase):
         self.assertEqual(r["status"], "listening")
         self.assertTrue(self.voice.window_open("кухня"))
 
+    def test_configured_name_replaces_the_default_trigger(self) -> None:
+        self.app.settings.update({"identity": {"name": "Нейри", "aliases": ["нейри"]}})
+        self.assertEqual(self.hear("Домовой, " + REMEMBER).get("reason"), "no_trigger")
+        r = self.hear("Нейри, " + REMEMBER)
+        self.assertTrue(r["handled"], r)
+        self.assertEqual(self.app.items.list()[0]["quantity"], 9)
+
     def test_stt_failure_or_busy_drops_the_segment_without_side_effects(self) -> None:
         self.stt.fail_status = 500
         self.assertEqual(self.voice.handle_audio(b"x", "audio/wav", room="кухня")["handled"], False)

@@ -8,6 +8,7 @@ from .clock import Clock
 from .config import Settings
 from .db import Database
 from .embeddings import HashingEmbedder
+from .identity import display_name
 from .providers.base import CircuitBreaker, HealthTracker, ResourceGate
 from .providers.caldav import CalDavProvider
 from .providers.homeassistant import HomeAssistantProvider, supervisor_token
@@ -78,7 +79,7 @@ class Domovoy:
 
         # -- domain --------------------------------------------------------------------------------
         self.audit = AuditLog(self.db, self.clock)
-        self.avatar = AvatarState(self.db, self.clock)
+        self.avatar = AvatarState(self.db, self.clock, lambda: display_name(self.settings))
         self.search = SearchService(self.db, self.clock)
         self.locations = LocationService(self.db, self.clock, self.audit, self.search)
         self.items = ItemService(self.db, self.clock, self.audit, self.search, self.locations)

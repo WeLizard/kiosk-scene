@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any
+from typing import Any, Callable
 
 from ..errors import ProviderError
 from ..nlu.intents import INTENTS, llm_json_schema
@@ -17,7 +17,7 @@ def _catalogue() -> str:
 
 
 SYSTEM = (
-    "Ты разбираешь команды для домашнего ассистента «Домовой». Отвечай ТОЛЬКО JSON по схеме. "
+    "Ты разбираешь команды для домашнего ассистента «{name}». Отвечай ТОЛЬКО JSON по схеме. "
     "Ничего не выдумывай: если данных не хватает, верни intent clarify с вопросом. "
     "Даты и время — ISO 8601 со смещением часового пояса. Местa задавай списком от большого к малому "
     "(например [\"Шкаф нижний\", \"Коробка 3\"]). Поле confidence — твоя честная уверенность 0..1.\n"
@@ -28,8 +28,9 @@ SYSTEM = (
 class LlmInterpreter:
     name = "llm"
 
-    def __init__(self, provider: Any) -> None:
+    def __init__(self, provider: Any, name: Callable[[], str] | None = None) -> None:
         self.provider = provider
+        self._name = name or (lambda: "Домовой")
 
     def available(self) -> bool:
         return bool(self.provider.configured()) and not self.provider.breaker.open
@@ -39,7 +40,7 @@ class LlmInterpreter:
         last = {k: session[k] for k in ("last_item_id", "last_location_id") if session.get(k)}
         if last:
             context += f"\nКонтекст беседы: {last}"
-        result = self.provider.chat_json(SYSTEM, context, llm_json_schema(), deadline=deadline)
+        result = self.provider.chat_json(SYSTEM.format(name=self._name()), context, llm_json_schema(), deadline=deadline)
         intents = result.get("intents")
         if not isinstance(intents, list):
             raise ProviderError("llm: response has no intents list", code="bad_response", retryable=True, provider="llm")

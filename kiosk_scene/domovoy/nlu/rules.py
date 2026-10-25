@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ..clock import to_iso
+from ..identity import strip_invocation
 from ..text import clean_phrase, norm_key, stem
 from .datetimes import DAY_PART_HOURS, WhenResult, extract_when
 from .items import parse_item_phrase
@@ -46,6 +47,7 @@ class InterpretContext:
     now: dt.datetime
     session: dict[str, Any] = field(default_factory=dict)
     contact_names: list[str] = field(default_factory=list)
+    assistant_names: list[str] = field(default_factory=list)
     default_reminder_hour: int = 9
 
 
@@ -88,7 +90,7 @@ class RuleInterpreter:
     # ---- entry point ---------------------------------------------------------------------------
 
     def interpret(self, text: str, ctx: InterpretContext) -> list[Intent] | None:
-        original = self._strip_invocation(text)
+        original = self._strip_invocation(text, ctx.assistant_names or None)
         if not original:
             return None
         folded = fold(original)
@@ -101,13 +103,8 @@ class RuleInterpreter:
         return None
 
     @staticmethod
-    def _strip_invocation(text: str) -> str:
-        value = " ".join(str(text or "").split())
-        value = re.sub(r"^(?:(?:эй|слушай|привет|алиса)[, ]+)*", "", value, flags=re.I)
-        value = re.sub(r"^(?:(?:попроси|спроси у|скажи|передай)\s+)?домов\w*[, :.-]*", "", value, flags=re.I)
-        value = re.sub(r"^(?:(?:пожалуйста|давай|ну)[, ]+)+", "", value, flags=re.I)
-        value = re.sub(r"[, ]*(?:пожалуйста|спасибо)[.! ]*$", "", value, flags=re.I)
-        return value.strip()
+    def _strip_invocation(text: str, names: list[str] | None = None) -> str:
+        return strip_invocation(text, names)
 
     # ---- meta ----------------------------------------------------------------------------------
 

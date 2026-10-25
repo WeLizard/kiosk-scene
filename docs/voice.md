@@ -27,14 +27,15 @@ The speaker is chosen by where the person is: an explicit room, else the room wh
 *комнаты*), else the speaker marked "по умолчанию". Quiet hours (default 23:00–07:00) silence speech; a failed
 delivery falls back to Telegram or the screen (setting). "Проверить" sends a test phrase.
 
-## Entrance 1 — Home Assistant sentence trigger («домовой …»)
+## Entrance 1 — Home Assistant sentence trigger (the configured name, «домовой …» by default)
 
 Works with anything that can put a sentence into Home Assistant's conversation (the Assist pipeline, the HA app, a
 voice satellite, or a Yandex Station integration that forwards recognised speech to HA).
 
 Integrations → *Доступ, Алиса и Home Assistant* shows a ready YAML: a `rest_command` that posts to
 `/frontends/assist` with the secret in `X-Domovoy-Secret`, and an automation with a `conversation` trigger
-`домовой {text}`. Domovoy speaks the answer itself (`"speak": true`), so it works the same for text and voice
+`<name> {text}` (the generated YAML uses the name from *Настройки → Имя ассистента*). Domovoy speaks the answer
+itself (`"speak": true`), so it works the same for text and voice
 entrances. Endpoint: `POST /domovoy-api/frontends/assist` `{ "text", "room"?, "speak"?, "conversation_id"? }` →
 `{ "reply", "status", "spoken", "response": { "speech": { "plain": { "speech": … } } } }`.
 
@@ -44,7 +45,8 @@ The Domovoy side is tested end to end (secret, transcript → reply → speak th
 ## Entrance 2 — Alice skill («Алиса, …»)
 
 A private skill in Yandex Dialogs whose webhook is `https://<your public host>/domovoy-api/frontends/alice/<secret>`
-(the exact path with your secret is shown, on request, in Integrations). The skill protocol is implemented:
+(the exact path with your secret is shown, on request, in Integrations). The skill's activation name is set in Yandex
+Dialogs; Domovoy also accepts the configured name/aliases repeated at the start of the command. The skill protocol is implemented:
 `ping`, welcome, follow-ups **without repeating the invocation**, «спасибо / хватит» ends the session, replies are made
 TTS-friendly and bounded, and slow processing gets an honest holding reply inside Alice's response budget (2.5 s by
 default). Add your Yandex user id to `alice.allowed_user_ids` in Integrations: while the list is empty the skill refuses
@@ -71,7 +73,8 @@ How it works:
    **utterances** (start after ~120 ms of clearly louder sound, end after 0.8 s of quiet, 15 s maximum). Sound that
    never pauses (a TV, an appliance) is not sent; it raises the noise floor instead.
 2. Each utterance is downsampled to 16 kHz mono WAV and posted to `/domovoy-api/api/voice/command` with the room.
-3. The server transcribes it and looks for a **trigger word** («домовой» in any case, editable). Without the trigger
+3. The server transcribes it and looks for a **trigger word**: the name and other forms from *Настройки → Имя
+   ассистента* («домовой» by default), plus any extra words in *Настройки → Голос*. Without the trigger
    — and outside the follow-up window opened by the last command in that room (20 s by default) — the transcript is
    dropped: not stored, not logged, nothing shown. Audio itself is never stored.
 4. With the trigger, the sentence is interpreted; the answer is spoken by the speakers and shown on the avatar.

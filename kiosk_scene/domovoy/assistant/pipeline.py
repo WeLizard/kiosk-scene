@@ -13,6 +13,7 @@ import time
 from typing import Any
 
 from ..errors import DomovoyError, ProviderError, ValidationError
+from ..identity import display_name, invocation_names, strip_invocation
 from ..nlu.datetimes import format_when
 from ..nlu.intents import is_mutating, validate_intent
 from ..nlu.numbers import ordinal_value, parse_number
@@ -30,7 +31,7 @@ class CommandPipeline:
         self.app = app
         self.rules = RuleInterpreter()
         self.executor = Executor(app)
-        self.llm = LlmInterpreter(app.llm)
+        self.llm = LlmInterpreter(app.llm, name=lambda: display_name(app.settings))
 
     # ---- public API ----------------------------------------------------------------------------
 
@@ -112,10 +113,16 @@ class CommandPipeline:
         interpreter = "rules"
         raw_intents: list[dict[str, Any]] | None = None
         deferred_reason = ""
+        names = invocation_names(app.settings)
+        command_text = strip_invocation(text, names)
+        if not command_text:
+            reply = "Слушаю."
+            app.commands.finish(command_id, status="answered", interpreter="identity", intents=[], confidence=1.0, reply=reply)
+            return {"status": "answered", "reply": reply, "results": [], "interpreter": "identity", "confidence": 1.0, "intents": []}
 
         pending = session.get("pending")
         if pending:
-            answered = self._resolve_pending(text, pending)
+            answered = self._resolve_pending(command_text, pending)
             session.pop("pending", None)
             if answered == []:
                 reply = "Хорошо, не буду."
@@ -129,15 +136,16 @@ class CommandPipeline:
             interp_ctx = InterpretContext(
                 now=now, session=session, default_reminder_hour=int(app.settings.get("default_reminder_hour")),
                 contact_names=[n for c in app.contacts.list() for n in [c["name"], *c["aliases"]]],
+                assistant_names=names,
             )
-            raw_intents = self.rules.interpret(text, interp_ctx)
+            raw_intents = self.rules.interpret(command_text, interp_ctx)
             confident = bool(raw_intents) and min(float(i.get("confidence", 0)) for i in raw_intents) >= review_threshold
             if not confident and self.llm.available():
                 remaining = None if deadline_s is None else deadline_s - (time.monotonic() - started)
                 if remaining is None or remaining >= 1.5:
                     app.avatar.thinking(True)
                     try:
-                        raw_intents = self.llm.interpret(text, now=now, session=session, deadline=remaining)
+                        raw_intents = self.llm.interpret(command_text, now=now, session=session, deadline=remaining)
                         interpreter = "llm"
                     except ProviderError as exc:
                         deferred_reason = f"Модель недоступна ({exc.code})"

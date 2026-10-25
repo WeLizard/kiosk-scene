@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import threading
-from typing import Any
+from typing import Any, Callable
 
 from ..clock import Clock, to_iso
 from ..db import Database
@@ -22,7 +22,7 @@ class AvatarState:
     for that duration. Timing is an estimate from text length, not phoneme-accurate lip sync.
     """
 
-    def __init__(self, db: Database, clock: Clock, assistant_name: str = "Домовой") -> None:
+    def __init__(self, db: Database, clock: Clock, assistant_name: str | Callable[[], str] = "Домовой") -> None:
         self.db, self.clock, self.assistant_name = db, clock, assistant_name
         self._lock = threading.Lock()
         self._message = ""
@@ -80,8 +80,9 @@ class AvatarState:
             if thinking:
                 cue = "think"
             activity = "speaking" if speaking else "thinking" if thinking else "idle"
+            assistant_name = self.assistant_name() if callable(self.assistant_name) else self.assistant_name
             return {
-                "version": 1, "assistant": self.assistant_name, "online": True, "busy": thinking, "status": "", "message": message,
+                "version": 1, "assistant": assistant_name, "online": True, "busy": thinking, "status": "", "message": message,
                 "source": "domovoy", "updatedAt": to_iso(self._updated_at), "emotion": "happy" if cue == "happy" else None,
                 "activity": activity, "cue": cue, "intensity": None, "speaking": speaking, "revision": self._revision,
                 "event": "speaking" if speaking else "thinking" if thinking else "",

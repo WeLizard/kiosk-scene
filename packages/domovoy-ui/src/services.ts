@@ -5,20 +5,33 @@ import { EVENTS_SOURCE_ID } from "./api.js";
 import { createMicClient, type MicState } from "./voice/mic.js";
 
 const MIC_LABELS: Record<string, string> = {
-  starting: "Запуск микрофона…", listening: "Слушаю: скажите «домовой …»", hearing: "Слышу…", sending: "Разбираю…", muted: "Микрофон выключен",
+  starting: "Запуск микрофона…", hearing: "Слышу…", sending: "Разбираю…", muted: "Микрофон выключен",
 };
 
 /** Small always-on-screen indicator: the person can always see whether the microphone is listening, and mute it. */
-function micIndicator(onToggle: () => void): { el: HTMLElement; render(state: MicState): void } {
+function micIndicator(onToggle: () => void): { el: HTMLElement; render(state: MicState): void; setName(name: string): void } {
   const dot = h("span", { class: "dv-mic-dot", "aria-hidden": "true" });
   const label = h("span", { class: "dv-mic-label" });
   const el = h("button", { class: "dv-mic", type: "button", "aria-live": "polite", title: "Включить или выключить микрофон", dataset: { noSwipe: "true" }, onClick: onToggle }, dot, label);
+  let assistantName = "домовой";
+  let lastState: MicState | null = null;
+  const render = (state: MicState): void => {
+    lastState = state;
+    el.dataset.state = state.kind;
+    el.hidden = state.kind === "off";
+    label.textContent = state.kind === "unavailable" ? state.reason
+      : state.kind === "heard" ? state.reply
+      : state.kind === "listening" ? `Слушаю: скажите «${assistantName} …»`
+      : MIC_LABELS[state.kind] ?? "";
+  };
   return {
     el,
-    render(state) {
-      el.dataset.state = state.kind;
-      el.hidden = state.kind === "off";
-      label.textContent = state.kind === "unavailable" ? state.reason : state.kind === "heard" ? state.reply : MIC_LABELS[state.kind] ?? "";
+    render,
+    setName(name: string) {
+      assistantName = name.trim() || "домовой";
+      if (lastState) {
+        render(lastState);
+      }
     },
   };
 }
@@ -63,6 +76,12 @@ export function createServices(http: HttpClient): ServiceDefinition[] {
         const indicator = micIndicator(() => client.setMuted(!client.muted));
         indicator.el.hidden = true;
         document.body.appendChild(indicator.el);
+        void runtime.readData<{ settings: { identity?: { name?: string } } }>("domovoy.api", { path: "api/settings" }).then((result) => {
+          const name = result.ok ? result.data?.settings?.identity?.name : "";
+          if (typeof name === "string" && name.trim()) {
+            indicator.setName(name);
+          }
+        });
         const client = createMicClient({ http, room, onState: indicator.render });
         void client.start();
         return () => {

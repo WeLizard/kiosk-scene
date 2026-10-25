@@ -13,6 +13,7 @@ interface Loaded {
 }
 
 const splitList = (text: string): string[] => text.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+const lines = (value: unknown): string => (Array.isArray(value) ? value.join(", ") : "");
 
 function timezoneOptions(current: string): Array<{ value: string; label: string }> {
   let zones: string[] = [];
@@ -77,6 +78,11 @@ export function mountSettings(host: HTMLElement, _params: Record<string, unknown
     },
     render: ({ settings: s, voice, state, backups }, refresh) => {
       setServerTimezone(state.timezone);
+      const identity = panel("Имя ассистента", "Так к нему обращаются и так он представляется в ответах. Имя распознаётся всегда; в «Других обращениях» можно добавить падежи, старое имя и ники.", saveForm(runtime, [
+        { name: "identity_name", label: "Имя", required: true, value: s.identity?.name ?? "Домовой", wide: true },
+        { name: "identity_aliases", label: "Другие обращения", type: "textarea", rows: 3, value: lines(s.identity?.aliases), hint: "Через запятую или с новой строки. Например: нейри, нейрия, нейрию. Для «домового» падежи уже добавлены.", wide: true },
+      ], (v) => ({ identity: { name: String(v.identity_name).trim(), aliases: splitList(String(v.identity_aliases)) } }), refresh));
+
       const general = panel("Общие", null, saveForm(runtime, [
         { name: "timezone", label: "Часовой пояс", type: "select", options: timezoneOptions(s.timezone), value: s.timezone, hint: `Сейчас на сервере: ${state.timezone}`, wide: true },
         { name: "default_reminder_hour", label: "Во сколько напоминать, если сказали только «завтра» (час)", type: "number", min: 0, max: 23, required: true, value: s.default_reminder_hour, wide: true },
@@ -92,7 +98,7 @@ export function mountSettings(host: HTMLElement, _params: Record<string, unknown
       const voiceCard = panel("Голос", "Обращение по слову-триггеру работает и с колонками через Home Assistant, и с микрофоном киоска. Разговор без слова-триггера не сохраняется.", h("p", null, "Микрофон киоска: ", voice.enabled ? badge("включён", "good") : badge("выключен", "neutral"), " ", voice.stt_configured ? badge("распознавание настроено", "good") : badge("распознавание не настроено", "warn")),
         saveForm(runtime, [
           { name: "enabled", label: "Принимать голосовые команды с микрофона киоска", type: "checkbox", value: s.voice.enabled, wide: true },
-          { name: "trigger_words", label: "Слова-триггеры", value: (s.voice.trigger_words ?? []).join(", "), hint: "Через запятую, все падежи, которые вы произносите: «домовой, домового, домовому».", wide: true },
+          { name: "trigger_words", label: "Дополнительные слова-триггеры", value: (s.voice.trigger_words ?? []).join(", "), hint: "Можно оставить пустым: имя и «Другие обращения» уже работают. Сюда добавьте слова, которые не хотите вносить в имя.", wide: true },
           { name: "window_s", label: "После обращения слушать без повторного слова, секунд", type: "number", min: 5, max: 120, required: true, value: s.voice.window_s, wide: true },
           { name: "reply", label: "Как отвечать", type: "select", options: [{ value: "speak", label: "Голосом через колонки" }, { value: "text", label: "Только текстом на экране" }], value: s.voice.reply, wide: true },
           { name: "room", label: "Комната этого микрофона", value: s.voice.room, hint: "Чтобы ответ прозвучал в ближайшей колонке.", wide: true },
@@ -147,7 +153,7 @@ export function mountSettings(host: HTMLElement, _params: Record<string, unknown
         h("small", { class: "ks-muted" }, "Копии лежат в /config/kiosk-scene/domovoy/backups — они попадают и в общую резервную копию Home Assistant."),
       );
 
-      return h("div", { class: "dv-stack" }, general, confidence, voiceCard, messaging, data);
+      return h("div", { class: "dv-stack" }, identity, general, confidence, voiceCard, messaging, data);
     },
   });
 

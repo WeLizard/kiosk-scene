@@ -3,7 +3,7 @@
 Trigger word and conversation window
 ------------------------------------
 Ambient audio from a microphone must not act on everything it hears. A segment is only *used* when its
-transcript starts with a trigger word («Домовой, …»). That opens a short conversation window for that room during
+transcript starts with the configured name/trigger (default «Домовой, …»). That opens a short conversation window for that room during
 which follow-ups need no trigger word. Transcripts of everything else are discarded immediately and never stored.
 
 Reply routing
@@ -20,23 +20,10 @@ import time
 from typing import Any
 
 from ..errors import ProviderError
-from ..text import normalize, stem
+from ..identity import invocation_names, strip_trigger
+from ..text import normalize
 
 DEFAULT_TRIGGERS = ["домовой", "домового", "домовому", "домовым", "домовом", "domovoy"]
-POLITE_LEADS = {"эй", "слушай", "слышь", "привет", "хэй", "ну", "алиса", "окей", "ок"}
-
-
-def strip_trigger(text: str, triggers: list[str]) -> tuple[bool, str]:
-    """`(had_trigger, rest)`. Matches a trigger word at the start (after polite filler), any grammatical case."""
-    words = str(text or "").strip().split()
-    known = {stem(normalize(t)) for t in triggers if t}
-    index = 0
-    while index < len(words) and normalize(words[index]) in POLITE_LEADS:
-        index += 1
-    if index < len(words) and stem(normalize(words[index]).strip()) in known:
-        rest = " ".join(words[index + 1:])
-        return True, re.sub(r"^[,:.\-–—\s]+", "", rest)
-    return False, str(text or "").strip()
 
 
 class VoiceGateway:
@@ -51,6 +38,18 @@ class VoiceGateway:
 
     def config(self) -> dict[str, Any]:
         return self.app.settings.get("voice")
+
+    def triggers(self) -> list[str]:
+        """The configured name/aliases plus any extra words from Voice settings."""
+        extra = [str(word) for word in (self.config().get("trigger_words") or []) if str(word).strip()]
+        seen: set[str] = set()
+        result: list[str] = []
+        for word in [*invocation_names(self.app.settings), *extra]:
+            key = word.casefold()
+            if key not in seen:
+                seen.add(key)
+                result.append(word)
+        return result or DEFAULT_TRIGGERS
 
     def window_open(self, room: str) -> bool:
         with self._lock:
@@ -89,8 +88,7 @@ class VoiceGateway:
         transcript = (transcript or "").strip()
         if not transcript:
             return {"handled": False, "reason": "empty"}
-        triggers = cfg.get("trigger_words") or DEFAULT_TRIGGERS
-        had_trigger, rest = strip_trigger(transcript, triggers)
+        had_trigger, rest = strip_trigger(transcript, self.triggers())
         if require_trigger and not had_trigger and not self.window_open(room):
             # Not addressed to us: forget it. Nothing is logged or stored.
             return {"handled": False, "reason": "no_trigger"}

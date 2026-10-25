@@ -252,7 +252,9 @@ function contactsSection(runtime: ExtensionRuntime, data: Loaded, refresh: () =>
 const HA_LOCAL_BASE = "http://127.0.0.1:48123/domovoy-api/";
 const SECRET_PLACEHOLDER = "<секрет Assist — нажмите «Показать»>";
 
-function haYaml(secret: string): string {
+function haYaml(secret: string, assistantName = "Домовой"): string {
+  const name = assistantName.trim() || "Домовой";
+  const phrase = name.toLowerCase();
   return [
     "# configuration.yaml — один раз",
     "rest_command:",
@@ -264,18 +266,18 @@ function haYaml(secret: string): string {
     "      Content-Type: application/json",
     '    payload: \'{"text": {{ text | tojson }}, "room": {{ room | default("") | tojson }}, "speak": true}\'',
     "",
-    "# автоматизация: фраза в Assist / на Яндекс Станции через HA: «домовой …»",
+    `# автоматизация: фраза в Assist / на Яндекс Станции через HA: «${phrase} …»`,
     "automation:",
-    "  - alias: Домовой — голосовая команда",
+    `  - alias: ${name} — голосовая команда`,
     "    trigger:",
     "      - platform: conversation",
     "        command:",
-    '          - "домовой {text}"',
+    `          - "${phrase} {text}"`,
     "    action:",
     "      - service: rest_command.domovoy_say",
     "        data:",
     '          text: "{{ trigger.slots.text }}"',
-    "    # ответ озвучит сам Домовой через колонки из раздела «Голос через колонки»",
+    `    # ответ озвучит сам ${name} через колонки из раздела «Голос через колонки»`,
   ].join("\n");
 }
 
@@ -329,18 +331,19 @@ function securityControls(runtime: ExtensionRuntime, refresh: () => void) {
   return { secretRow, fetchSecurity, copy };
 }
 
-function securitySection(runtime: ExtensionRuntime, refresh: () => void): HTMLElement {
+function securitySection(runtime: ExtensionRuntime, refresh: () => void, settings: Settings): HTMLElement {
   const { secretRow, fetchSecurity, copy } = securityControls(runtime, refresh);
+  const name = settings.identity?.name || "Домовой";
   return h(
     "div",
     null,
     h("p", { class: "ks-muted" }, "Из панели Home Assistant доступ уже открыт. Эти ключи нужны только для внешних клиентов: они не хранятся на странице, пока вы их не запросите."),
     secretRow("API-токен (Bearer)", (i) => i.api_token, "api_token"),
     secretRow("Секрет для Home Assistant (Assist)", (i) => i.assist_secret, "assist_secret"),
-    h("h3", null, "Голос через Home Assistant (фраза «домовой …»)"),
+    h("h3", null, `Голос через Home Assistant (фраза «${name.toLowerCase()} …»)`),
     h("p", { class: "ks-muted" }, "Если Home Assistant работает не на этом же устройстве, замените 127.0.0.1 на адрес, по которому он видит аддон."),
-    h("pre", { class: "dv-code" }, haYaml(SECRET_PLACEHOLDER)),
-    smallButton("Скопировать YAML с секретом", async () => { const info = await fetchSecurity(); if (info) { await copy(haYaml(info.assist_secret)); } }, "secondary"),
+    h("pre", { class: "dv-code" }, haYaml(SECRET_PLACEHOLDER, name)),
+    smallButton("Скопировать YAML с секретом", async () => { const info = await fetchSecurity(); if (info) { await copy(haYaml(info.assist_secret, name)); } }, "secondary"),
   );
 }
 
@@ -530,7 +533,7 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         ], (v) => ({ settings: { voice: { stt: { base_url: String(v.base_url).trim(), model: String(v.model).trim(), language: String(v.language).trim() || "ru", max_seconds: Number(v.max_seconds) || 15 } } } }), refresh)));
 
       const alice = section("alice", "Алиса", status("alice"), aliceSection(runtime, refresh, s));
-      const security = section("security", "Доступ и Home Assistant", null, securitySection(runtime, refresh));
+      const security = section("security", "Доступ и Home Assistant", null, securitySection(runtime, refresh, s));
 
       return h("div", { class: "dv-stack" }, statusGrid, ha, tg, alice, cal, speakers, rooms, llm, stt, security);
     },
