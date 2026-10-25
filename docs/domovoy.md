@@ -109,6 +109,12 @@ instead of the full schema, `ai.max_tokens` caps each answer, and `ai.monthly_to
 once the month's reported usage reaches the limit. Usage is shown on the Integrations page; the API key is write-only
 and belongs to the chat address it was saved for.
 
+A local chat model is the offline fallback: `local_base_url` points at Ollama's native API and `local_model` is tried
+when no cloud model is configured, the budget is exhausted, or the cloud call fails. On an N150, `qwen3.5:2b` is the
+smallest local model that reliably fills the intent fields, at roughly 30 s per long-tail command; smaller 0.8B/1.7B
+models are faster but often return only `type` and `confidence`. Local tokens are free and never counted against the
+cloud budget; results still go through the same validation and review policy.
+
 Secrets (Telegram token, CalDAV password, HA token, LLM key) are **write-only**: the API and UI can set them and see
 that they are set, never read them back; they are excluded from exports and live in `secrets.json` (mode 0600). A secret
 belongs to the address it was saved for: changing an integration's address to a different host forgets its secret, so

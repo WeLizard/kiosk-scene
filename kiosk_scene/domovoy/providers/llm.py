@@ -28,15 +28,17 @@ class OpenAICompatibleProvider:
 
     def configured(self) -> bool:
         cfg = self._config()
-        return bool(cfg.get("base_url") and cfg.get("enabled", True) and cfg.get("model"))
+        return bool(cfg.get("enabled", True) and (
+            (cfg.get("base_url") and cfg.get("model")) or (cfg.get("local_base_url") and cfg.get("local_model"))
+        ))
 
     @property
     def model_name(self) -> str:
         return str(self._config().get("model") or "")
 
-    def _headers(self, embedding: bool, base: str) -> dict[str, str]:
+    def _headers(self, *, embedding: bool = False, local: bool = False, base: str) -> dict[str, str]:
         key = self._api_key()
-        if not key:
+        if not key or local:
             return {}
         if embedding:
             # Never send a cloud key to a different (usually local) embedding endpoint.
@@ -46,16 +48,18 @@ class OpenAICompatibleProvider:
                 return {}
         return {"Authorization": f"Bearer {key}"}
 
-    def _post(self, path: str, payload: dict[str, Any], timeout: float, *, embedding: bool = False) -> Any:
+    def _post(self, path: str, payload: dict[str, Any], timeout: float, *, embedding: bool = False,
+              base_override: str | None = None, local: bool = False) -> Any:
         cfg = self._config()
-        base = str((cfg.get("embedding_base_url") if embedding else "") or cfg.get("base_url") or "").rstrip("/")
+        base = str(base_override or (cfg.get("embedding_base_url") if embedding else "") or cfg.get("base_url") or "").rstrip("/")
         if not base or cfg.get("enabled") is False:
             raise ProviderNotConfigured("llm", "Local AI provider is not configured")
-        if self.breaker.open:
+        if self.breaker.open and not local:
             raise ProviderError("llm: temporarily disabled after repeated failures", code="circuit_open", retryable=True, provider="llm")
         key = self._api_key()
         try:
-            data = json_request("POST", f"{base}/{path.lstrip('/')}", payload=payload, headers=self._headers(embedding, base),
+            data = json_request("POST", f"{base}/{path.lstrip('/')}", payload=payload,
+                                headers=self._headers(embedding=embedding, local=local, base=base),
                                 timeout=timeout, provider="llm", secrets=[key])
         except ProviderError as exc:
             self.breaker.failure()
@@ -65,24 +69,13 @@ class OpenAICompatibleProvider:
         self.health.ok()
         return data
 
-    def chat_json(self, system: str, user: str, schema: dict[str, Any], *, deadline: float | None = None) -> dict[str, Any]:
-        """Ask for JSON matching `schema`. `deadline` is seconds available in total (voice frontends are strict)."""
-        cfg = self._config()
-        if self.usage is not None and not self.usage.allow():
-            raise ProviderError("llm: monthly token budget exhausted", code="budget", retryable=False, provider="llm")
-        configured_timeout = float(cfg.get("timeout_s") or self.timeout)
-        timeout = min(configured_timeout, deadline) if deadline else configured_timeout
-        if timeout <= 0.2:
-            raise ProviderError("llm: no time left for a model call", code="deadline", retryable=True, provider="llm")
-        # Low-token mode sends no full JSON schema: the compact catalogue in the system prompt is enough,
-        # and the validator still rejects every unknown or malformed field.
-        response_format = ({"type": "json_object"} if cfg.get("low_tokens", True)
-                           else {"type": "json_schema", "json_schema": {"name": "domovoy_intents", "strict": True, "schema": schema}})
+    def _chat_with(self, base: str, model: str, system: str, user: str, response_format: dict[str, Any],
+                   timeout: float, *, local: bool, record: bool) -> dict[str, Any]:
         payload = {
-            "model": self.model_name or "default",
+            "model": model,
             "temperature": 0,
             # Never let generation run away, especially on a metered API.
-            "max_tokens": int(cfg.get("max_tokens") or 160),
+            "max_tokens": int(self._config().get("max_tokens") or 160),
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             # Local reasoning models otherwise spend the whole budget thinking and return empty content.
             "reasoning_effort": "none",
@@ -92,10 +85,10 @@ class OpenAICompatibleProvider:
             raise ProviderError("llm: model is busy with another job", code="busy", retryable=True, provider="llm")
         try:
             try:
-                data = self._post("chat/completions", payload, timeout)
+                data = self._post("chat/completions", payload, timeout, base_override=base, local=local)
             except ProviderError as exc:
-                # Ollama/llama.cpp may reject OpenAI's json_schema wrapper while still supporting JSON output.
-                # Retry once without it; the prompt already asks for JSON and extract_json_object is tolerant.
+                # Ollama/llama.cpp may reject OpenAI's json wrappers while still supporting JSON output.
+                # Retry once without them; the prompt already asks for JSON and extract_json_object is tolerant.
                 if exc.code not in ("http_400", "http_422"):
                     raise
                 removed = False
@@ -105,18 +98,81 @@ class OpenAICompatibleProvider:
                         removed = True
                 if not removed:
                     raise
-                data = self._post("chat/completions", payload, timeout)
+                data = self._post("chat/completions", payload, timeout, base_override=base, local=local)
         finally:
             self.gate.release()
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError):
             raise ProviderError("llm: unexpected response shape", code="bad_response", retryable=True, provider="llm") from None
-        if self.usage is not None:
+        if record and self.usage is not None:
             reported = (data.get("usage") or {}).get("total_tokens")
             tokens = reported if type(reported) is int and reported >= 0 else max(1, (len(system) + len(user) + len(str(content))) // 4)
             self.usage.record(tokens)
         return extract_json_object(content)
+
+    def _local_chat(self, base: str, model: str, system: str, user: str, schema: dict[str, Any],
+                    timeout: float) -> dict[str, Any]:
+        """Ollama's native chat endpoint honours `format` with the full schema; the OpenAI shim does not always."""
+        root = base.rstrip("/")
+        if root.endswith("/v1"):
+            root = root[:-3]
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "stream": False,
+            # Qwen3-class local models otherwise spend the budget on hidden reasoning.
+            "think": False,
+            "format": schema,
+            "options": {"temperature": 0, "num_predict": int(self._config().get("max_tokens") or 160)},
+        }
+        try:
+            data = self._post("api/chat", payload, timeout, base_override=root, local=True)
+        except ProviderError as exc:
+            if exc.code not in ("http_400", "http_422"):
+                raise
+            payload.pop("format", None)
+            payload.pop("think", None)
+            data = self._post("api/chat", payload, timeout, base_override=root, local=True)
+        try:
+            content = data["message"]["content"]
+        except (KeyError, TypeError):
+            raise ProviderError("llm: unexpected local response shape", code="bad_response", retryable=True, provider="llm") from None
+        return extract_json_object(content)
+
+    def chat_json(self, system: str, user: str, schema: dict[str, Any], *, deadline: float | None = None) -> dict[str, Any]:
+        """Ask for JSON matching `schema`. `deadline` is seconds available in total (voice frontends are strict)."""
+        cfg = self._config()
+        if cfg.get("enabled") is False:
+            raise ProviderNotConfigured("llm", "Local AI provider is not configured")
+        primary = bool(cfg.get("base_url") and cfg.get("model"))
+        local = bool(cfg.get("local_base_url") and cfg.get("local_model"))
+        if not primary and not local:
+            raise ProviderNotConfigured("llm", "Local AI provider is not configured")
+        configured_timeout = float(cfg.get("timeout_s") or self.timeout)
+        timeout = min(configured_timeout, deadline) if deadline else configured_timeout
+        if timeout <= 0.2:
+            raise ProviderError("llm: no time left for a model call", code="deadline", retryable=True, provider="llm")
+        # Low-token mode sends no full JSON schema: the compact catalogue in the system prompt is enough,
+        # and the validator still rejects every unknown or malformed field.
+        response_format = ({"type": "json_object"} if cfg.get("low_tokens", True)
+                           else {"type": "json_schema", "json_schema": {"name": "domovoy_intents", "strict": True, "schema": schema}})
+        primary_error: ProviderError | None = None
+        if primary:
+            if self.usage is None or self.usage.allow():
+                try:
+                    return self._chat_with(cfg["base_url"], cfg["model"], system, user, response_format, timeout,
+                                           local=False, record=True)
+                except ProviderError as exc:
+                    primary_error = exc
+            else:
+                primary_error = ProviderError("llm: monthly token budget exhausted", code="budget", retryable=False, provider="llm")
+        if local:
+            # The local fallback is free: never count its tokens against the cloud budget and never send the cloud key.
+            return self._local_chat(cfg["local_base_url"], cfg["local_model"], system, user, schema, timeout)
+        if primary_error is not None:
+            raise primary_error
+        raise ProviderNotConfigured("llm", "Local AI provider is not configured")
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         model = str(self._config().get("embedding_model") or self.model_name or "default")

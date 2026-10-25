@@ -17,6 +17,7 @@ DEFAULTS: dict[str, Any] = {
     "review_confidence": 0.5,
     "identity": {"name": DEFAULT_NAME, "aliases": list(DEFAULT_ALIASES), "gender": "male"},
     "ai": {"enabled": False, "base_url": "", "embedding_base_url": "", "model": "", "embedding_model": "",
+           "local_base_url": "", "local_model": "",
            "auto_apply": False, "timeout_s": 20, "max_tokens": 160, "low_tokens": True, "monthly_token_budget": 0},
     "voice": {"enabled": False, "trigger_words": [],
               "window_s": 20, "reply": "speak", "room": "", "stt": {"base_url": "", "model": "", "language": "ru", "max_seconds": 15}},
@@ -141,7 +142,7 @@ class SettingsService:
                 raise ValidationError("Token budget must be 0..10000000", fields={key: "monthly_token_budget: invalid"})
         urls = [(key, value, "base_url"), (key, value, "url")] if key in ("ai", "caldav", "ha", "telegram") else []
         if key == "ai":
-            urls.append((key, value, "embedding_base_url"))
+            urls.extend(((key, value, "embedding_base_url"), (key, value, "local_base_url")))
         if key == "voice" and isinstance(value.get("stt"), dict):
             urls.append(("voice.stt", value["stt"], "base_url"))
         for owner, block, field in urls:

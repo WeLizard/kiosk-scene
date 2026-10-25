@@ -319,7 +319,7 @@ class ProviderResilience(AppCase):
     def test_model_client_breaks_the_circuit_after_repeated_failures_and_recovers(self) -> None:
         with FakeLLM() as llm:
             now = [0.0]
-            provider = OpenAICompatibleProvider(lambda: {"base_url": llm.url + "/v1", "enabled": True}, lambda: "",
+            provider = OpenAICompatibleProvider(lambda: {"base_url": llm.url + "/v1", "enabled": True, "model": "tiny"}, lambda: "",
                                                 HealthTracker("llm", self.clock), CircuitBreaker(3, 30, now=lambda: now[0]), timeout=2)
             llm.fail_status = 500
             for _ in range(3):
@@ -341,7 +341,7 @@ class ProviderResilience(AppCase):
         with FakeLLM() as llm:
             llm.reject_response_format = True
             llm.reply = {"ok": True}
-            provider = OpenAICompatibleProvider(lambda: {"base_url": llm.url + "/v1", "enabled": True}, lambda: "",
+            provider = OpenAICompatibleProvider(lambda: {"base_url": llm.url + "/v1", "enabled": True, "model": "tiny"}, lambda: "",
                                                 HealthTracker("llm", self.clock), timeout=2)
             self.assertEqual(provider.chat_json("s", "u", {"type": "object"}), {"ok": True})
             self.assertEqual(len(llm.requests), 2)
@@ -379,6 +379,36 @@ class ProviderResilience(AppCase):
             self.assertEqual(stopped.exception.code, "budget")
             self.assertEqual(llm.requests, [])
 
+    def test_local_model_falls_back_without_spending_the_cloud_budget(self) -> None:
+        with FakeLLM() as cloud, FakeLLM() as local:
+            cloud.fail_status = 500
+            local.reply = {"intents": []}
+            local.usage_total = 99
+            provider = OpenAICompatibleProvider(
+                lambda: {"base_url": cloud.url + "/v1", "model": "cloud", "local_base_url": local.url + "/v1",
+                         "local_model": "small", "enabled": True},
+                lambda: "SECRET", HealthTracker("llm", self.clock), timeout=2, usage=self.app.usage,
+            )
+            self.assertEqual(provider.chat_json("s", "u", {}), {"intents": []})
+            self.assertEqual(len(cloud.requests), 1)
+            self.assertEqual(len(local.requests), 1)
+            payload = json.loads(local.requests[0][3])
+            self.assertEqual(payload["model"], "small")
+            self.assertNotIn("authorization", {k.lower(): v for k, v in local.requests[0][2].items()})
+            self.assertEqual(self.app.usage.snapshot()["used"], 0)
+
+    def test_local_model_is_used_when_no_cloud_model_is_configured(self) -> None:
+        with FakeLLM() as local:
+            local.reply = {"intents": []}
+            provider = OpenAICompatibleProvider(
+                lambda: {"base_url": "", "model": "", "local_base_url": local.url + "/v1", "local_model": "small",
+                         "enabled": True},
+                lambda: "", HealthTracker("llm", self.clock), timeout=2,
+            )
+            self.assertTrue(provider.configured())
+            self.assertEqual(provider.chat_json("s", "u", {}), {"intents": []})
+            self.assertEqual(len(local.requests), 1)
+
     def test_embeddings_can_use_a_separate_local_endpoint_without_the_cloud_key(self) -> None:
         with FakeLLM() as chat, FakeLLM() as embed:
             provider = OpenAICompatibleProvider(
@@ -395,7 +425,7 @@ class ProviderResilience(AppCase):
     def test_heavy_jobs_share_one_slot_and_fail_fast(self) -> None:
         gate = ResourceGate(1)
         with FakeLLM() as llm:
-            provider = OpenAICompatibleProvider(lambda: {"base_url": llm.url + "/v1"}, lambda: "", HealthTracker("llm", self.clock), gate=gate, timeout=2)
+            provider = OpenAICompatibleProvider(lambda: {"base_url": llm.url + "/v1", "model": "tiny"}, lambda: "", HealthTracker("llm", self.clock), gate=gate, timeout=2)
             self.assertTrue(gate.acquire())
             try:
                 with self.assertRaises(ProviderError) as busy:

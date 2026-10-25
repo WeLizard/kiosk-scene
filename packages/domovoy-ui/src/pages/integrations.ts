@@ -477,12 +477,15 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         h("p", { class: "ks-muted" }, "Подойдёт любой OpenAI-совместимый сервер: локальный (Ollama, llama.cpp, LM Studio) или облачный. Без неё Домовой работает по правилам — быстро и без нагрузки на процессор. Модель ничего не решает сама: её предложения проходят проверку и попадают в «Проверку»."),
         h("p", { class: "ks-muted" }, "Модель эмбеддингов делает поиск смысловым и включает быстрый роутер личных фактов: «у меня день рождения…», «что я люблю» разбираются за ~0,3 с, без генерации. Языковая модель нужна только для длинного хвоста."),
         h("p", { class: "ks-muted" }, "Для облачного API оставьте адрес эмбеддингов локальным (Ollama): тогда семантика не тратит облачные токены. Компактный режим не отправляет полную JSON-схему, а лимит останавливает запросы при исчерпании бюджета."),
+        h("p", { class: "ks-muted" }, "Локальная модель — страховка: работает без интернета и не тратит облачные токены, но на N150 медленнее. Сначала всегда пробуются правила и семантический роутер."),
         llmUsage ? h("p", { class: "ks-muted" }, `Токенов в этом месяце: ${llmUsage.used.toLocaleString("ru-RU")}${llmUsage.budget ? ` из ${llmUsage.budget.toLocaleString("ru-RU")}` : " (без лимита)"}.`) : null,
         settingsForm(runtime, [
           { name: "enabled", label: "Включена", type: "checkbox", value: s.ai.enabled },
           { name: "base_url", label: "Адрес API (чат)", type: "url", value: s.ai.base_url, placeholder: "https://api.openai.com/v1", wide: true },
           { name: "embedding_base_url", label: "Адрес эмбеддингов (локальный)", type: "url", value: s.ai.embedding_base_url, placeholder: "http://127.0.0.1:11434/v1", hint: "Пусто — использовать основной адрес. Для облачного чата укажите локальный Ollama, чтобы не платить за эмбеддинги.", wide: true },
-          { name: "model", label: "Модель для команд", value: s.ai.model, placeholder: "gpt-4o-mini", hint: "Можно оставить пустым: тогда работают правила и семантический роутер, без генерации." },
+          { name: "model", label: "Модель для команд (облако)", value: s.ai.model, placeholder: "gpt-4o-mini", hint: "Необязательно: без неё работает локальная модель ниже или только правила/роутер." },
+          { name: "local_base_url", label: "Адрес локальной модели", type: "url", value: s.ai.local_base_url, placeholder: "http://127.0.0.1:11434", hint: "Ollama native API (можно и с /v1). Fallback, если облако не задано или не ответило; ключ облака сюда не отправляется.", wide: true },
+          { name: "local_model", label: "Локальная модель (fallback)", value: s.ai.local_model, placeholder: "qwen3.5:2b", hint: "2B на N150 заполняет JSON, но отвечает ~30 с. 0.8B/1.7B быстрее, но часто отдают только type/confidence; годится лишь как аварийный вариант." },
           { name: "embedding_model", label: "Модель для смыслового поиска и роутера", value: s.ai.embedding_model, placeholder: "qwen3-embedding:0.6b", hint: "Пусто — поиск по словам и опечаткам, без семантики. Для Ollama подойдёт qwen3-embedding:0.6b." },
           { name: "max_tokens", label: "Максимум токенов на ответ", type: "number", min: 32, max: 4096, value: s.ai.max_tokens ?? 160, hint: "160 хватает на 1–2 команды; больше — только если модель обрезает JSON." },
           { name: "monthly_token_budget", label: "Лимит токенов в месяц (0 — без лимита)", type: "number", min: 0, max: 10000000, value: s.ai.monthly_token_budget ?? 0, wide: true },
@@ -490,7 +493,8 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
           secretField("llm_api_key", "API-ключ (если нужен)", data.secrets.llm_api_key),
         ], (v) => ({ settings: { ai: {
           enabled: v.enabled === true, base_url: String(v.base_url).trim(), embedding_base_url: String(v.embedding_base_url).trim(),
-          model: String(v.model).trim(), embedding_model: String(v.embedding_model).trim(),
+          model: String(v.model).trim(), local_base_url: String(v.local_base_url).trim(), local_model: String(v.local_model).trim(),
+          embedding_model: String(v.embedding_model).trim(),
           max_tokens: Number(v.max_tokens) || 160, monthly_token_budget: Number(v.monthly_token_budget) || 0,
           low_tokens: v.low_tokens === true,
         } }, secrets: { llm_api_key: String(v.llm_api_key) } }), refresh)));

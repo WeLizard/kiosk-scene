@@ -204,6 +204,9 @@ class FakeLLM(FakeServer):
                 return 400, {}, {"error": {"message": "response_format unsupported"}}
             content = self.reply if isinstance(self.reply, str) else json.dumps(self.reply, ensure_ascii=False)
             return 200, {}, {"choices": [{"message": {"content": content}}], "usage": {"total_tokens": self.usage_total}}
+        if path == "/api/chat":
+            content = self.reply if isinstance(self.reply, str) else json.dumps(self.reply, ensure_ascii=False)
+            return 200, {}, {"message": {"content": content}, "done": True}
         if path == "/v1/embeddings":
             data = json.loads(body)
             return 200, {}, {"data": [{"index": i, "embedding": [float((hash(t) >> k) & 3) for k in range(self.embed_dim)]} for i, t in enumerate(data["input"])]}

@@ -152,8 +152,12 @@ class Domovoy:
             entry = {**health.public(), "configured": configured}
             if name == "llm":
                 entry["usage"] = self.usage.snapshot()
-                if semantic_ready and not self.llm.configured():
-                    entry["detail"] = "Семантический поиск и роутер работают; чат-модель не задана"
+                cloud = bool(ai.get("base_url") and ai.get("model"))
+                local = bool(ai.get("local_base_url") and ai.get("local_model"))
+                if semantic_ready and not cloud:
+                    entry["detail"] = "Семантический поиск и роутер работают; " + (
+                        f"локальная модель {ai.get('local_model')}" if local else "чат-модель не задана"
+                    )
             result.append(entry)
         alice_allowed = [str(item).strip() for item in (self.settings.get("alice").get("allowed_user_ids") or []) if str(item).strip()]
         result.append({
