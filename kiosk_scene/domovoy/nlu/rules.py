@@ -438,6 +438,13 @@ class RuleInterpreter:
         m = re.match(r"^(?:добавь|поставь|создай|заведи|запиши)\s+(?:в\s+(?:мои\s+)?(?:задачи|дела)\s+)?(?:задач\w+|дело)\s*[:,]?\s*(?P<t>.+)$", folded)
         if m:
             return self._task_intent(original, original[m.start("t"):], ctx, 0.9)
+        # «мне нужно не забыть позвонить маме в субботу» is a reminder, not a silent task.
+        forget = re.match(r"^(?:мне\s+)?(?:надо|нужно|необходимо|хочу|планирую)\s+не\s+забыть\s+(?P<t>.+)$", folded)
+        if not forget:
+            forget = re.match(r"^не\s+забудь(?:те)?\s+(?P<t>.+)$", folded)
+        if forget:
+            rest = original[forget.start("t"):]
+            return self._reminder("напомни " + rest, "напомни " + fold(rest), ctx)
         m = re.match(r"^(?:мне\s+)?(?:надо|нужно|необходимо|не забыть|не забудь|хочу|планирую)\s+(?P<t>.+)$", folded)
         if m:
             return self._task_intent(original, original[m.start("t"):], ctx, 0.72)

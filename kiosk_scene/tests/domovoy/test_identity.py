@@ -60,6 +60,13 @@ class Identity(AppCase):
         self.assertEqual(self.app.commands.list()[0]["result"][0]["message"], "Запомнила.")
         self.assertEqual(self.app.speech.render("Отметил использование."), "Отметила использование.")
 
+    def test_forget_phrase_becomes_a_reminder(self) -> None:
+        answer = self.say("мне нужно не забыть позвонить маме в субботу")
+        self.assertEqual(answer["status"], "applied")
+        reminder = self.app.reminders.list()[0]
+        self.assertEqual(reminder["text"], "Позвонить маме")
+        self.assertTrue(reminder["due_at"].startswith("2026-10-03"), reminder["due_at"])
+
     def test_greeting_is_answered_instead_of_rejected(self) -> None:
         for text in ("На связи", "привет", "ты здесь?"):
             answer = self.say(text)
