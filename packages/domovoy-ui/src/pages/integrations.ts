@@ -474,11 +474,12 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
 
       const llm = section("llm", "Языковая модель (необязательно)", status("llm"), h("div", null, detail("llm"),
         h("p", { class: "ks-muted" }, "Подойдёт любой OpenAI-совместимый сервер: локальный (Ollama, llama.cpp, LM Studio) или облачный. Без неё Домовой работает по правилам — быстро и без нагрузки на процессор. Модель ничего не решает сама: её предложения проходят проверку и попадают в «Проверку»."),
+        h("p", { class: "ks-muted" }, "Модель эмбеддингов делает поиск смысловым и включает быстрый роутер личных фактов: «у меня день рождения…», «что я люблю» разбираются за ~0,3 с, без генерации. Языковая модель нужна только для длинного хвоста."),
         settingsForm(runtime, [
           { name: "enabled", label: "Включена", type: "checkbox", value: s.ai.enabled },
-          { name: "base_url", label: "Адрес API", type: "url", value: s.ai.base_url, placeholder: "http://192.168.1.20:11434/v1", wide: true },
-          { name: "model", label: "Модель для команд", value: s.ai.model, placeholder: "qwen2.5:3b-instruct" },
-          { name: "embedding_model", label: "Модель для смыслового поиска", value: s.ai.embedding_model, placeholder: "nomic-embed-text", hint: "Пусто — поиск по словам и опечаткам, без модели." },
+          { name: "base_url", label: "Адрес API", type: "url", value: s.ai.base_url, placeholder: "http://127.0.0.1:11434/v1", wide: true },
+          { name: "model", label: "Модель для команд", value: s.ai.model, placeholder: "lfm2.5:8b-a1b" },
+          { name: "embedding_model", label: "Модель для смыслового поиска и роутера", value: s.ai.embedding_model, placeholder: "qwen3-embedding:0.6b", hint: "Пусто — поиск по словам и опечаткам, без семантики. Для Ollama подойдёт qwen3-embedding:0.6b." },
           secretField("llm_api_key", "API-ключ (если нужен)", data.secrets.llm_api_key),
         ], (v) => ({ settings: { ai: { enabled: v.enabled === true, base_url: String(v.base_url).trim(), model: String(v.model).trim(), embedding_model: String(v.embedding_model).trim() } }, secrets: { llm_api_key: String(v.llm_api_key) } }), refresh)));
 

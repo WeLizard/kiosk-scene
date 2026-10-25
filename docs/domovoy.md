@@ -37,8 +37,10 @@ text ─► interpreter ─► intents ─► strict validation ─► policy �
 ```
 
 1. **Interpreter.** Deterministic rules for Russian (numbers in words, relative dates, «в третьей коробке нижнего
-   шкафа» → a path Шкаф нижний → Коробка 3, item phrases with quantity and unit). If rules are unsure *and* a model is
-   configured, the model proposes intents as JSON. The model is a suggestion source, not a source of truth.
+   шкафа» → a path Шкаф нижний → Коробка 3, item phrases with quantity and unit). If rules are unsure, an optional
+   **semantic router** on embeddings catches personal facts and questions about them («у меня день рождения …», «что я
+   люблю?») in ~0.3 s; it never touches general commands. Only then, if a model is configured, the model proposes
+   intents as JSON. The model is a suggestion source, not a source of truth.
 2. **Validation.** Every intent is rebuilt field by field from an allow-list (types, lengths, ranges, ISO dates).
    Unknown keys are dropped, nonsense is rejected — before anything reaches the database.
 3. **Policy.**
@@ -92,8 +94,14 @@ Everything is optional and shown with an honest status (works / degraded / not a
 | Calendar | built-in local calendar; CalDAV (read/create/update/delete, edits patch the VEVENT so attendees and alarms survive); Home Assistant calendars can be read and can receive new events. One source failing shows a warning, never an empty page |
 | Telegram | bot token; `/start` in a private chat requests linking; the owner attaches the chat to a contact marked **Я / is_self** to allow commands. Other contacts are message recipients only. `/help`, `/today`, `/shopping` and ordinary Russian text use the existing pipeline and durable outbox. Groups, bots, non-text updates and unmatched senders cannot issue commands. Disabling Telegram pauses polling and queued Telegram deliveries without consuming retries. In networks where `api.telegram.org` is blocked, set **Интеграции → Telegram → HTTP-прокси** to an HTTP CONNECT proxy; the Home Assistant Tor app can provide one on port 9080 with `http_tunnel: true` |
 | Alice | a private skill with its own secret path. `alice.allowed_user_ids` must list at least one Yandex user id: the skill refuses commands while the list is empty. Repeated wrong secrets are rate-limited per real client |
-| Language model | any OpenAI-compatible server (`/chat/completions`, `/embeddings`), local or cloud; not required |
+| Language model | any OpenAI-compatible server (`/chat/completions`, `/embeddings`), local or cloud; not required. The embedding model powers semantic search and the fast personal-fact router; the chat model is the fallback for the long tail |
 | Speech to text | any OpenAI-compatible `/audio/transcriptions` server, only for the kiosk microphone |
+
+On a small CPU-only box the embedding model is the useful one: `qwen3-embedding:0.6b` gives semantic search and the
+fast router in about 0.3 s. The chat model is a fallback for the long tail; a dense 2B–4B model on an N150 typically
+needs 10–20 s per JSON answer, so it must not sit on the path of every command. A 1B-active MoE such as
+`lfm2.5:8b-a1b` is the speed/quality compromise on that hardware. The integration accepts any OpenAI-compatible
+`/v1` endpoint (Ollama, llama.cpp, LM Studio); the router falls back to the model only when it is not confident.
 
 Secrets (Telegram token, CalDAV password, HA token, LLM key) are **write-only**: the API and UI can set them and see
 that they are set, never read them back; they are excluded from exports and live in `secrets.json` (mode 0600). A secret

@@ -70,7 +70,15 @@ class OpenAICompatibleProvider:
         if not self.gate.acquire(wait=min(1.0, max(0.0, timeout - 0.2))):
             raise ProviderError("llm: model is busy with another job", code="busy", retryable=True, provider="llm")
         try:
-            data = self._post("chat/completions", payload, timeout)
+            try:
+                data = self._post("chat/completions", payload, timeout)
+            except ProviderError as exc:
+                # Ollama/llama.cpp may reject OpenAI's json_schema wrapper while still supporting JSON output.
+                # Retry once without it; the prompt already asks for JSON and extract_json_object is tolerant.
+                if exc.code not in ("http_400", "http_422") or "response_format" not in payload:
+                    raise
+                payload.pop("response_format", None)
+                data = self._post("chat/completions", payload, timeout)
         finally:
             self.gate.release()
         try:

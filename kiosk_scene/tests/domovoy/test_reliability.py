@@ -337,6 +337,17 @@ class ProviderResilience(AppCase):
             self.assertFalse(provider.breaker.open)
             self.assertEqual(provider.health.health.status, "ok")
 
+    def test_llm_retries_without_an_unsupported_response_format(self) -> None:
+        with FakeLLM() as llm:
+            llm.reject_response_format = True
+            llm.reply = {"ok": True}
+            provider = OpenAICompatibleProvider(lambda: {"base_url": llm.url + "/v1", "enabled": True}, lambda: "",
+                                                HealthTracker("llm", self.clock), timeout=2)
+            self.assertEqual(provider.chat_json("s", "u", {"type": "object"}), {"ok": True})
+            self.assertEqual(len(llm.requests), 2)
+            self.assertIn("response_format", json.loads(llm.requests[0][3]))
+            self.assertNotIn("response_format", json.loads(llm.requests[1][3]))
+
     def test_heavy_jobs_share_one_slot_and_fail_fast(self) -> None:
         gate = ResourceGate(1)
         with FakeLLM() as llm:

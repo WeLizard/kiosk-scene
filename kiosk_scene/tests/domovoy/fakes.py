@@ -191,12 +191,16 @@ class FakeLLM(FakeServer):
         super().__init__()
         self.reply: Any = {"intents": []}
         self.fail_status = 0
+        self.reject_response_format = False
         self.embed_dim = 8
 
     def handle(self, method, path, query, headers, body):
         if self.fail_status:
             return self.fail_status, {}, {"error": "down"}
         if path == "/v1/chat/completions":
+            data = json.loads(body or b"{}")
+            if self.reject_response_format and data.get("response_format"):
+                return 400, {}, {"error": {"message": "response_format unsupported"}}
             content = self.reply if isinstance(self.reply, str) else json.dumps(self.reply, ensure_ascii=False)
             return 200, {}, {"choices": [{"message": {"content": content}}]}
         if path == "/v1/embeddings":

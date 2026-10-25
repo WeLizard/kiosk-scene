@@ -21,6 +21,7 @@ from ..nlu.rules import InterpretContext, RuleInterpreter, fold
 from ..services.context import Ctx
 from .executor import Executor, Outcome
 from .llm_interpreter import LlmInterpreter
+from .semantic import SemanticRouter
 
 LOG = logging.getLogger("domovoy.pipeline")
 MAX_TEXT = 1000
@@ -32,6 +33,7 @@ class CommandPipeline:
         self.rules = RuleInterpreter()
         self.executor = Executor(app)
         self.llm = LlmInterpreter(app.llm, name=lambda: display_name(app.settings))
+        self.semantic = SemanticRouter(app)
 
     # ---- public API ----------------------------------------------------------------------------
 
@@ -148,6 +150,14 @@ class CommandPipeline:
             )
             raw_intents = self.rules.interpret(command_text, interp_ctx)
             confident = bool(raw_intents) and min(float(i.get("confidence", 0)) for i in raw_intents) >= review_threshold
+            if not confident:
+                remaining = None if deadline_s is None else deadline_s - (time.monotonic() - started)
+                if remaining is None or remaining >= 0.4:
+                    semantic = self.semantic.route(command_text)
+                    if semantic:
+                        raw_intents = semantic
+                        interpreter = "semantic"
+                        confident = min(float(i.get("confidence", 0)) for i in semantic) >= review_threshold
             if not confident and self.llm.available():
                 remaining = None if deadline_s is None else deadline_s - (time.monotonic() - started)
                 if remaining is None or remaining >= 1.5:

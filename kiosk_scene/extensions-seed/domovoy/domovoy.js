@@ -1361,11 +1361,12 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
         null,
         u("llm"),
         a("p", { class: "ks-muted" }, "Подойдёт любой OpenAI-совместимый сервер: локальный (Ollama, llama.cpp, LM Studio) или облачный. Без неё Домовой работает по правилам — быстро и без нагрузки на процессор. Модель ничего не решает сама: её предложения проходят проверку и попадают в «Проверку»."),
+        a("p", { class: "ks-muted" }, "Модель эмбеддингов делает поиск смысловым и включает быстрый роутер личных фактов: «у меня день рождения…», «что я люблю» разбираются за ~0,3 с, без генерации. Языковая модель нужна только для длинного хвоста."),
         te(t, [
           { name: "enabled", label: "Включена", type: "checkbox", value: c.ai.enabled },
-          { name: "base_url", label: "Адрес API", type: "url", value: c.ai.base_url, placeholder: "http://192.168.1.20:11434/v1", wide: !0 },
-          { name: "model", label: "Модель для команд", value: c.ai.model, placeholder: "qwen2.5:3b-instruct" },
-          { name: "embedding_model", label: "Модель для смыслового поиска", value: c.ai.embedding_model, placeholder: "nomic-embed-text", hint: "Пусто — поиск по словам и опечаткам, без модели." },
+          { name: "base_url", label: "Адрес API", type: "url", value: c.ai.base_url, placeholder: "http://127.0.0.1:11434/v1", wide: !0 },
+          { name: "model", label: "Модель для команд", value: c.ai.model, placeholder: "lfm2.5:8b-a1b" },
+          { name: "embedding_model", label: "Модель для смыслового поиска и роутера", value: c.ai.embedding_model, placeholder: "qwen3-embedding:0.6b", hint: "Пусто — поиск по словам и опечаткам, без семантики. Для Ollama подойдёт qwen3-embedding:0.6b." },
           ge("llm_api_key", "API-ключ (если нужен)", r.secrets.llm_api_key)
         ], (f) => ({ settings: { ai: { enabled: f.enabled === !0, base_url: String(f.base_url).trim(), model: String(f.model).trim(), embedding_model: String(f.embedding_model).trim() } }, secrets: { llm_api_key: String(f.llm_api_key) } }), l)
       )), y = W("speak", "Голос через колонки (Яндекс Станции)", d("speak"), a(

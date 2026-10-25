@@ -20,6 +20,8 @@ LOG = logging.getLogger("domovoy")
 def build(app: Domovoy) -> tuple[ApiContext, Scheduler]:
     pipeline = CommandPipeline(app)
     voice = VoiceGateway(app, pipeline)
+    if pipeline.semantic.configured():
+        threading.Thread(target=pipeline.semantic.warmup, daemon=True, name="domovoy-semantic-warmup").start()
     scheduler = Scheduler(app)
     context = ApiContext(app, pipeline, voice, AliceFrontend(app, pipeline, voice), AssistFrontend(voice),
                          Authenticator(app.secrets, trust_local=app.env.trust_local), scheduler)
