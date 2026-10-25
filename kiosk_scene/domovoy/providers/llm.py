@@ -25,7 +25,7 @@ class OpenAICompatibleProvider:
 
     def configured(self) -> bool:
         cfg = self._config()
-        return bool(cfg.get("base_url") and cfg.get("enabled", True))
+        return bool(cfg.get("base_url") and cfg.get("enabled", True) and cfg.get("model"))
 
     @property
     def model_name(self) -> str:
@@ -56,7 +56,8 @@ class OpenAICompatibleProvider:
 
     def chat_json(self, system: str, user: str, schema: dict[str, Any], *, deadline: float | None = None) -> dict[str, Any]:
         """Ask for JSON matching `schema`. `deadline` is seconds available in total (voice frontends are strict)."""
-        timeout = min(self.timeout, deadline) if deadline else self.timeout
+        configured_timeout = float(self._config().get("timeout_s") or self.timeout)
+        timeout = min(configured_timeout, deadline) if deadline else configured_timeout
         if timeout <= 0.2:
             raise ProviderError("llm: no time left for a model call", code="deadline", retryable=True, provider="llm")
         payload = {
@@ -65,6 +66,8 @@ class OpenAICompatibleProvider:
             # Small local models on a CPU-only box: never let generation run away.
             "max_tokens": int(self._config().get("max_tokens") or 320),
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            # Local reasoning models otherwise spend the whole budget thinking and return empty content.
+            "reasoning_effort": "none",
             "response_format": {"type": "json_schema", "json_schema": {"name": "domovoy_intents", "strict": True, "schema": schema}},
         }
         if not self.gate.acquire(wait=min(1.0, max(0.0, timeout - 0.2))):
@@ -75,9 +78,15 @@ class OpenAICompatibleProvider:
             except ProviderError as exc:
                 # Ollama/llama.cpp may reject OpenAI's json_schema wrapper while still supporting JSON output.
                 # Retry once without it; the prompt already asks for JSON and extract_json_object is tolerant.
-                if exc.code not in ("http_400", "http_422") or "response_format" not in payload:
+                if exc.code not in ("http_400", "http_422"):
                     raise
-                payload.pop("response_format", None)
+                removed = False
+                for field in ("reasoning_effort", "response_format"):
+                    if field in payload:
+                        payload.pop(field, None)
+                        removed = True
+                if not removed:
+                    raise
                 data = self._post("chat/completions", payload, timeout)
         finally:
             self.gate.release()

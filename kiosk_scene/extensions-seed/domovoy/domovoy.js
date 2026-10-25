@@ -1365,7 +1365,7 @@ script.turn_on`, hint: "Дополнительно к базовым (свет, 
         te(t, [
           { name: "enabled", label: "Включена", type: "checkbox", value: c.ai.enabled },
           { name: "base_url", label: "Адрес API", type: "url", value: c.ai.base_url, placeholder: "http://127.0.0.1:11434/v1", wide: !0 },
-          { name: "model", label: "Модель для команд", value: c.ai.model, placeholder: "lfm2.5:8b-a1b" },
+          { name: "model", label: "Модель для команд", value: c.ai.model, placeholder: "lfm2.5:8b-a1b", hint: "Можно оставить пустым: тогда работают правила и семантический роутер, без генерации." },
           { name: "embedding_model", label: "Модель для смыслового поиска и роутера", value: c.ai.embedding_model, placeholder: "qwen3-embedding:0.6b", hint: "Пусто — поиск по словам и опечаткам, без семантики. Для Ollama подойдёт qwen3-embedding:0.6b." },
           ge("llm_api_key", "API-ключ (если нужен)", r.secrets.llm_api_key)
         ], (f) => ({ settings: { ai: { enabled: f.enabled === !0, base_url: String(f.base_url).trim(), model: String(f.model).trim(), embedding_model: String(f.embedding_model).trim() } }, secrets: { llm_api_key: String(f.llm_api_key) } }), l)

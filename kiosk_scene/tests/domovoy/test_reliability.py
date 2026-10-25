@@ -345,8 +345,11 @@ class ProviderResilience(AppCase):
                                                 HealthTracker("llm", self.clock), timeout=2)
             self.assertEqual(provider.chat_json("s", "u", {"type": "object"}), {"ok": True})
             self.assertEqual(len(llm.requests), 2)
-            self.assertIn("response_format", json.loads(llm.requests[0][3]))
-            self.assertNotIn("response_format", json.loads(llm.requests[1][3]))
+            first, second = json.loads(llm.requests[0][3]), json.loads(llm.requests[1][3])
+            self.assertIn("response_format", first)
+            self.assertEqual(first.get("reasoning_effort"), "none")
+            self.assertNotIn("response_format", second)
+            self.assertNotIn("reasoning_effort", second)
 
     def test_heavy_jobs_share_one_slot_and_fail_fast(self) -> None:
         gate = ResourceGate(1)

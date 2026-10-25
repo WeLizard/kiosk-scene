@@ -72,6 +72,7 @@ class Domovoy:
         self.llm = OpenAICompatibleProvider(
             config=lambda: self.settings.get("ai"), api_key=lambda: self.secrets.get("llm_api_key"),
             health=self.health["llm"], breaker=CircuitBreaker(), gate=self.gate,
+            timeout=float(self.settings.get("ai").get("timeout_s") or 20),
         )
         self.stt = SttProvider(
             config=lambda: self.settings.get("voice")["stt"], api_key=lambda: self.secrets.get("llm_api_key"),

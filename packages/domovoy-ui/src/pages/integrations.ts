@@ -478,7 +478,7 @@ export function mountIntegrations(host: HTMLElement, _params: Record<string, unk
         settingsForm(runtime, [
           { name: "enabled", label: "Включена", type: "checkbox", value: s.ai.enabled },
           { name: "base_url", label: "Адрес API", type: "url", value: s.ai.base_url, placeholder: "http://127.0.0.1:11434/v1", wide: true },
-          { name: "model", label: "Модель для команд", value: s.ai.model, placeholder: "lfm2.5:8b-a1b" },
+          { name: "model", label: "Модель для команд", value: s.ai.model, placeholder: "lfm2.5:8b-a1b", hint: "Можно оставить пустым: тогда работают правила и семантический роутер, без генерации." },
           { name: "embedding_model", label: "Модель для смыслового поиска и роутера", value: s.ai.embedding_model, placeholder: "qwen3-embedding:0.6b", hint: "Пусто — поиск по словам и опечаткам, без семантики. Для Ollama подойдёт qwen3-embedding:0.6b." },
           secretField("llm_api_key", "API-ключ (если нужен)", data.secrets.llm_api_key),
         ], (v) => ({ settings: { ai: { enabled: v.enabled === true, base_url: String(v.base_url).trim(), model: String(v.model).trim(), embedding_model: String(v.embedding_model).trim() } }, secrets: { llm_api_key: String(v.llm_api_key) } }), refresh)));
